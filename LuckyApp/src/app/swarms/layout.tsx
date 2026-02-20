@@ -1,4 +1,4 @@
-import { Header } from "@/components/header";
+import { HeaderWrapper as Header } from "@/components/header-wrapper";
 import { Sidebar } from "@/components/sidebar";
 
 export default function SwarmsLayout({ children }: { children: React.ReactNode }) {

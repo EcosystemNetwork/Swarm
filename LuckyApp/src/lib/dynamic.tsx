@@ -1,19 +1,13 @@
 'use client';
 
-import { DynamicContextProvider } from '@dynamic-labs/sdk-react-core';
-import { EthereumWalletConnectors } from '@dynamic-labs/ethereum';
+import dynamic from 'next/dynamic';
+import { type ReactNode } from 'react';
 
-export function DynamicProvider({ children }: { children: React.ReactNode }) {
-  const environmentId = process.env.NEXT_PUBLIC_DYNAMIC_ENVIRONMENT_ID || 'REPLACE_ME';
+const DynamicProviderInner = dynamic(
+  () => import('./dynamic-inner').then(mod => ({ default: mod.DynamicProviderInner })),
+  { ssr: false }
+);
 
-  return (
-    <DynamicContextProvider
-      settings={{
-        environmentId,
-        walletConnectors: [EthereumWalletConnectors],
-      }}
-    >
-      {children}
-    </DynamicContextProvider>
-  );
+export function DynamicProvider({ children }: { children: ReactNode }) {
+  return <DynamicProviderInner>{children}</DynamicProviderInner>;
 }

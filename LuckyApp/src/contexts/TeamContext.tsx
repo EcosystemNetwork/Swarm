@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useState, useCallback, type ReactNode } from 'react';
+import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react';
 import { useDynamicContext, getAuthToken } from '@dynamic-labs/sdk-react-core';
 
 export interface Team {
@@ -54,12 +54,18 @@ function saveTeamsToStorage(teams: Team[]) {
 
 export function TeamProvider({ children }: { children: ReactNode }) {
   const { primaryWallet } = useDynamicContext();
-  const [teams, setTeams] = useState<Team[]>(() => loadTeamsFromStorage());
-  const [currentTeam, setCurrentTeam] = useState<Team | null>(() => {
-    const saved = typeof window !== 'undefined' ? localStorage.getItem(TEAM_STORAGE_KEY) : null;
+  const [teams, setTeams] = useState<Team[]>([]);
+  const [currentTeam, setCurrentTeam] = useState<Team | null>(null);
+
+  // Hydrate from localStorage on mount (client only)
+  useEffect(() => {
     const allTeams = loadTeamsFromStorage();
-    return allTeams.find(t => t.id === saved) || allTeams[0] || null;
-  });
+    const saved = localStorage.getItem(TEAM_STORAGE_KEY);
+    if (allTeams.length > 0) {
+      setTeams(allTeams);
+      setCurrentTeam(allTeams.find(t => t.id === saved) || allTeams[0]);
+    }
+  }, []);
   const [loading] = useState(false);
   const [error] = useState<string | null>(null);
 
