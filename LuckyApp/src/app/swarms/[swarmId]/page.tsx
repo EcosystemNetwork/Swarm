@@ -488,77 +488,152 @@ export default function ProjectDetailPage() {
 
         {/* Channel Tab */}
         <TabsContent value="channel">
-          <Card>
-            <CardHeader className="pb-3 border-b">
-              <CardTitle className="text-base">📡 Project Channel</CardTitle>
-              <CardDescription>
-                Real-time communication with project agents
-                {channel && <span className="ml-2 text-xs opacity-50">ID: {channel.id}</span>}
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="p-0 flex flex-col" style={{ height: '500px' }}>
-              {/* Messages */}
-              <div className="flex-1 overflow-y-auto p-4 space-y-3">
-                {messages.length === 0 && (
-                  <div className="flex items-center justify-center h-full text-muted-foreground">
-                    <div className="text-center">
-                      <div className="text-4xl mb-3">💬</div>
-                      <p className="text-sm">No messages yet — say hello!</p>
-                    </div>
-                  </div>
-                )}
-                {messages.map((msg) => {
-                  const isAgent = msg.senderType === 'agent';
-                  const ts = msg.createdAt && typeof msg.createdAt === 'object' && 'seconds' in msg.createdAt
-                    ? new Date((msg.createdAt as { seconds: number }).seconds * 1000)
-                    : msg.createdAt instanceof Date ? msg.createdAt : null;
-                  return (
-                    <div key={msg.id} className={`flex gap-3 ${isAgent ? '' : ''}`}>
-                      <div className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-sm" 
-                           style={{ background: isAgent ? 'rgba(139,92,246,0.15)' : 'rgba(245,158,11,0.15)' }}>
-                        {isAgent ? '🤖' : '👤'}
+          <div className="grid grid-cols-[1fr_220px] gap-4">
+            {/* Main Chat Area */}
+            <Card>
+              <CardHeader className="pb-3 border-b">
+                <CardTitle className="text-base">📡 Project Channel</CardTitle>
+                <CardDescription>
+                  Real-time communication with project agents
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="p-0 flex flex-col" style={{ height: '500px' }}>
+                {/* Messages */}
+                <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                  {messages.length === 0 && (
+                    <div className="flex items-center justify-center h-full text-muted-foreground">
+                      <div className="text-center">
+                        <div className="text-4xl mb-3">💬</div>
+                        <p className="text-sm">No messages yet — say hello!</p>
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-0.5">
-                          <span className="font-medium text-sm">{msg.senderName}</span>
-                          {isAgent && (
-                            <Badge variant="secondary" className="text-[10px] px-1.5 py-0 bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400">
-                              Agent
-                            </Badge>
-                          )}
-                          {ts && (
-                            <span className="text-[10px] text-muted-foreground">
-                              {ts.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                            </span>
-                          )}
+                    </div>
+                  )}
+                  {messages.map((msg) => {
+                    const isAgent = msg.senderType === 'agent';
+                    const isMe = msg.senderId === (account?.address || '');
+                    const ts = msg.createdAt && typeof msg.createdAt === 'object' && 'seconds' in msg.createdAt
+                      ? new Date((msg.createdAt as { seconds: number }).seconds * 1000)
+                      : msg.createdAt instanceof Date ? msg.createdAt : null;
+
+                    // Resolve display name
+                    const agentMatch = isAgent ? assignedAgents.find(a => a.id === msg.senderId || a.name === msg.senderName) : null;
+                    const displayName = isAgent
+                      ? (agentMatch?.name || msg.senderName)
+                      : isMe ? 'You' : (msg.senderId.slice(0, 6) + '...' + msg.senderId.slice(-4));
+                    const badgeLabel = isAgent
+                      ? (agentMatch?.type || 'Agent')
+                      : 'Operator';
+
+                    return (
+                      <div key={msg.id} className={`flex gap-3 ${isMe ? 'flex-row-reverse' : ''}`}>
+                        {/* Avatar */}
+                        <div
+                          className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
+                            isAgent
+                              ? 'bg-amber-500/20 text-amber-400'
+                              : 'bg-blue-500/20 text-blue-400'
+                          }`}
+                        >
+                          {isAgent ? '🤖' : '👤'}
                         </div>
-                        <p className="text-sm text-foreground/90 break-words">{msg.content}</p>
+                        {/* Bubble */}
+                        <div className={`max-w-[75%] min-w-0 ${isMe ? 'text-right' : ''}`}>
+                          <div className={`flex items-center gap-2 mb-0.5 ${isMe ? 'justify-end' : ''}`}>
+                            <span className="font-medium text-sm">{displayName}</span>
+                            <Badge
+                              variant="secondary"
+                              className={`text-[10px] px-1.5 py-0 ${
+                                isAgent
+                                  ? 'bg-amber-500/15 text-amber-500 border-amber-500/30'
+                                  : 'bg-blue-500/15 text-blue-400 border-blue-500/30'
+                              }`}
+                            >
+                              {badgeLabel}
+                            </Badge>
+                            {ts && (
+                              <span className="text-[10px] text-muted-foreground">
+                                {ts.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                              </span>
+                            )}
+                          </div>
+                          <div
+                            className={`inline-block rounded-lg px-3 py-1.5 text-sm break-words ${
+                              isMe
+                                ? 'bg-amber-500/15 text-foreground'
+                                : isAgent
+                                ? 'bg-muted/60 text-foreground border border-amber-500/10'
+                                : 'bg-muted/60 text-foreground'
+                            }`}
+                          >
+                            {msg.content}
+                          </div>
+                        </div>
                       </div>
+                    );
+                  })}
+                  <div ref={messagesEndRef} />
+                </div>
+                {/* Input */}
+                <div className="border-t p-3 flex gap-2">
+                  <Input
+                    placeholder="Type a message..."
+                    value={chatInput}
+                    onChange={(e) => setChatInput(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendChat(); } }}
+                    disabled={sendingChat || !channel}
+                    className="flex-1"
+                  />
+                  <Button
+                    onClick={handleSendChat}
+                    disabled={sendingChat || !chatInput.trim() || !channel}
+                    className="bg-amber-600 hover:bg-amber-700"
+                  >
+                    Send
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Participants Sidebar */}
+            <Card className="h-fit">
+              <CardHeader className="pb-2 border-b">
+                <CardTitle className="text-sm">👥 Participants</CardTitle>
+              </CardHeader>
+              <CardContent className="p-3 space-y-2">
+                {/* Current user */}
+                <div className="flex items-center gap-2 p-1.5 rounded-md bg-blue-500/10">
+                  <div className="w-6 h-6 rounded-full bg-blue-500/20 flex items-center justify-center text-xs">👤</div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-medium truncate">
+                      {account?.address ? account.address.slice(0, 6) + '...' + account.address.slice(-4) : 'You'}
+                    </p>
+                    <p className="text-[10px] text-blue-400">Operator</p>
+                  </div>
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 flex-shrink-0" />
+                </div>
+
+                {/* Assigned agents */}
+                {assignedAgents.map((agent) => (
+                  <div key={agent.id} className="flex items-center gap-2 p-1.5 rounded-md hover:bg-muted/50 transition-colors">
+                    <div className="w-6 h-6 rounded-full bg-amber-500/20 flex items-center justify-center text-xs">🤖</div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs font-medium truncate">{agent.name}</p>
+                      <p className="text-[10px] text-amber-500">{agent.type}</p>
                     </div>
-                  );
-                })}
-                <div ref={messagesEndRef} />
-              </div>
-              {/* Input */}
-              <div className="border-t p-3 flex gap-2">
-                <Input
-                  placeholder="Type a message..."
-                  value={chatInput}
-                  onChange={(e) => setChatInput(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendChat(); } }}
-                  disabled={sendingChat || !channel}
-                  className="flex-1"
-                />
-                <Button
-                  onClick={handleSendChat}
-                  disabled={sendingChat || !chatInput.trim() || !channel}
-                  className="bg-amber-600 hover:bg-amber-700"
-                >
-                  Send
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+                    <span
+                      className={`w-2 h-2 rounded-full flex-shrink-0 ${
+                        agent.status === 'online' ? 'bg-emerald-500' : agent.status === 'busy' ? 'bg-orange-500' : 'bg-red-500'
+                      }`}
+                    />
+                  </div>
+                ))}
+
+                {assignedAgents.length === 0 && (
+                  <p className="text-[10px] text-muted-foreground text-center py-2">No agents assigned</p>
+                )}
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
       </Tabs>
 
