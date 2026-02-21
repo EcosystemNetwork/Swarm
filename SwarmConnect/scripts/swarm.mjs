@@ -12,6 +12,7 @@
  *   node swarm.mjs inbox count
  *   node swarm.mjs chat send <channelId> <message>
  *   node swarm.mjs chat listen <channelId>
+ *   node swarm.mjs chat poll              — check all project channels for new messages
  */
 
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
@@ -30,6 +31,7 @@ import {
   where,
   orderBy,
   serverTimestamp,
+  Timestamp,
 } from "firebase/firestore";
 
 // ---------------------------------------------------------------------------
@@ -37,6 +39,7 @@ import {
 // ---------------------------------------------------------------------------
 const SWARM_DIR = join(homedir(), ".swarm");
 const CREDS_PATH = join(SWARM_DIR, "credentials.json");
+const STATE_PATH = join(SWARM_DIR, "poll-state.json");
 
 // ---------------------------------------------------------------------------
 // Firebase config — uses the same project as the Swarm webapp
@@ -251,6 +254,117 @@ async function cmdChatSend() {
   console.log(`💬 Sent to #${channelId}`);
 }
 
+async function cmdChatPoll() {
+  const creds = loadCreds();
+  const db = getDb();
+
+  // Load poll state (tracks last seen timestamp per channel)
+  let pollState = {};
+  if (existsSync(STATE_PATH)) {
+    try { pollState = JSON.parse(readFileSync(STATE_PATH, "utf-8")); } catch {}
+  }
+
+  // 1. Get agent doc to find projectIds
+  const agentSnap = await getDoc(doc(db, "agents", creds.agentId));
+  if (!agentSnap.exists()) {
+    console.log("❌ Agent not found in Firestore. Re-register.");
+    return;
+  }
+  const agentData = agentSnap.data();
+  const projectIds = agentData.projectIds || [];
+
+  if (projectIds.length === 0) {
+    console.log("📭 No projects assigned. Nothing to poll.");
+    return;
+  }
+
+  // 2. Find channels for each project
+  let totalNew = 0;
+
+  for (const projectId of projectIds) {
+    // Get project name
+    const projSnap = await getDoc(doc(db, "projects", projectId));
+    const projName = projSnap.exists() ? projSnap.data().name : projectId;
+
+    // Find channels for this project
+    const channelsQ = query(
+      collection(db, "channels"),
+      where("projectId", "==", projectId)
+    );
+    const channelsSnap = await getDocs(channelsQ);
+
+    for (const chDoc of channelsSnap.docs) {
+      const chData = chDoc.data();
+      const channelId = chDoc.id;
+      const channelName = chData.name || "Project Channel";
+      const lastSeen = pollState[channelId] || 0;
+
+      // Get messages in this channel
+      let messagesQ;
+      if (lastSeen > 0) {
+        const lastTs = Timestamp.fromMillis(lastSeen);
+        messagesQ = query(
+          collection(db, "messages"),
+          where("channelId", "==", channelId),
+          where("createdAt", ">", lastTs)
+        );
+      } else {
+        // First poll — get last 10 messages
+        messagesQ = query(
+          collection(db, "messages"),
+          where("channelId", "==", channelId)
+        );
+      }
+
+      const msgsSnap = await getDocs(messagesQ);
+      const messages = [];
+      let maxTs = lastSeen;
+
+      for (const mDoc of msgsSnap.docs) {
+        const m = mDoc.data();
+        // Skip own messages
+        if (m.senderId === creds.agentId) {
+          const mTs = m.createdAt?.toMillis?.() || 0;
+          if (mTs > maxTs) maxTs = mTs;
+          continue;
+        }
+        const mTs = m.createdAt?.toMillis?.() || 0;
+        if (mTs > maxTs) maxTs = mTs;
+        messages.push({
+          id: mDoc.id,
+          from: m.senderName || m.senderId || "unknown",
+          type: m.senderType || "user",
+          text: m.content || m.text || "",
+          time: m.createdAt?.toDate?.()?.toISOString?.() || "",
+        });
+      }
+
+      if (messages.length > 0) {
+        console.log(`\n📢 [${projName}] #${channelName} (${channelId}) — ${messages.length} new message(s):`);
+        for (const msg of messages) {
+          const icon = msg.type === "agent" ? "🤖" : "👤";
+          console.log(`  ${icon} ${msg.from}: ${msg.text}`);
+        }
+        console.log(`  ↳ Reply with: node swarm.mjs chat send ${channelId} "<your message>"`);
+        totalNew += messages.length;
+      }
+
+      // Update state
+      if (maxTs > lastSeen) {
+        pollState[channelId] = maxTs;
+      }
+    }
+  }
+
+  if (totalNew === 0) {
+    console.log("📭 No new messages.");
+  }
+
+  // Save poll state
+  mkdirSync(SWARM_DIR, { recursive: true });
+  writeFileSync(STATE_PATH, JSON.stringify(pollState, null, 2) + "\n");
+}
+
 async function cmdChatListen() {
   const channelId = process.argv[4];
 
@@ -316,6 +430,7 @@ try {
   else if (cmd === "inbox" && sub === "list") await cmdInboxList();
   else if (cmd === "inbox" && sub === "count") await cmdInboxCount();
   else if (cmd === "chat" && sub === "send") await cmdChatSend();
+  else if (cmd === "chat" && sub === "poll") await cmdChatPoll();
   else if (cmd === "chat" && sub === "listen") await cmdChatListen();
   else {
     console.log(`Swarm Connect CLI
@@ -328,6 +443,7 @@ Commands:
   inbox list
   inbox count
   chat send <channelId> <message>
+  chat poll
   chat listen <channelId>`);
   }
 } catch (err) {
