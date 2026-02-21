@@ -7,27 +7,52 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select } from "@/components/ui/select";
+import { useTeam } from "@/contexts/TeamContext";
+import { createAgent } from "@/lib/firestore";
 import type { AgentType } from "@/lib/mock-data";
 
 interface RegisterAgentDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onCreated?: () => void;
 }
 
 const AGENT_TYPES: AgentType[] = ["Crypto", "Sports", "Esports", "Events", "Quant", "Scout"];
 
-export function RegisterAgentDialog({ open, onOpenChange }: RegisterAgentDialogProps) {
+export function RegisterAgentDialog({ open, onOpenChange, onCreated }: RegisterAgentDialogProps) {
+  const { currentTeam } = useTeam();
   const [name, setName] = useState("");
   const [type, setType] = useState<AgentType>("Crypto");
   const [description, setDescription] = useState("");
   const [capabilities, setCapabilities] = useState("");
+  const [saving, setSaving] = useState(false);
 
-  const handleRegister = () => {
-    setName("");
-    setType("Crypto");
-    setDescription("");
-    setCapabilities("");
-    onOpenChange(false);
+  const handleRegister = async () => {
+    if (!currentTeam || !name.trim()) return;
+    setSaving(true);
+    try {
+      await createAgent({
+        name: name.trim(),
+        type,
+        description,
+        capabilities: capabilities.split(",").map((c) => c.trim()).filter(Boolean),
+        status: "offline",
+        winRate: 0,
+        totalPredictions: 0,
+        teamId: currentTeam.id,
+        createdAt: Date.now(),
+      });
+      setName("");
+      setType("Crypto");
+      setDescription("");
+      setCapabilities("");
+      onOpenChange(false);
+      onCreated?.();
+    } catch (err) {
+      console.error("Failed to register agent:", err);
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -83,10 +108,10 @@ export function RegisterAgentDialog({ open, onOpenChange }: RegisterAgentDialogP
         </Button>
         <Button
           onClick={handleRegister}
-          disabled={!name.trim()}
+          disabled={!name.trim() || saving}
           className="bg-green-500 hover:bg-green-600 text-white"
         >
-          Register Agent
+          {saving ? "Registering..." : "Register Agent"}
         </Button>
       </DialogFooter>
     </Dialog>

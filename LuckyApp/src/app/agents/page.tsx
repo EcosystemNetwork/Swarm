@@ -1,11 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { RegisterAgentDialog } from "@/components/register-agent-dialog";
+import { useTeam } from "@/contexts/TeamContext";
+import { getAgentsByTeam, type FirestoreAgent } from "@/lib/firestore";
 import { mockAgents } from "@/lib/mock-data";
 
 const TYPE_COLORS: Record<string, string> = {
@@ -19,6 +21,38 @@ const TYPE_COLORS: Record<string, string> = {
 
 export default function AgentsPage() {
   const [showRegister, setShowRegister] = useState(false);
+  const { currentTeam } = useTeam();
+  const [agents, setAgents] = useState<FirestoreAgent[]>([]);
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    if (!currentTeam) {
+      setAgents([]);
+      setLoaded(true);
+      return;
+    }
+    getAgentsByTeam(currentTeam.id)
+      .then((a) => { setAgents(a); setLoaded(true); })
+      .catch(() => setLoaded(true));
+  }, [currentTeam]);
+
+  const displayAgents = loaded && agents.length > 0
+    ? agents.map((a) => ({
+        id: a.id!,
+        name: a.name,
+        type: a.type,
+        description: a.description,
+        status: a.status,
+        winRate: a.winRate,
+        totalPredictions: a.totalPredictions,
+      }))
+    : mockAgents;
+
+  const handleAgentCreated = () => {
+    if (currentTeam) {
+      getAgentsByTeam(currentTeam.id).then(setAgents);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -37,8 +71,15 @@ export default function AgentsPage() {
         </Button>
       </div>
 
+      {loaded && agents.length === 0 && !mockAgents.length && (
+        <div className="text-center py-12 text-gray-500">
+          <p className="text-lg">No agents yet</p>
+          <p className="text-sm mt-1">Register your first agent to get started</p>
+        </div>
+      )}
+
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        {mockAgents.map((agent) => (
+        {displayAgents.map((agent) => (
           <Link key={agent.id} href={`/agents/${agent.id}`}>
             <Card className="hover:border-green-300 transition-colors cursor-pointer h-full">
               <CardHeader>
@@ -80,7 +121,7 @@ export default function AgentsPage() {
         ))}
       </div>
 
-      <RegisterAgentDialog open={showRegister} onOpenChange={setShowRegister} />
+      <RegisterAgentDialog open={showRegister} onOpenChange={setShowRegister} onCreated={handleAgentCreated} />
     </div>
   );
 }
