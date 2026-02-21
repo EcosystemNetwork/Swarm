@@ -10,7 +10,9 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useOrg } from "@/contexts/OrgContext";
-import { getAgentsByOrg, createAgent, updateAgent, deleteAgent, type Agent } from "@/lib/firestore";
+import { createAgent, updateAgent, deleteAgent, type Agent } from "@/lib/firestore";
+import { collection, query, where, onSnapshot } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 
 const TYPE_COLORS: Record<string, string> = {
   Research: "bg-amber-100 text-amber-700 border-amber-200",
@@ -129,7 +131,7 @@ export default function AgentsPage() {
         description: editDescription.trim(),
       });
       setShowEdit(false);
-      await loadAgents();
+      
     } catch (err) {
       console.error('Failed to update agent:', err);
       setError(err instanceof Error ? err.message : 'Failed to update agent');
@@ -150,7 +152,7 @@ export default function AgentsPage() {
       await deleteAgent(deleteTarget.id);
       setShowDelete(false);
       setDeleteTarget(null);
-      await loadAgents();
+      
     } catch (err) {
       console.error('Failed to delete agent:', err);
       setError(err instanceof Error ? err.message : 'Failed to delete agent');
@@ -164,25 +166,36 @@ export default function AgentsPage() {
   const [setupApiKey, setSetupApiKey] = useState('');
   const [setupAgentId, setSetupAgentId] = useState('');
 
-  const loadAgents = async () => {
-    if (!currentOrg) return;
+  // Real-time Firestore listener — updates instantly when agent status changes
+  useEffect(() => {
+    if (!currentOrg) {
+      setAgents([]);
+      setLoading(false);
+      return;
+    }
 
-    try {
-      setLoading(true);
-      setError(null);
-      const agentsData = await getAgentsByOrg(currentOrg.id);
+    setLoading(true);
+    setError(null);
+
+    const q = query(
+      collection(db, "agents"),
+      where("orgId", "==", currentOrg.id)
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const agentsData = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+      })) as Agent[];
       setAgents(agentsData);
-    } catch (err) {
+      setLoading(false);
+    }, (err) => {
       console.error("Failed to load agents:", err);
       setError(err instanceof Error ? err.message : 'Failed to load agents');
-    } finally {
       setLoading(false);
-    }
-  };
+    });
 
-  useEffect(() => {
-    loadAgents();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    return () => unsubscribe();
   }, [currentOrg]);
 
   const handleRegisterAgent = async () => {
@@ -230,7 +243,7 @@ export default function AgentsPage() {
       setCopied(false);
 
       // Reload agents
-      await loadAgents();
+      
     } catch (err) {
       console.error('Failed to register agent:', err);
       setError(err instanceof Error ? err.message : 'Failed to register agent');
