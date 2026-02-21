@@ -5,10 +5,12 @@ import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useOrg } from '@/contexts/OrgContext';
+import { useActiveWallet } from 'thirdweb/react';
 
 export default function OnboardingPage() {
   const router = useRouter();
   const { createOrg } = useOrg();
+  const wallet = useActiveWallet();
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [creating, setCreating] = useState(false);
@@ -75,6 +77,21 @@ export default function OnboardingPage() {
           >
             {creating ? 'Creating...' : 'Create Organization'}
           </Button>
+
+          <div className="flex items-center justify-center gap-4 pt-2">
+            <button
+              onClick={() => router.push('/')}
+              className="text-sm text-gray-500 hover:text-gray-700 underline"
+            >
+              ← Back to Home
+            </button>
+            <button
+              onClick={() => { wallet?.disconnect(); router.push('/'); }}
+              className="text-sm text-red-500 hover:text-red-700 underline"
+            >
+              Disconnect Wallet
+            </button>
+          </div>
         </CardContent>
       </Card>
     </main>
