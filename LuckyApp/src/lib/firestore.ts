@@ -47,6 +47,7 @@ export interface Agent {
   capabilities: string[];
   status: 'online' | 'offline' | 'busy';
   projectIds: string[];
+  apiKey?: string;
   createdAt: unknown;
 }
 

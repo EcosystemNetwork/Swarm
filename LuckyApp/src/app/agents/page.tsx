@@ -78,6 +78,23 @@ export default function AgentsPage() {
   const [agentType, setAgentType] = useState<Agent['type']>('Research');
   const [agentDescription, setAgentDescription] = useState('');
 
+  const handleReinvite = (agent: Agent) => {
+    const key = agent.apiKey || crypto.randomUUID();
+    const prompt = buildSetupPrompt({
+      agentName: agent.name,
+      agentType: agent.type,
+      orgName: currentOrg?.name || '',
+      orgId: currentOrg?.id || '',
+      agentId: agent.id,
+      apiKey: key,
+    });
+    setSetupPrompt(prompt);
+    setSetupApiKey(key);
+    setSetupAgentId(agent.id);
+    setShowSetup(true);
+    setCopied(false);
+  };
+
   // Setup prompt state (shown after successful registration)
   const [setupPrompt, setSetupPrompt] = useState('');
   const [setupApiKey, setSetupApiKey] = useState('');
@@ -110,6 +127,7 @@ export default function AgentsPage() {
     try {
       setCreating(true);
       setError(null);
+      const apiKeyForNew = crypto.randomUUID();
 
       const newAgentId = await createAgent({
         orgId: currentOrg.id,
@@ -119,10 +137,11 @@ export default function AgentsPage() {
         capabilities: [TYPE_DESCRIPTIONS[agentType]],
         status: 'offline',
         projectIds: [],
+        apiKey: apiKeyForNew,
         createdAt: new Date(),
       });
 
-      const apiKey = crypto.randomUUID();
+      const apiKey = apiKeyForNew;
 
       const prompt = buildSetupPrompt({
         agentName: agentName.trim(),
@@ -267,6 +286,14 @@ export default function AgentsPage() {
                       <div className="text-lg font-bold text-foreground">{agent.capabilities.length}</div>
                     </div>
                   </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full mt-3 text-amber-600 border-amber-300 hover:bg-amber-50 hover:text-amber-700"
+                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleReinvite(agent); }}
+                  >
+                    🔗 Re-invite Agent
+                  </Button>
                 </CardContent>
               </Card>
             </Link>
