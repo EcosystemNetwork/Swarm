@@ -51,6 +51,12 @@ const orgColumns = [
   { status: "completed" as const, label: "Completed", icon: "✅", accent: "border-emerald-400" },
 ];
 
+const parseRewardValue = (reward?: string): number => {
+  if (!reward) return 0;
+  const n = parseFloat(reward.replace(/[^0-9.]/g, ''));
+  return isNaN(n) ? 0 : n;
+};
+
 const priorityColors = {
   low: "bg-muted text-muted-foreground",
   medium: "bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400",
@@ -370,9 +376,29 @@ export default function JobBoardPage() {
               </Button>
             </div>
           ) : (
+            <>
+            {(() => {
+              const totalBudget = jobs.reduce((s, j) => s + (parseFloat(j.reward || "0") || 0), 0);
+              const spentBudget = jobs.filter(j => j.status === "completed").reduce((s, j) => s + (parseFloat(j.reward || "0") || 0), 0);
+              const activeBudget = jobs.filter(j => j.status === "in_progress").reduce((s, j) => s + (parseFloat(j.reward || "0") || 0), 0);
+              return totalBudget > 0 ? (
+                <div className="flex gap-4 mb-4 text-xs">
+                  <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-muted/50 border">
+                    <span>💰</span><span className="font-medium">Total: {totalBudget} HBAR</span>
+                  </div>
+                  {activeBudget > 0 && <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/20">
+                    <span>🔄</span><span className="font-medium text-amber-600 dark:text-amber-400">Active: {activeBudget} HBAR</span>
+                  </div>}
+                  {spentBudget > 0 && <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20">
+                    <span>✅</span><span className="font-medium text-emerald-600 dark:text-emerald-400">Spent: {spentBudget} HBAR</span>
+                  </div>}
+                </div>
+              ) : null;
+            })()}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {orgColumns.map((col) => {
                 const colJobs = getJobsByStatus(col.status);
+                const colCost = colJobs.reduce((sum, j) => sum + (parseFloat(j.reward || "0") || 0), 0);
                 return (
                   <div key={col.status} className="space-y-3">
                     <div className={cn(
@@ -383,22 +409,47 @@ export default function JobBoardPage() {
                         <span className="text-sm">{col.icon}</span>
                         <h2 className="font-semibold text-sm">{col.label}</h2>
                       </div>
-                      <Badge variant="secondary" className="text-xs">{colJobs.length}</Badge>
+                      <div className="flex items-center gap-2">
+                        {colCost > 0 && <span className="text-xs text-amber-600 dark:text-amber-400 font-medium">{colCost} HBAR</span>}
+                        <Badge variant="secondary" className="text-xs">{colJobs.length}</Badge>
+                      </div>
                     </div>
                     <div className="space-y-2 min-h-[100px]">
                       {colJobs.map((job) => (
                         <Card
                           key={job.id}
-                          className="cursor-pointer hover:shadow-md transition-all hover:border-amber-300 dark:hover:border-amber-700"
+                          className={cn(
+                            "cursor-pointer hover:shadow-md transition-all hover:border-amber-300 dark:hover:border-amber-700 relative",
+                            job.status === "in_progress" && "border-amber-500/40 animate-glow-pulse"
+                          )}
                           onClick={() => { setSelectedJob(job); setDetailOpen(true); }}
                         >
+                          {/* Indeterminate progress bar for in_progress */}
+                          {job.status === "in_progress" && (
+                            <div className="absolute top-0 left-0 right-0 h-0.5 bg-amber-500/10 overflow-hidden rounded-t-lg">
+                              <div className="w-1/3 h-full bg-amber-500/60 animate-indeterminate" />
+                            </div>
+                          )}
                           <CardContent className="p-3 space-y-2">
                             <div className="flex items-start justify-between gap-2">
-                              <h3 className="text-sm font-medium leading-snug line-clamp-2 min-w-0">{job.title}</h3>
+                              <div className="flex items-center gap-1.5 min-w-0">
+                                {job.status === "in_progress" && (
+                                  <span className="relative flex h-2 w-2 shrink-0">
+                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
+                                    <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500" />
+                                  </span>
+                                )}
+                                <h3 className="text-sm font-medium leading-snug line-clamp-2 min-w-0">{job.title}</h3>
+                              </div>
                               <Badge variant="outline" className={cn("text-[10px] shrink-0", priorityColors[job.priority])}>
                                 {job.priority}
                               </Badge>
                             </div>
+                            {job.status === "in_progress" && (
+                              <div className="text-[11px] text-amber-500 animate-processing font-medium">
+                                🔄 Agent working...
+                              </div>
+                            )}
                             {job.description && (
                               <p className="text-xs text-muted-foreground line-clamp-2">{job.description}</p>
                             )}
@@ -419,6 +470,18 @@ export default function JobBoardPage() {
                                     +{job.requiredSkills.length - 3}
                                   </Badge>
                                 )}
+                              </div>
+                            )}
+                            {job.status === "open" && agents.length > 0 && (
+                              <div className="pt-1" onClick={(e) => e.stopPropagation()}>
+                                <Select onValueChange={(agentId) => handleTakeJob(job, agentId)}>
+                                  <SelectTrigger className="h-7 text-xs bg-amber-500/10 border-amber-500/30 hover:bg-amber-500/20">
+                                    <SelectValue placeholder="▶️ Start — pick agent..." />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {agents.map((a) => <SelectItem key={a.id} value={a.id}>🤖 {a.name}</SelectItem>)}
+                                  </SelectContent>
+                                </Select>
                               </div>
                             )}
                             <div className="flex items-center justify-between text-[11px] text-muted-foreground pt-1">
@@ -453,6 +516,7 @@ export default function JobBoardPage() {
                 );
               })}
             </div>
+            </>
           )}
         </>
       )}

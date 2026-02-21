@@ -20,6 +20,8 @@ interface Agent {
   type: string;
   status: string;
   costPerRun?: number;
+  activeJobName?: string;
+  assignedCost?: number;
 }
 
 interface Task {
@@ -78,6 +80,8 @@ function AgentMapInner({ projectName, agents, tasks }: AgentMapProps) {
           taskCount: agentTasks.length,
           activeCount: agentActive.length,
           costEstimate: `$${(agent.costPerRun ?? 1.5).toFixed(2)}`,
+          activeJobName: agent.activeJobName,
+          assignedCost: agent.assignedCost ?? 0,
         },
       };
     });

@@ -350,6 +350,17 @@ export default function ProjectDetailPage() {
     }
   };
 
+  // Cost helpers
+  const parseReward = (reward?: string): number => {
+    if (!reward) return 0;
+    const n = parseFloat(reward.replace(/[^0-9.]/g, ''));
+    return isNaN(n) ? 0 : n;
+  };
+  const totalBudget = jobs.reduce((s, j) => s + parseReward(j.reward), 0);
+  const spentBudget = jobs.filter(j => j.status === 'completed').reduce((s, j) => s + parseReward(j.reward), 0);
+  const inProgressBudget = jobs.filter(j => j.status === 'in_progress').reduce((s, j) => s + parseReward(j.reward), 0);
+  const openBudget = jobs.filter(j => j.status === 'open').reduce((s, j) => s + parseReward(j.reward), 0);
+
   const formatTime = (timestamp: unknown) => {
     if (!timestamp) return 'Unknown time';
     
@@ -435,11 +446,42 @@ export default function ProjectDetailPage() {
         </div>
       )}
 
+      {/* Cost Breakdown */}
+      {jobs.length > 0 && (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {[
+            { label: "Total Budget", value: totalBudget, icon: "💰", color: "text-amber-500" },
+            { label: "Open", value: openBudget, icon: "📢", color: "text-muted-foreground" },
+            { label: "In Progress", value: inProgressBudget, icon: "⚙️", color: "text-amber-400" },
+            { label: "Completed", value: spentBudget, icon: "✅", color: "text-emerald-500" },
+          ].map((stat) => (
+            <Card key={stat.label} className="border-border">
+              <CardContent className="p-3">
+                <div className="flex items-center gap-1.5 mb-1">
+                  <span className="text-xs">{stat.icon}</span>
+                  <p className="text-[11px] text-muted-foreground">{stat.label}</p>
+                </div>
+                <p className={`text-lg font-bold ${stat.color}`}>
+                  {stat.value.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} <span className="text-xs font-normal text-muted-foreground">HBAR</span>
+                </p>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+
       <Tabs defaultValue="agents">
         <TabsList>
           <TabsTrigger value="agents">🤖 Agents ({assignedAgents.length})</TabsTrigger>
           <TabsTrigger value="tasks">📋 Tasks ({tasks.length})</TabsTrigger>
-          <TabsTrigger value="jobs">💼 Jobs ({jobs.length})</TabsTrigger>
+          <TabsTrigger value="jobs" className="relative">
+            💼 Jobs ({jobs.length})
+            {jobs.filter(j => j.status === 'in_progress').length > 0 && (
+              <span className="ml-1.5 inline-flex items-center justify-center w-5 h-5 text-[10px] font-bold rounded-full bg-amber-500 text-black animate-pulse">
+                {jobs.filter(j => j.status === 'in_progress').length}
+              </span>
+            )}
+          </TabsTrigger>
           <TabsTrigger value="map">🗺️ Agent Map</TabsTrigger>
           <TabsTrigger value="channel">📡 Project Channel</TabsTrigger>
         </TabsList>
@@ -587,28 +629,54 @@ export default function ProjectDetailPage() {
           ) : (
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
               {jobs.map((job) => (
-                <Card key={job.id} className="border-border">
+                <Card key={job.id} className={`border-border relative ${job.status === 'in_progress' ? 'border-amber-500/40 animate-glow-pulse' : ''}`}>
+                  {/* Indeterminate progress bar for in_progress */}
+                  {job.status === 'in_progress' && (
+                    <div className="absolute top-0 left-0 right-0 h-0.5 bg-amber-500/10 overflow-hidden rounded-t-lg">
+                      <div className="w-1/3 h-full bg-amber-500/60 animate-indeterminate" />
+                    </div>
+                  )}
                   <CardContent className="p-4 space-y-2">
                     <div className="flex items-start justify-between">
-                      <h3 className="font-semibold text-sm">{job.title}</h3>
-                      <Badge variant="outline" className="text-[10px] capitalize">{job.status}</Badge>
+                      <div className="flex items-center gap-2">
+                        {job.status === 'in_progress' && (
+                          <span className="relative flex h-2.5 w-2.5">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
+                            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500" />
+                          </span>
+                        )}
+                        <h3 className="font-semibold text-sm">{job.title}</h3>
+                      </div>
+                      <Badge variant="outline" className={`text-[10px] capitalize ${job.status === 'in_progress' ? 'bg-amber-500/15 text-amber-500 border-amber-500/30' : ''}`}>
+                        {job.status === 'in_progress' ? '⚙️ In Progress' : job.status}
+                      </Badge>
                     </div>
+                    {job.status === 'in_progress' && (
+                      <div className="text-xs text-amber-500 animate-processing font-medium">
+                        🔄 Agent working...
+                      </div>
+                    )}
                     {job.description && <p className="text-xs text-muted-foreground line-clamp-2">{job.description}</p>}
-                    {job.reward && <div className="text-xs font-medium text-amber-600">💰 {job.reward}</div>}
+                    {job.reward && (
+                      <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-amber-500/10 border border-amber-500/20 w-fit">
+                        <span className="text-sm font-bold text-amber-500">{job.reward}</span>
+                        <span className="text-[10px] text-amber-500/70">HBAR</span>
+                      </div>
+                    )}
                     {job.requiredSkills && job.requiredSkills.length > 0 && (
                       <div className="flex flex-wrap gap-1">
                         {job.requiredSkills.map((s) => <Badge key={s} variant="outline" className="text-[10px]">{s}</Badge>)}
                       </div>
                     )}
                     {job.status === "open" && assignedAgents.length > 0 && (
-                      <div className="pt-2">
+                      <div className="pt-2 space-y-2">
                         <Select onValueChange={async (agentId) => {
                           try {
                             await claimJob(job.id, agentId, job.orgId, job.projectId);
                             await loadProjectData();
                           } catch (e) { setError(e instanceof Error ? e.message : "Claim failed"); }
                         }}>
-                          <SelectTrigger className="h-7 text-xs"><SelectValue placeholder="Claim for agent..." /></SelectTrigger>
+                          <SelectTrigger className="h-7 text-xs"><SelectValue placeholder="▶️ Start — pick an agent..." /></SelectTrigger>
                           <SelectContent>
                             {assignedAgents.map((a) => <SelectItem key={a.id} value={a.id}>🤖 {a.name}</SelectItem>)}
                           </SelectContent>
@@ -679,20 +747,38 @@ export default function ProjectDetailPage() {
 
         {/* Agent Map Tab */}
         <TabsContent value="map">
-          <AgentMap
-            projectName={project.name}
-            agents={assignedAgents.map((a) => ({
-              id: a.id,
-              name: a.name,
-              type: a.type,
-              status: a.status,
-            }))}
-            tasks={tasks.map((t) => ({
-              id: t.id,
-              status: t.status,
-              assigneeAgentId: t.assigneeAgentId,
-            }))}
-          />
+          <div className="space-y-4">
+            <div className="flex justify-end">
+              <Button
+                onClick={() => setShowAssignAgent(true)}
+                disabled={unassignedAgents.length === 0}
+                className="bg-amber-600 hover:bg-amber-700"
+              >
+                ➕ Add Agent
+              </Button>
+            </div>
+            <AgentMap
+              projectName={project.name}
+              agents={assignedAgents.map((a) => {
+                const activeJob = jobs.find(j => j.takenByAgentId === a.id && j.status === 'in_progress');
+                const agentJobs = jobs.filter(j => j.takenByAgentId === a.id);
+                const agentCost = agentJobs.reduce((s, j) => s + parseReward(j.reward), 0);
+                return {
+                  id: a.id,
+                  name: a.name,
+                  type: a.type,
+                  status: activeJob ? 'busy' : a.status,
+                  activeJobName: activeJob?.title,
+                  assignedCost: agentCost,
+                };
+              })}
+              tasks={tasks.map((t) => ({
+                id: t.id,
+                status: t.status,
+                assigneeAgentId: t.assigneeAgentId,
+              }))}
+            />
+          </div>
         </TabsContent>
 
         {/* Channel Tab */}
