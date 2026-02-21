@@ -118,7 +118,7 @@ export function OrgProvider({ children }: { children: ReactNode }) {
       setError(null);
       const orgId = await createOrganization({
         name,
-        description,
+        description: description || '',
         ownerAddress: address,
         members: [address], // Owner is also a member
         createdAt: new Date(),
