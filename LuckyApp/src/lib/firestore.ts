@@ -268,7 +268,7 @@ export async function getAgentsByOrg(orgId: string): Promise<Agent[]> {
 
 export async function getUnassignedAgents(orgId: string): Promise<Agent[]> {
   const agents = await getAgentsByOrg(orgId);
-  return agents.filter(agent => agent.projectIds.length === 0);
+  return agents.filter(agent => (agent.projectIds ?? []).length === 0);
 }
 
 export async function updateAgent(agentId: string, data: Partial<Agent>): Promise<void> {

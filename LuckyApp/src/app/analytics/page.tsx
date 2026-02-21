@@ -63,7 +63,7 @@ export default function AnalyticsPage() {
         .filter((t) => t.status === TaskStatus.Completed)
         .reduce((sum, t) => sum + t.budget, 0);
       const winRate = wins + losses > 0 ? (wins / (wins + losses)) * 100 : 0;
-      const firstSkill = agent.skills.split(",")[0]?.trim() || "Agent";
+      const firstSkill = (agent.skills || "").split(",")[0]?.trim() || "Agent";
 
       return {
         agentId: agent.agentAddress,

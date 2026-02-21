@@ -480,7 +480,7 @@ export default function ProjectDetailPage() {
                   <p className="text-sm text-muted-foreground mb-3">{agent.description}</p>
                   <div className="flex justify-between items-center">
                     <span className="text-xs text-muted-foreground">
-                      {agent.capabilities.length} capabilities
+                      {(agent.capabilities ?? []).length} capabilities
                     </span>
                     <Button
                       variant="outline" 

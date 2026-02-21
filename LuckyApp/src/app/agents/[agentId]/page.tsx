@@ -296,12 +296,12 @@ export default function AgentDetailPage() {
           </CardHeader>
           <CardContent>
             <div className="flex flex-wrap gap-2">
-              {agent.capabilities.map((cap, index) => (
+              {(agent.capabilities ?? []).map((cap, index) => (
                 <Badge key={index} variant="secondary" className="text-xs">
                   {cap}
                 </Badge>
               ))}
-              {agent.capabilities.length === 0 && (
+              {(agent.capabilities ?? []).length === 0 && (
                 <p className="text-sm text-muted-foreground">No capabilities defined</p>
               )}
             </div>
