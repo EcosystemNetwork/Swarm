@@ -46,25 +46,50 @@ function buildSetupPrompt(p: {
   apiKey: string;
   inviteCode?: string;
 }) {
-  return `You are now connected to the Swarm platform as agent "${p.agentName}" (${p.agentType}).
+  return `## Swarm Connect — Setup Task
 
-Organization: ${p.orgName} (ID: ${p.orgId})
-Invite Code: ${p.inviteCode || 'N/A'}
-Agent ID: ${p.agentId}
-Platform: https://swarm.perkos.xyz
+You've been invited to join **${p.orgName}** on the Swarm platform as agent **"${p.agentName}"** (${p.agentType}).
 
-To set up, install the Swarm Connect skill:
-1. Download: https://swarm.perkos.xyz/plugins/swarm-connect.zip
-2. Extract to ~/.openclaw/skills/swarm-connect/
-3. Run: cd ~/.openclaw/skills/swarm-connect && npm install
+**Do the following steps now:**
 
-Register your agent:
-  node ~/.openclaw/skills/swarm-connect/scripts/swarm.mjs register --org ${p.orgId} --name "${p.agentName}" --type "${p.agentType}" --api-key ${p.apiKey} --agent-id ${p.agentId}
+### Step 1: Download & Install the Swarm Connect plugin
+\`\`\`bash
+curl -L -o /tmp/swarm-connect.zip https://swarm.perkos.xyz/plugins/swarm-connect.zip
+mkdir -p ~/.openclaw/skills/swarm-connect
+cd ~/.openclaw/skills/swarm-connect
+unzip -o /tmp/swarm-connect.zip
+npm install
+\`\`\`
 
-Check status:
-  node ~/.openclaw/skills/swarm-connect/scripts/swarm.mjs status
+### Step 2: Register with the platform
+\`\`\`bash
+node ~/.openclaw/skills/swarm-connect/scripts/swarm.mjs register \\
+  --org ${p.orgId} \\
+  --name "${p.agentName}" \\
+  --type "${p.agentType}" \\
+  --api-key ${p.apiKey} \\
+  --agent-id ${p.agentId}
+\`\`\`
 
-Your tasks will appear when assigned via the Swarm dashboard.`;
+### Step 3: Verify connection
+\`\`\`bash
+node ~/.openclaw/skills/swarm-connect/scripts/swarm.mjs status
+\`\`\`
+
+You should see your agent info and status "online".
+
+### Step 4: Check for work
+\`\`\`bash
+node ~/.openclaw/skills/swarm-connect/scripts/swarm.mjs tasks list
+node ~/.openclaw/skills/swarm-connect/scripts/swarm.mjs inbox list
+\`\`\`
+
+### Ongoing
+From now on, periodically check for new tasks and inbox messages using the commands above. When you receive tasks, execute them and update their status. Use \`chat send <channelId> <message>\` to communicate in project channels.
+
+**Platform:** https://swarm.perkos.xyz
+**Agent ID:** ${p.agentId}
+**Org:** ${p.orgName} (${p.orgId})${p.inviteCode ? `\n**Invite Code:** ${p.inviteCode}` : ''}`;
 }
 
 export default function AgentsPage() {
