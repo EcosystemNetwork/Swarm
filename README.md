@@ -21,14 +21,14 @@ Built for solo founders, startups, and teams who need to command multiple AI age
 
 ## Features
 
-- 🏢 **Organization Management** — Multi-tenant orgs, each with their own fleet and members
+- 🏢 **Organization Management** — Multi-tenant orgs with onboarding flow, each with their own fleet and members
 - 📋 **Project Boards** — Group agents into Projects by domain, strategy, or objective
-- 🤖 **Agent Fleet** — Deploy specialized agents — each an expert in their domain
-- 📋 **Task Management** — Assign objectives, set parameters, track execution
-- 💬 **Real-time Channels** — Live communication between members and agents
-- 📊 **Analytics Dashboard** — Track agent performance and fleet health at a glance
-- 🔐 **Wallet Auth** — Web3-native login via RainbowKit + wagmi
-- 🟢 **Live Status** — Real-time agent health, online/offline monitoring
+- 🤖 **Agent Fleet** — Register and deploy specialized agents — Research, Trading, Operations, Support, Analytics, Scout
+- 📝 **Task Management** — Kanban boards (Todo → In Progress → Done), assign to agents, set priority
+- 💬 **Real-time Channels** — Live Firestore-powered chat between members and agents
+- 📊 **Analytics Dashboard** — Track agent performance, fleet health, and project metrics
+- 🔐 **Wallet Auth** — Web3-native login via Thirdweb (Base + Hedera)
+- ⚙️ **Settings** — Org management, member configuration
 
 ## Agent Types
 
@@ -56,8 +56,8 @@ Built for solo founders, startups, and teams who need to command multiple AI age
 |-------|-----------|
 | Framework | Next.js 16 |
 | UI | React 19 + Tailwind v4 + shadcn/ui |
-| Wallet | RainbowKit + wagmi |
-| Database | Firebase Firestore |
+| Wallet | Thirdweb |
+| Database | Firebase Firestore (real-time) |
 | AI Orchestration | OpenClaw |
 | Chains | Base, Hedera |
 
@@ -65,15 +65,15 @@ Built for solo founders, startups, and teams who need to command multiple AI age
 
 ```bash
 # Clone the repo
-git clone https://github.com/PerkOS-xyz/LuckySt.git
-cd LuckySt
+git clone https://github.com/PerkOS-xyz/Swarm.git
+cd Swarm/LuckyApp
 
 # Install dependencies
 npm install
 
 # Set up environment variables
 cp .env.example .env.local
-# Fill in your API keys and Firebase config
+# Fill in your Firebase config and Thirdweb client ID
 
 # Run the dev server
 npm run dev
@@ -208,10 +208,16 @@ sequenceDiagram
 ## Repo Structure
 
 ```
-LuckySt/
+Swarm/
 ├── LuckyApp/     # Frontend (Next.js)
-├── hub/          # Backend (Express + WebSocket)
-└── contracts/    # Smart contracts
+│   ├── src/
+│   │   ├── app/          # Pages (dashboard, projects, agents, tasks, chat, settings)
+│   │   ├── components/   # UI components (header, sidebar, dialogs)
+│   │   ├── contexts/     # OrgContext (organization state management)
+│   │   └── lib/          # Firebase, Firestore service, utilities
+│   └── public/           # Static assets
+├── hub/          # Backend (Express + WebSocket) — coming soon
+└── contracts/    # Smart contracts — coming soon
 ```
 
 ## Team
