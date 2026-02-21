@@ -2,20 +2,34 @@
 
 import { useState, useEffect } from 'react';
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { StatCard } from "@/components/analytics/stat-card";
 import { useOrg } from "@/contexts/OrgContext";
-import { 
-  getOrgStats, 
-  getTasksByOrg, 
+import {
+  getOrgStats,
+  getTasksByOrg,
   getProjectsByOrg,
   getAgentsByOrg,
-  type Task, 
-  type Project, 
-  type Agent 
+  type Task,
+  type Project,
+  type Agent
 } from "@/lib/firestore";
+
+const SwarmCanvas = dynamic(
+  () => import('@/components/swarm-workflow/swarm-canvas').then(mod => ({ default: mod.SwarmCanvas })),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex items-center justify-center h-96 text-gray-500">
+        Loading workflow editor...
+      </div>
+    ),
+  }
+);
 
 interface OrgStats {
   projectCount: number;
@@ -28,8 +42,8 @@ interface OrgStats {
 
 const statusColors: Record<string, string> = {
   todo: "bg-gray-100 text-gray-800",
-  in_progress: "bg-blue-100 text-blue-800", 
-  done: "bg-green-100 text-green-800",
+  in_progress: "bg-amber-100 text-amber-800",
+  done: "bg-emerald-100 text-emerald-800",
 };
 
 const statusLabels: Record<string, string> = {
@@ -42,6 +56,7 @@ export default function DashboardPage() {
   const { currentOrg } = useOrg();
   const [stats, setStats] = useState<OrgStats | null>(null);
   const [recentTasks, setRecentTasks] = useState<(Task & { agentName?: string; projectName?: string })[]>([]);
+  const [agents, setAgents] = useState<Agent[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -58,15 +73,18 @@ export default function DashboardPage() {
         setStats(orgStats);
 
         // Load recent tasks
-        const [tasks, projects, agents] = await Promise.all([
+        const [tasks, projects, agentsData] = await Promise.all([
           getTasksByOrg(currentOrg.id),
           getProjectsByOrg(currentOrg.id),
           getAgentsByOrg(currentOrg.id)
         ]);
 
+        // Store agents for the swarm workflow tab
+        setAgents(agentsData);
+
         // Create lookup maps for names
         const projectMap = new Map(projects.map(p => [p.id, p.name]));
-        const agentMap = new Map(agents.map(a => [a.id, a.name]));
+        const agentMap = new Map(agentsData.map(a => [a.id, a.name]));
 
         // Enrich tasks with names and sort by most recent
         const enrichedTasks = tasks
@@ -149,135 +167,150 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <StatCard
-          title="Projects"
-          value={String(stats?.projectCount || 0)}
-          icon="📁"
-          change={0}
-          changeLabel="active projects"
-        />
-        <StatCard
-          title="Agents"
-          value={String(stats?.agentCount || 0)}
-          icon="🤖"
-          change={0}
-          changeLabel="registered agents"
-        />
-        <StatCard
-          title="Active Tasks"
-          value={String(stats?.activeTasks || 0)}
-          icon="🎯"
-          change={0}
-          changeLabel="in progress"
-        />
-        <StatCard
-          title="Completed Tasks"
-          value={String(stats?.completedTasks || 0)}
-          icon="✅"
-          change={0}
-          changeLabel="total completed"
-        />
-      </div>
+      <Tabs defaultValue="overview">
+        <TabsList>
+          <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="swarm">Swarm Workflow</TabsTrigger>
+        </TabsList>
 
-      <div className="grid gap-6 lg:grid-cols-3">
-        <div className="lg:col-span-2 space-y-6">
-          {/* Recent Tasks */}
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="text-lg">📋 Recent Tasks</CardTitle>
-              <Link href="/missions" className="text-sm text-blue-600 hover:underline">View all →</Link>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {recentTasks.length === 0 ? (
-                <div className="text-center py-8 text-gray-500">
-                  <p>No tasks yet</p>
-                  <Link href="/missions" className="text-blue-600 hover:underline text-sm">
-                    Create your first task →
-                  </Link>
-                </div>
-              ) : (
-                recentTasks.map((task) => (
-                  <div key={task.id} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0">
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium truncate">{task.title}</p>
-                      <p className="text-xs text-gray-500">
-                        📁 {task.projectName} · 🤖 {task.agentName}
-                      </p>
+        <TabsContent value="overview">
+          <div className="space-y-6">
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+              <StatCard
+                title="Projects"
+                value={String(stats?.projectCount || 0)}
+                icon="📁"
+                change={0}
+                changeLabel="active projects"
+              />
+              <StatCard
+                title="Agents"
+                value={String(stats?.agentCount || 0)}
+                icon="🤖"
+                change={0}
+                changeLabel="registered agents"
+              />
+              <StatCard
+                title="Active Tasks"
+                value={String(stats?.activeTasks || 0)}
+                icon="🎯"
+                change={0}
+                changeLabel="in progress"
+              />
+              <StatCard
+                title="Completed Tasks"
+                value={String(stats?.completedTasks || 0)}
+                icon="✅"
+                change={0}
+                changeLabel="total completed"
+              />
+            </div>
+
+            <div className="grid gap-6 lg:grid-cols-3">
+              <div className="lg:col-span-2 space-y-6">
+                {/* Recent Tasks */}
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between">
+                    <CardTitle className="text-lg">📋 Recent Tasks</CardTitle>
+                    <Link href="/missions" className="text-sm text-amber-600 hover:underline">View all →</Link>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    {recentTasks.length === 0 ? (
+                      <div className="text-center py-8 text-gray-500">
+                        <p>No tasks yet</p>
+                        <Link href="/missions" className="text-amber-600 hover:underline text-sm">
+                          Create your first task →
+                        </Link>
+                      </div>
+                    ) : (
+                      recentTasks.map((task) => (
+                        <div key={task.id} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0">
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm font-medium truncate">{task.title}</p>
+                            <p className="text-xs text-gray-500">
+                              📁 {task.projectName} · 🤖 {task.agentName}
+                            </p>
+                          </div>
+                          <Badge className={`text-[10px] ${statusColors[task.status]}`}>
+                            {statusLabels[task.status]}
+                          </Badge>
+                        </div>
+                      ))
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* Activity Feed Placeholder */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">📈 Recent Activity</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-center py-8 text-gray-500">
+                      <p>Activity feed coming soon</p>
+                      <p className="text-sm">Track agent actions and task updates here</p>
                     </div>
-                    <Badge className={`text-[10px] ${statusColors[task.status]}`}>
-                      {statusLabels[task.status]}
-                    </Badge>
-                  </div>
-                ))
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Activity Feed Placeholder */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">📈 Recent Activity</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-center py-8 text-gray-500">
-                <p>Activity feed coming soon</p>
-                <p className="text-sm">Track agent actions and task updates here</p>
+                  </CardContent>
+                </Card>
               </div>
-            </CardContent>
-          </Card>
-        </div>
 
-        {/* Quick Actions */}
-        <div className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">⚡ Quick Actions</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <Button asChild className="w-full" variant="outline">
-                <Link href="/swarms">
-                  📁 Create Project
-                </Link>
-              </Button>
-              <Button asChild className="w-full" variant="outline">
-                <Link href="/agents">
-                  🤖 Register Agent
-                </Link>
-              </Button>
-              <Button asChild className="w-full" variant="outline">
-                <Link href="/missions">
-                  📋 Create Task
-                </Link>
-              </Button>
-              <Button asChild className="w-full" variant="outline">
-                <Link href="/chat">
-                  💬 Open Chat
-                </Link>
-              </Button>
-            </CardContent>
-          </Card>
+              {/* Quick Actions */}
+              <div className="space-y-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">⚡ Quick Actions</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <Button asChild className="w-full" variant="outline">
+                      <Link href="/swarms">
+                        📁 Create Project
+                      </Link>
+                    </Button>
+                    <Button asChild className="w-full" variant="outline">
+                      <Link href="/agents">
+                        🤖 Register Agent
+                      </Link>
+                    </Button>
+                    <Button asChild className="w-full" variant="outline">
+                      <Link href="/missions">
+                        📋 Create Task
+                      </Link>
+                    </Button>
+                    <Button asChild className="w-full" variant="outline">
+                      <Link href="/chat">
+                        💬 Open Chat
+                      </Link>
+                    </Button>
+                  </CardContent>
+                </Card>
 
-          {/* Org Info */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">🏢 Organization</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                <p className="font-medium">{currentOrg.name}</p>
-                {currentOrg.description && (
-                  <p className="text-sm text-gray-600">{currentOrg.description}</p>
-                )}
-                <div className="text-xs text-gray-500 pt-2 border-t">
-                  <p>Members: {currentOrg.members.length}</p>
-                  <p>Owner: {currentOrg.ownerAddress.slice(0, 6)}...{currentOrg.ownerAddress.slice(-4)}</p>
-                </div>
+                {/* Org Info */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">🏢 Organization</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2">
+                      <p className="font-medium">{currentOrg.name}</p>
+                      {currentOrg.description && (
+                        <p className="text-sm text-gray-600">{currentOrg.description}</p>
+                      )}
+                      <div className="text-xs text-gray-500 pt-2 border-t">
+                        <p>Members: {currentOrg.members.length}</p>
+                        <p>Owner: {currentOrg.ownerAddress.slice(0, 6)}...{currentOrg.ownerAddress.slice(-4)}</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
               </div>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
+            </div>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="swarm">
+          <SwarmCanvas agents={agents} />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

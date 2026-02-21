@@ -7,6 +7,7 @@ import { createThirdwebClient } from "thirdweb";
 import { base, defineChain } from "thirdweb/chains";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
+import Image from "next/image";
 
 const client = createThirdwebClient({
   clientId: process.env.NEXT_PUBLIC_THIRDWEB_CLIENT_ID || 'cbd8abcfa13db759ca2f5fa7d8a5a5e5',
@@ -26,7 +27,10 @@ export default function LandingPage() {
     <div className="flex flex-col min-h-screen">
       <header className="sticky top-0 z-50 w-full border-b bg-white/95 backdrop-blur">
         <div className="flex h-16 items-center justify-between px-6 max-w-7xl mx-auto">
-          <span className="text-xl font-bold text-blue-600">⚡ Swarm</span>
+          <div className="flex items-center gap-2">
+            <Image src="/lobsterlogo.png" alt="Swarm Logo" width={40} height={40} />
+            <span className="text-xl font-bold text-amber-600">Swarm</span>
+          </div>
           <ConnectButton client={client} chains={[base, hedera]} />
         </div>
       </header>
@@ -35,7 +39,7 @@ export default function LandingPage() {
         <div className="text-center max-w-3xl mx-auto px-6">
           <h1 className="text-5xl font-bold tracking-tight text-gray-900 sm:text-6xl">
             Enterprise AI Fleet{" "}
-            <span className="text-blue-600">Orchestration</span>
+            <span className="text-amber-600">Orchestration</span>
           </h1>
           <p className="mt-6 text-lg leading-8 text-gray-600">
             Command fleets of AI agents across any business domain.
@@ -59,15 +63,15 @@ export default function LandingPage() {
           </div>
           <div className="mt-12 grid grid-cols-3 gap-8 text-center">
             <div>
-              <div className="text-3xl font-bold text-blue-600">500+</div>
+              <div className="text-3xl font-bold text-amber-600">500+</div>
               <div className="text-sm text-gray-500 mt-1">Active Agents</div>
             </div>
             <div>
-              <div className="text-3xl font-bold text-blue-600">99.9%</div>
+              <div className="text-3xl font-bold text-amber-600">99.9%</div>
               <div className="text-sm text-gray-500 mt-1">Uptime SLA</div>
             </div>
             <div>
-              <div className="text-3xl font-bold text-blue-600">24/7</div>
+              <div className="text-3xl font-bold text-amber-600">24/7</div>
               <div className="text-sm text-gray-500 mt-1">Autonomous Ops</div>
             </div>
           </div>

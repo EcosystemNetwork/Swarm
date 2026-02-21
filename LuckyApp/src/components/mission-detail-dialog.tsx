@@ -6,8 +6,8 @@ import { type Mission, getAgentById, getSwarmById } from "@/lib/mock-data";
 
 const statusColors: Record<string, string> = {
   pending: "bg-yellow-100 text-yellow-800",
-  active: "bg-blue-100 text-blue-800",
-  resolved: "bg-green-100 text-green-800",
+  active: "bg-amber-100 text-blue-800",
+  resolved: "bg-emerald-100 text-green-800",
 };
 
 const statusIcons: Record<string, string> = {
@@ -96,7 +96,7 @@ export function MissionDetailDialog({ mission, open, onOpenChange }: MissionDeta
                 <div className="flex items-center gap-2">
                   <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
                     <div
-                      className="h-full bg-blue-600 rounded-full"
+                      className="h-full bg-amber-600 rounded-full"
                       style={{ width: `${mission.prediction.confidence}%` }}
                     />
                   </div>
@@ -113,11 +113,11 @@ export function MissionDetailDialog({ mission, open, onOpenChange }: MissionDeta
 
         {/* Outcome */}
         {mission.outcome && (
-          <div className={`rounded-lg p-4 ${mission.outcome.result === "win" ? "bg-green-50 border border-green-200" : "bg-red-50 border border-red-200"}`}>
+          <div className={`rounded-lg p-4 ${mission.outcome.result === "win" ? "bg-emerald-50 border border-green-200" : "bg-red-50 border border-red-200"}`}>
             <h4 className="text-sm font-semibold mb-1">
               {mission.outcome.result === "win" ? "🏆 Won" : "❌ Lost"}
             </h4>
-            <p className={`text-lg font-bold ${mission.outcome.pnl >= 0 ? "text-blue-700" : "text-red-700"}`}>
+            <p className={`text-lg font-bold ${mission.outcome.pnl >= 0 ? "text-amber-700" : "text-red-700"}`}>
               {mission.outcome.pnl >= 0 ? "+" : ""}{mission.outcome.pnl.toLocaleString()} USDC
             </p>
             <p className="text-xs text-gray-500 mt-1">Resolved {formatDate(mission.outcome.resolvedAt)}</p>

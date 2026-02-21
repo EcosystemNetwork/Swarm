@@ -22,7 +22,7 @@ export function ChannelList({
       {/* Header */}
       <div className="p-4 border-b border-gray-200">
         <h2 className="font-semibold text-sm text-gray-900 flex items-center gap-2">
-          <MessageSquare className="w-4 h-4 text-blue-600" />
+          <MessageSquare className="w-4 h-4 text-amber-600" />
           Channels
         </h2>
       </div>
@@ -76,14 +76,14 @@ function ChannelItem({
       onClick={onClick}
       className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm transition-colors ${
         isActive
-          ? "bg-blue-50 text-blue-700 font-medium"
+          ? "bg-amber-50 text-amber-700 font-medium"
           : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
       }`}
     >
       <Hash className="w-4 h-4 shrink-0 text-gray-400" />
       <span className="truncate flex-1 text-left">{channel.name}</span>
       {channel.unreadCount > 0 && (
-        <span className="bg-blue-600 text-white text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center shrink-0">
+        <span className="bg-amber-600 text-white text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center shrink-0">
           {channel.unreadCount}
         </span>
       )}
@@ -105,22 +105,22 @@ function DMItem({
       onClick={onClick}
       className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm transition-colors ${
         isActive
-          ? "bg-blue-50 text-blue-700 font-medium"
+          ? "bg-amber-50 text-amber-700 font-medium"
           : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
       }`}
     >
       <div
         className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] shrink-0 ${
           dm.participantType === "agent"
-            ? "bg-blue-100 text-blue-600"
-            : "bg-blue-100 text-blue-600"
+            ? "bg-amber-100 text-amber-600"
+            : "bg-amber-100 text-amber-600"
         }`}
       >
         {dm.participantType === "agent" ? "🤖" : dm.participantName[0]}
       </div>
       <span className="truncate flex-1 text-left">{dm.participantName}</span>
       {dm.unreadCount > 0 && (
-        <span className="bg-blue-600 text-white text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center shrink-0">
+        <span className="bg-amber-600 text-white text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center shrink-0">
           {dm.unreadCount}
         </span>
       )}

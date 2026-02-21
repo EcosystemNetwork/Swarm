@@ -8,7 +8,7 @@ const Header = dynamic(
     ssr: false,
     loading: () => (
       <header className="sticky top-0 z-50 w-full border-b bg-white/95 backdrop-blur h-16 flex items-center px-6">
-        <span className="text-xl font-bold text-blue-600">⚡ Swarm</span>
+        <span className="text-xl font-bold text-amber-600">⚡ Swarm</span>
       </header>
     ),
   }

@@ -23,7 +23,7 @@ export function Leaderboard({ limit = 6, compact = false }: LeaderboardProps) {
         <CardTitle className={cn(compact ? "text-lg" : "text-xl")}>
           🏆 Top Agents
         </CardTitle>
-        <Badge className="bg-blue-50 text-blue-700 text-xs">
+        <Badge className="bg-amber-50 text-amber-700 text-xs">
           By P&L
         </Badge>
       </CardHeader>
@@ -55,7 +55,7 @@ export function Leaderboard({ limit = 6, compact = false }: LeaderboardProps) {
                   <span
                     className={cn(
                       "font-semibold text-sm tabular-nums",
-                      isPositive ? "text-blue-600" : "text-red-500"
+                      isPositive ? "text-amber-600" : "text-red-500"
                     )}
                   >
                     {isPositive ? "+" : ""}${Math.abs(agent.pnl).toLocaleString()}
@@ -67,7 +67,7 @@ export function Leaderboard({ limit = 6, compact = false }: LeaderboardProps) {
                     <div
                       className={cn(
                         "h-full rounded-full transition-all",
-                        isPositive ? "bg-blue-600" : "bg-red-400"
+                        isPositive ? "bg-amber-600" : "bg-red-400"
                       )}
                       style={{ width: `${barWidth}%` }}
                     />

@@ -29,7 +29,7 @@ export function StatCard({ title, value, icon, change, changeLabel, prefix }: St
             <span
               className={cn(
                 "text-xs font-medium flex items-center gap-0.5",
-                isPositive ? "text-blue-600" : "text-red-500"
+                isPositive ? "text-amber-600" : "text-red-500"
               )}
             >
               {isPositive ? "↑" : "↓"} {Math.abs(change).toFixed(1)}%

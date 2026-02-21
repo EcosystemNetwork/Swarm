@@ -63,7 +63,7 @@ export function PerformanceTable<T>({
                 <span className="flex items-center gap-1">
                   {col.label}
                   {col.sortable && sortKey === col.key && (
-                    <span className="text-blue-600">
+                    <span className="text-amber-600">
                       {sortDir === "desc" ? "▼" : "▲"}
                     </span>
                   )}
@@ -94,7 +94,7 @@ export function PerformanceTable<T>({
 export function PnlDisplay({ value }: { value: number }) {
   const isPositive = value >= 0;
   return (
-    <span className={cn("font-semibold", isPositive ? "text-blue-600" : "text-red-500")}>
+    <span className={cn("font-semibold", isPositive ? "text-amber-600" : "text-red-500")}>
       {isPositive ? "+" : ""}{value.toLocaleString()}
     </span>
   );
@@ -105,7 +105,7 @@ export function WinRateBar({ rate }: { rate: number }) {
     <div className="flex items-center gap-2">
       <div className="w-16 h-2 bg-gray-100 rounded-full overflow-hidden">
         <div
-          className="h-full bg-blue-600 rounded-full"
+          className="h-full bg-amber-600 rounded-full"
           style={{ width: `${Math.min(rate, 100)}%` }}
         />
       </div>

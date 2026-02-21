@@ -28,13 +28,13 @@ import {
 
 const TASK_STATUS_COLORS: Record<string, string> = {
   todo: "bg-gray-100 text-gray-700",
-  in_progress: "bg-blue-100 text-blue-700",
-  done: "bg-green-100 text-green-700",
+  in_progress: "bg-amber-100 text-amber-700",
+  done: "bg-emerald-100 text-emerald-700",
 };
 
 const PRIORITY_LABELS: Record<string, { label: string; color: string }> = {
   low: { label: "Low", color: "text-gray-500" },
-  medium: { label: "Medium", color: "text-blue-600" },
+  medium: { label: "Medium", color: "text-amber-600" },
   high: { label: "High", color: "text-orange-600" },
 };
 
@@ -224,7 +224,7 @@ export default function ProjectDetailPage() {
       {/* Header */}
       <div className="flex items-start justify-between">
         <div className="flex items-center gap-4">
-          <Link href="/swarms" className="text-gray-400 hover:text-blue-600 transition-colors text-lg">
+          <Link href="/swarms" className="text-gray-400 hover:text-amber-600 transition-colors text-lg">
             ←
           </Link>
           <div>
@@ -233,7 +233,7 @@ export default function ProjectDetailPage() {
               <Badge
                 className={
                   project.status === "active"
-                    ? "bg-blue-100 text-blue-700 border-blue-200"
+                    ? "bg-amber-100 text-amber-700 border-amber-200"
                     : project.status === "paused"
                     ? "bg-yellow-100 text-yellow-700 border-yellow-200"
                     : "bg-gray-100 text-gray-600 border-gray-200"
@@ -267,7 +267,7 @@ export default function ProjectDetailPage() {
             <Button 
               onClick={() => setShowAssignAgent(true)}
               disabled={unassignedAgents.length === 0}
-              className="bg-blue-600 hover:bg-blue-700"
+              className="bg-amber-600 hover:bg-blue-700"
             >
               + Assign Agent
             </Button>
@@ -278,14 +278,14 @@ export default function ProjectDetailPage() {
               <Card key={agent.id} className="relative">
                 <CardHeader className="pb-3">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-lg font-bold text-blue-700">
+                    <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center text-lg font-bold text-amber-700">
                       {agent.name.charAt(0)}
                     </div>
                     <div>
                       <CardTitle className="text-base">{agent.name}</CardTitle>
                       <div className="flex items-center gap-2 mt-0.5">
                         <Badge variant="secondary" className="text-xs">{agent.type}</Badge>
-                        <span className={`text-xs ${agent.status === "online" ? "text-green-600" : agent.status === "busy" ? "text-orange-600" : "text-gray-400"}`}>
+                        <span className={`text-xs ${agent.status === "online" ? "text-emerald-600" : agent.status === "busy" ? "text-orange-600" : "text-gray-400"}`}>
                           {agent.status === "online" ? "● Online" : 
                            agent.status === "busy" ? "● Busy" : "○ Offline"}
                         </span>
@@ -332,7 +332,7 @@ export default function ProjectDetailPage() {
           <div className="flex justify-end">
             <Button 
               onClick={() => setShowCreateTask(true)}
-              className="bg-blue-600 hover:bg-blue-700"
+              className="bg-amber-600 hover:bg-blue-700"
             >
               + Create Task
             </Button>

@@ -13,8 +13,8 @@ import { useOrg } from "@/contexts/OrgContext";
 import { getAgentsByOrg, createAgent, type Agent } from "@/lib/firestore";
 
 const TYPE_COLORS: Record<string, string> = {
-  Research: "bg-blue-100 text-blue-700 border-blue-200",
-  Trading: "bg-green-100 text-green-700 border-green-200",
+  Research: "bg-amber-100 text-amber-700 border-amber-200",
+  Trading: "bg-emerald-100 text-emerald-700 border-green-200",
   Operations: "bg-purple-100 text-purple-700 border-purple-200",
   Support: "bg-yellow-100 text-yellow-700 border-yellow-200",
   Analytics: "bg-cyan-100 text-cyan-700 border-cyan-200",
@@ -195,7 +195,7 @@ export default function AgentsPage() {
         </div>
         <Button
           onClick={() => setShowRegister(true)}
-          className="bg-blue-600 hover:bg-blue-700 text-white"
+          className="bg-amber-600 hover:bg-blue-700 text-white"
         >
           + Register Agent
         </Button>
@@ -231,7 +231,7 @@ export default function AgentsPage() {
                 <CardHeader>
                   <div className="flex items-start justify-between">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-lg font-bold text-blue-700">
+                      <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center text-lg font-bold text-amber-700">
                         {agent.name.charAt(0)}
                       </div>
                       <div>
@@ -239,11 +239,11 @@ export default function AgentsPage() {
                         <div className="flex items-center gap-2 mt-1">
                           <Badge className={TYPE_COLORS[agent.type] || ""}>{agent.type}</Badge>
                           <span className={`text-xs flex items-center gap-1 ${
-                            agent.status === "online" ? "text-green-600" : 
+                            agent.status === "online" ? "text-emerald-600" : 
                             agent.status === "busy" ? "text-orange-600" : "text-gray-400"
                           }`}>
                             <span className={`w-2 h-2 rounded-full ${
-                              agent.status === "online" ? "bg-green-500" : 
+                              agent.status === "online" ? "bg-emerald-500" : 
                               agent.status === "busy" ? "bg-orange-500" : "bg-gray-300"
                             }`} />
                             {agent.status}
@@ -258,7 +258,7 @@ export default function AgentsPage() {
                   <div className="grid grid-cols-2 gap-3 pt-3 border-t border-gray-100">
                     <div>
                       <div className="text-xs text-gray-500">Projects</div>
-                      <div className="text-lg font-bold text-blue-600">
+                      <div className="text-lg font-bold text-amber-600">
                         {agent.projectIds.length}
                       </div>
                     </div>
@@ -331,7 +331,7 @@ export default function AgentsPage() {
               <Button
                 onClick={handleRegisterAgent}
                 disabled={creating || !agentName.trim()}
-                className="bg-blue-600 hover:bg-blue-700"
+                className="bg-amber-600 hover:bg-blue-700"
               >
                 {creating ? 'Registering...' : 'Register Agent'}
               </Button>

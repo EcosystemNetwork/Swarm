@@ -138,7 +138,7 @@ export default function ProjectsPage() {
         </div>
         <Button
           onClick={() => setShowCreate(true)}
-          className="bg-blue-600 hover:bg-blue-700 text-white"
+          className="bg-amber-600 hover:bg-blue-700 text-white"
         >
           + Create Project
         </Button>
@@ -173,7 +173,7 @@ export default function ProjectsPage() {
                     <Badge
                       className={
                         project.status === "active"
-                          ? "bg-blue-100 text-blue-700 border-blue-200"
+                          ? "bg-amber-100 text-amber-700 border-amber-200"
                           : project.status === "paused"
                           ? "bg-yellow-100 text-yellow-700 border-yellow-200"
                           : "bg-gray-100 text-gray-600 border-gray-200"
@@ -193,7 +193,7 @@ export default function ProjectsPage() {
                     {project.assignedAgents.slice(0, 4).map((agent) => (
                       <div
                         key={agent.id}
-                        className="w-8 h-8 rounded-full bg-blue-100 border-2 border-white flex items-center justify-center text-xs font-bold text-blue-700"
+                        className="w-8 h-8 rounded-full bg-amber-100 border-2 border-white flex items-center justify-center text-xs font-bold text-amber-700"
                         title={agent.name}
                       >
                         {agent.name.charAt(0)}
@@ -251,7 +251,7 @@ export default function ProjectsPage() {
               <Button
                 onClick={handleCreateProject}
                 disabled={creating || !name.trim()}
-                className="bg-blue-600 hover:bg-blue-700"
+                className="bg-amber-600 hover:bg-blue-700"
               >
                 {creating ? 'Creating...' : 'Create Project'}
               </Button>

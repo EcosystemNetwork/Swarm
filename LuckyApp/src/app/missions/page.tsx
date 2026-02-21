@@ -22,13 +22,13 @@ import {
 
 const columns = [
   { status: "todo" as const, label: "To Do", icon: "📋", bg: "bg-gray-50", border: "border-gray-200" },
-  { status: "in_progress" as const, label: "In Progress", icon: "🔄", bg: "bg-blue-50", border: "border-blue-200" },
-  { status: "done" as const, label: "Done", icon: "✅", bg: "bg-green-50", border: "border-green-200" },
+  { status: "in_progress" as const, label: "In Progress", icon: "🔄", bg: "bg-amber-50", border: "border-amber-200" },
+  { status: "done" as const, label: "Done", icon: "✅", bg: "bg-emerald-50", border: "border-green-200" },
 ];
 
 const priorityColors = {
   low: "bg-gray-100 text-gray-700",
-  medium: "bg-blue-100 text-blue-700", 
+  medium: "bg-amber-100 text-amber-700", 
   high: "bg-orange-100 text-orange-700",
 };
 
@@ -185,7 +185,7 @@ export default function TasksPage() {
         </div>
         <Button 
           onClick={() => setCreateOpen(true)} 
-          className="bg-blue-600 hover:bg-blue-700 text-white"
+          className="bg-amber-600 hover:bg-blue-700 text-white"
           disabled={projects.length === 0}
         >
           + New Task
@@ -408,7 +408,7 @@ export default function TasksPage() {
               <Button
                 onClick={handleCreateTask}
                 disabled={creating || !taskTitle.trim() || !taskProject}
-                className="bg-blue-600 hover:bg-blue-700"
+                className="bg-amber-600 hover:bg-blue-700"
               >
                 {creating ? 'Creating...' : 'Create Task'}
               </Button>

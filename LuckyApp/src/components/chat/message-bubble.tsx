@@ -18,15 +18,15 @@ export function MessageBubble({ message }: MessageBubbleProps) {
   return (
     <div
       className={`flex items-start gap-3 py-2 px-3 rounded-lg transition-colors hover:bg-gray-50 ${
-        isAgent ? "bg-blue-50/50" : ""
+        isAgent ? "bg-amber-50/50" : ""
       }`}
     >
       {/* Avatar */}
       <div
         className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 text-sm font-medium ${
           isAgent
-            ? "bg-blue-100 text-blue-700"
-            : "bg-blue-100 text-blue-700"
+            ? "bg-amber-100 text-amber-700"
+            : "bg-amber-100 text-amber-700"
         }`}
       >
         {isAgent ? "🤖" : message.senderName.charAt(0).toUpperCase()}
@@ -37,13 +37,13 @@ export function MessageBubble({ message }: MessageBubbleProps) {
         <div className="flex items-baseline gap-2">
           <span
             className={`font-semibold text-sm ${
-              isAgent ? "text-blue-700" : "text-gray-900"
+              isAgent ? "text-amber-700" : "text-gray-900"
             }`}
           >
             {message.senderName}
           </span>
           {isAgent && (
-            <span className="text-[10px] bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded-full font-medium">
+            <span className="text-[10px] bg-amber-100 text-amber-600 px-1.5 py-0.5 rounded-full font-medium">
               Agent
             </span>
           )}

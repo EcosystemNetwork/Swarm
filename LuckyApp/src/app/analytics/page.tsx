@@ -62,7 +62,7 @@ const agentColumns = [
     render: (a: AgentPerformance) => {
       const isWin = a.streak > 0;
       return (
-        <span className={cn("text-sm font-medium", isWin ? "text-blue-600" : "text-red-500")}>
+        <span className={cn("text-sm font-medium", isWin ? "text-amber-600" : "text-red-500")}>
           {isWin ? `🔥 ${a.streak}W` : `${Math.abs(a.streak)}L`}
         </span>
       );
@@ -79,7 +79,7 @@ const swarmColumns = [
         <span className="font-medium">{s.name}</span>
         <Badge className={cn(
           "text-[10px]",
-          s.status === "active" ? "bg-blue-50 text-blue-700" : "bg-gray-100 text-gray-500"
+          s.status === "active" ? "bg-amber-50 text-amber-700" : "bg-gray-100 text-gray-500"
         )}>
           {s.status}
         </Badge>
@@ -228,13 +228,13 @@ export default function AnalyticsPage() {
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-500">P&L</span>
-                    <span className={cn("font-semibold", m.totalPnl >= 0 ? "text-blue-600" : "text-red-500")}>
+                    <span className={cn("font-semibold", m.totalPnl >= 0 ? "text-amber-600" : "text-red-500")}>
                       {m.totalPnl >= 0 ? "+" : ""}${Math.abs(m.totalPnl).toLocaleString()}
                     </span>
                   </div>
                   <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden mt-1">
                     <div
-                      className="h-full bg-blue-600 rounded-full"
+                      className="h-full bg-amber-600 rounded-full"
                       style={{ width: `${m.winRate}%` }}
                     />
                   </div>

@@ -18,8 +18,8 @@ import {
 } from "@/lib/firestore";
 
 const TYPE_COLORS: Record<string, string> = {
-  Research: "bg-blue-100 text-blue-700 border-blue-200",
-  Trading: "bg-green-100 text-green-700 border-green-200",
+  Research: "bg-amber-100 text-amber-700 border-amber-200",
+  Trading: "bg-emerald-100 text-emerald-700 border-green-200",
   Operations: "bg-purple-100 text-purple-700 border-purple-200",
   Support: "bg-yellow-100 text-yellow-700 border-yellow-200",
   Analytics: "bg-cyan-100 text-cyan-700 border-cyan-200",
@@ -157,11 +157,11 @@ export default function AgentDetailPage() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-start gap-4">
-        <Link href="/agents" className="text-gray-400 hover:text-blue-600 transition-colors text-lg mt-2">
+        <Link href="/agents" className="text-gray-400 hover:text-amber-600 transition-colors text-lg mt-2">
           ←
         </Link>
         <div className="flex items-center gap-4 flex-1">
-          <div className="w-16 h-16 rounded-full bg-blue-100 flex items-center justify-center text-2xl font-bold text-blue-700">
+          <div className="w-16 h-16 rounded-full bg-amber-100 flex items-center justify-center text-2xl font-bold text-amber-700">
             {agent.name.charAt(0)}
           </div>
           <div className="flex-1">
@@ -169,11 +169,11 @@ export default function AgentDetailPage() {
               <h1 className="text-3xl font-bold tracking-tight">{agent.name}</h1>
               <Badge className={TYPE_COLORS[agent.type] || ""}>{agent.type}</Badge>
               <span className={`text-sm flex items-center gap-1.5 ${
-                agent.status === "online" ? "text-green-600" : 
+                agent.status === "online" ? "text-emerald-600" : 
                 agent.status === "busy" ? "text-orange-600" : "text-gray-400"
               }`}>
                 <span className={`w-2.5 h-2.5 rounded-full ${
-                  agent.status === "online" ? "bg-green-500" : 
+                  agent.status === "online" ? "bg-emerald-500" : 
                   agent.status === "busy" ? "bg-orange-500" : "bg-gray-300"
                 }`} />
                 {agent.status}
@@ -186,7 +186,7 @@ export default function AgentDetailPage() {
               onClick={handleStatusToggle}
               disabled={updating}
               variant={agent.status === 'online' ? 'outline' : 'default'}
-              className={agent.status === 'online' ? 'hover:bg-red-50 hover:border-red-300 hover:text-red-600' : 'bg-green-600 hover:bg-green-700'}
+              className={agent.status === 'online' ? 'hover:bg-red-50 hover:border-red-300 hover:text-red-600' : 'bg-emerald-600 hover:bg-green-700'}
             >
               {updating ? 'Updating...' : agent.status === 'online' ? 'Set Offline' : 'Set Online'}
             </Button>
@@ -204,7 +204,7 @@ export default function AgentDetailPage() {
       <div className="grid gap-4 md:grid-cols-4">
         <Card>
           <CardContent className="p-4 text-center">
-            <div className="text-2xl font-bold text-blue-600">{assignedProjects.length}</div>
+            <div className="text-2xl font-bold text-amber-600">{assignedProjects.length}</div>
             <div className="text-xs text-gray-500 mt-1">Assigned Projects</div>
           </CardContent>
         </Card>
@@ -216,7 +216,7 @@ export default function AgentDetailPage() {
         </Card>
         <Card>
           <CardContent className="p-4 text-center">
-            <div className="text-2xl font-bold text-green-600">{completedTasks}</div>
+            <div className="text-2xl font-bold text-emerald-600">{completedTasks}</div>
             <div className="text-xs text-gray-500 mt-1">Completed</div>
           </CardContent>
         </Card>
@@ -265,7 +265,7 @@ export default function AgentDetailPage() {
                   <Badge
                     className={
                       project.status === "active"
-                        ? "bg-blue-100 text-blue-700"
+                        ? "bg-amber-100 text-amber-700"
                         : project.status === "paused"
                         ? "bg-yellow-100 text-yellow-700"
                         : "bg-gray-100 text-gray-600"
@@ -309,9 +309,9 @@ export default function AgentDetailPage() {
                   <Badge
                     className={
                       task.status === "done"
-                        ? "bg-green-100 text-green-700"
+                        ? "bg-emerald-100 text-emerald-700"
                         : task.status === "in_progress"
-                        ? "bg-blue-100 text-blue-700"
+                        ? "bg-amber-100 text-amber-700"
                         : "bg-gray-100 text-gray-700"
                     }
                   >

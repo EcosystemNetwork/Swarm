@@ -9,6 +9,9 @@ const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 export const metadata: Metadata = {
   title: "Swarm — Enterprise AI Fleet Orchestration",
   description: "Enterprise AI fleet orchestration for solo founders",
+  icons: {
+    icon: "/lobsterlogo.png",
+  },
 };
 
 export default function RootLayout({

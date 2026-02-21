@@ -12,7 +12,7 @@ export function PredictionsFeed() {
     .slice(0, 8);
 
   const outcomeStyles: Record<string, { bg: string; text: string; label: string }> = {
-    win: { bg: "bg-green-50", text: "text-green-700", label: "Won" },
+    win: { bg: "bg-emerald-50", text: "text-emerald-700", label: "Won" },
     loss: { bg: "bg-red-50", text: "text-red-700", label: "Lost" },
     pending: { bg: "bg-yellow-50", text: "text-yellow-700", label: "Pending" },
   };

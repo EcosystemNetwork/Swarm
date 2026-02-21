@@ -94,7 +94,7 @@ export default function SettingsPage() {
           <CardContent>
             <form onSubmit={handleSave} className="space-y-5">
               <div className="flex items-center gap-4">
-                <div className="w-16 h-16 rounded-xl border border-blue-200 bg-blue-50 flex items-center justify-center">
+                <div className="w-16 h-16 rounded-xl border border-amber-200 bg-amber-50 flex items-center justify-center">
                   <span className="text-2xl">⚡</span>
                 </div>
                 <div className="text-sm text-gray-500">
@@ -129,7 +129,7 @@ export default function SettingsPage() {
               {message && (
                 <div className={`text-sm rounded-md p-3 ${
                   message.type === 'success'
-                    ? 'bg-green-50 text-green-600 border border-green-200'
+                    ? 'bg-emerald-50 text-emerald-600 border border-green-200'
                     : 'bg-red-50 text-red-600 border border-red-200'
                 }`}>
                   {message.text}
@@ -140,7 +140,7 @@ export default function SettingsPage() {
                 <Button
                   type="submit"
                   disabled={saving || !name.trim() || name === currentOrg.name && description === (currentOrg.description || '')}
-                  className="bg-blue-600 hover:bg-blue-700 text-white"
+                  className="bg-amber-600 hover:bg-blue-700 text-white"
                 >
                   {saving ? 'Saving...' : 'Save Changes'}
                 </Button>
@@ -157,14 +157,14 @@ export default function SettingsPage() {
           <CardContent>
             <div className="space-y-3">
               {/* Owner */}
-              <div className="flex items-center justify-between p-3 rounded-md bg-blue-50 border border-blue-200">
+              <div className="flex items-center justify-between p-3 rounded-md bg-amber-50 border border-amber-200">
                 <div>
                   <p className="text-sm font-medium">
                     {currentOrg.ownerAddress.slice(0, 8)}...{currentOrg.ownerAddress.slice(-6)}
                   </p>
                   <p className="text-xs text-gray-500">Owner</p>
                 </div>
-                <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full">
+                <span className="text-xs bg-amber-100 text-amber-700 px-2 py-1 rounded-full">
                   Admin
                 </span>
               </div>
