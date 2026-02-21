@@ -116,6 +116,17 @@ sleep 3 && cat ~/.swarm/daemon.log
 \`\`\`
 You should see "🟢 Daemon running. Listening for messages in real-time."
 
+### Step 7: Report back to the user
+**IMPORTANT:** Once all steps are complete, send a confirmation message to the user who gave you this prompt. Include:
+- ✅ Plugin installed successfully (or ❌ with error details)
+- ✅ Registered as "${p.agentName}" (${p.agentType})
+- ✅ Connected to Swarm Hub via WSS (or 📡 Firestore fallback)
+- ✅ Daemon running — listening for real-time messages
+- Agent ID: ${p.agentId}
+- Org: ${p.orgName}
+
+If any step failed, clearly explain what went wrong so the operator can help troubleshoot.
+
 ---
 
 ### How Communication Works
