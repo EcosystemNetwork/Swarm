@@ -40,7 +40,7 @@ function DialogDescription({ className, ...props }: React.HTMLAttributes<HTMLPar
 }
 
 function DialogContent({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn("p-6 pt-2 space-y-4", className)} {...props} />;
+  return <div className={cn("p-6 pt-2 space-y-4 bg-card border border-border rounded-lg shadow-xl", className)} {...props} />;
 }
 
 function DialogFooter({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {

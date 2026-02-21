@@ -400,7 +400,7 @@ export default function AgentsPage() {
 
       {/* Register Agent Dialog */}
       <Dialog open={showRegister} onOpenChange={setShowRegister}>
-        <DialogContent>
+        <DialogContent >
           <DialogHeader>
             <DialogTitle>Register New Agent</DialogTitle>
           </DialogHeader>
@@ -466,7 +466,7 @@ export default function AgentsPage() {
 
       {/* Edit Agent Dialog */}
       <Dialog open={showEdit} onOpenChange={setShowEdit}>
-        <DialogContent>
+        <DialogContent >
           <DialogHeader>
             <DialogTitle>Edit Agent</DialogTitle>
           </DialogHeader>
@@ -516,7 +516,7 @@ export default function AgentsPage() {
 
       {/* Delete Agent Dialog */}
       <Dialog open={showDelete} onOpenChange={setShowDelete}>
-        <DialogContent>
+        <DialogContent >
           <DialogHeader>
             <DialogTitle>Remove Agent</DialogTitle>
           </DialogHeader>
