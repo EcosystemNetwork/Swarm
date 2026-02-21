@@ -1,0 +1,115 @@
+"use client";
+
+import { useState } from "react";
+import { cn } from "@/lib/utils";
+
+type SortDirection = "asc" | "desc";
+
+interface Column<T> {
+  key: string;
+  label: string;
+  sortable?: boolean;
+  render: (item: T) => React.ReactNode;
+  getValue?: (item: T) => number;
+}
+
+interface PerformanceTableProps<T> {
+  data: T[];
+  columns: Column<T>[];
+  defaultSortKey?: string;
+  defaultSortDir?: SortDirection;
+}
+
+export function PerformanceTable<T>({
+  data,
+  columns,
+  defaultSortKey,
+  defaultSortDir = "desc",
+}: PerformanceTableProps<T>) {
+  const [sortKey, setSortKey] = useState(defaultSortKey || "");
+  const [sortDir, setSortDir] = useState<SortDirection>(defaultSortDir);
+
+  const handleSort = (key: string) => {
+    if (sortKey === key) {
+      setSortDir(sortDir === "asc" ? "desc" : "asc");
+    } else {
+      setSortKey(key);
+      setSortDir("desc");
+    }
+  };
+
+  const sortedData = [...data].sort((a, b) => {
+    const col = columns.find((c) => c.key === sortKey);
+    if (!col?.getValue) return 0;
+    const aVal = col.getValue(a);
+    const bVal = col.getValue(b);
+    return sortDir === "asc" ? aVal - bVal : bVal - aVal;
+  });
+
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="border-b border-gray-200">
+            {columns.map((col) => (
+              <th
+                key={col.key}
+                className={cn(
+                  "text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider",
+                  col.sortable && "cursor-pointer hover:text-gray-700 select-none"
+                )}
+                onClick={() => col.sortable && handleSort(col.key)}
+              >
+                <span className="flex items-center gap-1">
+                  {col.label}
+                  {col.sortable && sortKey === col.key && (
+                    <span className="text-green-600">
+                      {sortDir === "desc" ? "▼" : "▲"}
+                    </span>
+                  )}
+                </span>
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {sortedData.map((item, i) => (
+            <tr
+              key={i}
+              className="border-b border-gray-50 hover:bg-gray-50/80 transition-colors"
+            >
+              {columns.map((col) => (
+                <td key={col.key} className="py-3 px-4">
+                  {col.render(item)}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+export function PnlDisplay({ value }: { value: number }) {
+  const isPositive = value >= 0;
+  return (
+    <span className={cn("font-semibold", isPositive ? "text-green-600" : "text-red-500")}>
+      {isPositive ? "+" : ""}{value.toLocaleString()}
+    </span>
+  );
+}
+
+export function WinRateBar({ rate }: { rate: number }) {
+  return (
+    <div className="flex items-center gap-2">
+      <div className="w-16 h-2 bg-gray-100 rounded-full overflow-hidden">
+        <div
+          className="h-full bg-green-500 rounded-full"
+          style={{ width: `${Math.min(rate, 100)}%` }}
+        />
+      </div>
+      <span className="text-sm font-medium">{rate.toFixed(1)}%</span>
+    </div>
+  );
+}
