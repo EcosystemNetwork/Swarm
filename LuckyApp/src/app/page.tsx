@@ -70,24 +70,21 @@ export default function LandingPage() {
     if (account) router.push('/dashboard');
   }, [account, router]);
 
-  // Global Mouse Tracking Forwarder
+  // Global Mouse Tracking Forwarder — Spline uses pointermove, not mousemove
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
       [kittyRef, robotRef].forEach(ref => {
         if (ref.current && ref.current.canvas) {
-          const canvas = ref.current.canvas;
-          const rect = canvas.getBoundingClientRect();
-          const x = e.clientX - rect.left;
-          const y = e.clientY - rect.top;
-
-          // Dispatch move event to the canvas so Spline's internal listener catches it
-          canvas.dispatchEvent(new MouseEvent('mousemove', {
+          const canvas = ref.current.canvas as HTMLCanvasElement;
+          canvas.dispatchEvent(new PointerEvent('pointermove', {
             clientX: e.clientX,
             clientY: e.clientY,
             screenX: e.screenX,
             screenY: e.screenY,
             bubbles: false,
-            cancelable: true
+            cancelable: true,
+            pointerId: 1,
+            pointerType: 'mouse',
           }));
         }
       });
