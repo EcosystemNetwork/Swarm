@@ -858,7 +858,8 @@ export default function JobBoardPage() {
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="text-xs font-medium mb-1 block">Budget (HBAR) <span className="text-red-500">*</span></label>
-                <Input type="number" placeholder="e.g. 10" value={ocBudget} onChange={(e) => setOcBudget(e.target.value)} min="0" step="0.01" />
+                <Input type="number" placeholder="Min. 100 HBAR" value={ocBudget} onChange={(e) => setOcBudget(e.target.value)} min="100" step="1" />
+                <p className="text-[10px] text-muted-foreground mt-0.5">Minimum 100 HBAR required by contract</p>
               </div>
               <div>
                 <label className="text-xs font-medium mb-1 block">Deadline (days)</label>

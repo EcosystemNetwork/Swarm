@@ -61,7 +61,7 @@ export function useSwarmWrite(): SwarmWrite {
     try {
       const signer = await getSigner();
       const board = new ethers.Contract(CONTRACTS.TASK_BOARD, TASK_BOARD_ABI, signer);
-      const tx = await board.claimTask(taskId, { gasLimit: HEDERA_GAS_LIMIT });
+      const tx = await board.claimTask(taskId, { gasLimit: HEDERA_GAS_LIMIT, type: 0 });
       const receipt = await tx.wait();
       setState({ isLoading: false, error: null, txHash: receipt.hash });
       return receipt.hash;
@@ -77,7 +77,7 @@ export function useSwarmWrite(): SwarmWrite {
     try {
       const signer = await getSigner();
       const board = new ethers.Contract(CONTRACTS.TASK_BOARD, TASK_BOARD_ABI, signer);
-      const tx = await board.submitDelivery(taskId, deliveryHash, { gasLimit: HEDERA_GAS_LIMIT });
+      const tx = await board.submitDelivery(taskId, deliveryHash, { gasLimit: HEDERA_GAS_LIMIT, type: 0 });
       const receipt = await tx.wait();
       setState({ isLoading: false, error: null, txHash: receipt.hash });
       return receipt.hash;
@@ -98,6 +98,9 @@ export function useSwarmWrite(): SwarmWrite {
   ): Promise<string | null> => {
     setState({ isLoading: true, error: null, txHash: null });
     try {
+      if (parseFloat(budgetHbar) < 100) {
+        throw new Error("Minimum budget is 100 HBAR");
+      }
       const signer = await getSigner();
       const board = new ethers.Contract(CONTRACTS.TASK_BOARD, TASK_BOARD_ABI, signer);
       const tx = await board.postTask(
@@ -106,7 +109,7 @@ export function useSwarmWrite(): SwarmWrite {
         description,
         requiredSkills,
         deadlineUnix,
-        { value: ethers.parseEther(budgetHbar), gasLimit: HEDERA_GAS_LIMIT },
+        { value: ethers.parseEther(budgetHbar), gasLimit: HEDERA_GAS_LIMIT, type: 0 },
       );
       const receipt = await tx.wait();
       setState({ isLoading: false, error: null, txHash: receipt.hash });
@@ -123,7 +126,7 @@ export function useSwarmWrite(): SwarmWrite {
     try {
       const signer = await getSigner();
       const registry = new ethers.Contract(CONTRACTS.AGENT_REGISTRY, AGENT_REGISTRY_ABI, signer);
-      const tx = await registry.registerAgent(name, skills, feeRate, { gasLimit: HEDERA_GAS_LIMIT });
+      const tx = await registry.registerAgent(name, skills, feeRate, { gasLimit: HEDERA_GAS_LIMIT, type: 0 });
       const receipt = await tx.wait();
       setState({ isLoading: false, error: null, txHash: receipt.hash });
       return receipt.hash;
