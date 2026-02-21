@@ -88,19 +88,33 @@ export default function LandingPage() {
       <main className="flex-1">
         {/* Hero Section */}
         <section className="relative pt-24 pb-32 overflow-hidden min-h-[95vh] flex items-center justify-center">
-          {/* Spline Background Container */}
+          {/* Dual Spline Background Container */}
           <div className="absolute inset-0 z-0">
-            <Suspense fallback={
-              <div className="w-full h-full flex items-center justify-center bg-black/20">
-                <div className="w-12 h-12 border-4 border-amber-500/20 border-t-amber-500 rounded-full animate-spin" />
-              </div>
-            }>
-              <Spline
-                scene="https://prod.spline.design/G9Uv2yhuZyhmrxRG/scene.splinecode"
-                className="w-full h-full opacity-80"
-              />
-            </Suspense>
-            {/* Gradient Overlay to fade Spline into background - KEEP pointer-events-none so mouse events reach Spline underneath */}
+            {/* Left Asset: Kitty Robot */}
+            <div className="absolute inset-0 z-0 opacity-60 pointer-events-auto">
+              <Suspense fallback={null}>
+                <Spline
+                  scene="https://prod.spline.design/G9Uv2yhuZyhmrxRG/scene.splinecode"
+                  className="w-full h-full scale-[0.8] translate-x-[-25%] md:translate-x-[-35%]"
+                />
+              </Suspense>
+            </div>
+
+            {/* Center Asset: New Robot */}
+            <div className="absolute inset-0 z-[1] opacity-90 pointer-events-auto">
+              <Suspense fallback={
+                <div className="w-full h-full flex items-center justify-center bg-black/20">
+                  <div className="w-12 h-12 border-4 border-amber-500/20 border-t-amber-500 rounded-full animate-spin" />
+                </div>
+              }>
+                <Spline
+                  scene="https://prod.spline.design/Apa6K76Zg3Ki-VRj/scene.splinecode"
+                  className="w-full h-full"
+                />
+              </Suspense>
+            </div>
+
+            {/* Gradient Overlay - ensuring mouse events still pass through to Spline elements */}
             <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-transparent to-black pointer-events-none" />
           </div>
 
