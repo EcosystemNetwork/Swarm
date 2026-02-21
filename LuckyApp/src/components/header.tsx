@@ -9,6 +9,7 @@ import { createThirdwebClient } from 'thirdweb';
 import { base, defineChain } from 'thirdweb/chains';
 import { useOrg } from '@/contexts/OrgContext';
 import { getProjectsByOrg, createProject, createOrganization, type Project } from '@/lib/firestore';
+import GradientText from '@/components/reactbits/GradientText';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -113,7 +114,7 @@ export function Header() {
         <div className="flex items-center gap-8">
           <Link href="/" className="flex items-center gap-2">
             <Image src="/lobsterlogo.png" alt="Swarm Logo" width={40} height={40} />
-            <span className="text-xl font-bold text-[#FFD700]">Swarm</span>
+            <GradientText colors={['#FFD700', '#FFA500', '#FF8C00']} animationSpeed={4} className="text-xl font-bold">Swarm</GradientText>
           </Link>
           {isConnected && (
             <nav className="hidden md:flex items-center gap-6">

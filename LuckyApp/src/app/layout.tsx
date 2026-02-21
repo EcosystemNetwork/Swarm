@@ -30,8 +30,9 @@ export default function RootLayout({
       <body className={inter.className} suppressHydrationWarning>
         <Web3Provider>
           <OrgProvider>
-            <SparkleTrail />
-            {children}
+            <SparkleTrail>
+              {children}
+            </SparkleTrail>
           </OrgProvider>
         </Web3Provider>
       </body>

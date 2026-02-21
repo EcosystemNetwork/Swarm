@@ -32,6 +32,9 @@ import {
   type AgentProfile,
 } from "@/lib/swarm-contracts";
 import { cn } from "@/lib/utils";
+import BlurText from "@/components/reactbits/BlurText";
+import SpotlightCard from "@/components/reactbits/SpotlightCard";
+import CountUp from "@/components/reactbits/CountUp";
 
 // ─── Constants ───────────────────────────────────────────
 
@@ -229,7 +232,7 @@ export default function JobBoardPage() {
     return (
       <div className="space-y-6">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Job Board</h1>
+          <BlurText text="Job Board" className="text-3xl font-bold tracking-tight" delay={80} animateBy="letters" />
           <p className="text-muted-foreground mt-1">No organization selected</p>
         </div>
       </div>
@@ -241,7 +244,7 @@ export default function JobBoardPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="min-w-0">
-          <h1 className="text-3xl font-bold tracking-tight">Job Board</h1>
+          <BlurText text="Job Board" className="text-3xl font-bold tracking-tight" delay={80} animateBy="letters" />
           <p className="text-muted-foreground mt-1 text-sm">
             Post and claim jobs for your agent fleet
           </p>
@@ -421,17 +424,17 @@ export default function JobBoardPage() {
               {/* Stats Row */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 {[
-                  { label: "Open", value: onchainOpen.length, color: "text-emerald-500" },
-                  { label: "In Progress", value: onchainClaimed.length, color: "text-amber-500" },
-                  { label: "Completed", value: onchainCompleted.length, color: "text-blue-500" },
-                  { label: "Total Paid", value: `${totalPaid.toFixed(2)} HBAR`, color: "text-emerald-400" },
+                  { label: "Open", value: onchainOpen.length, color: "text-emerald-500", isNum: true },
+                  { label: "In Progress", value: onchainClaimed.length, color: "text-amber-500", isNum: true },
+                  { label: "Completed", value: onchainCompleted.length, color: "text-blue-500", isNum: true },
+                  { label: "Total Paid", value: `${totalPaid.toFixed(2)} HBAR`, color: "text-emerald-400", isNum: false },
                 ].map((stat) => (
-                  <Card key={stat.label}>
-                    <CardContent className="p-4">
-                      <p className="text-xs text-muted-foreground mb-1">{stat.label}</p>
-                      <p className={cn("text-xl font-bold truncate", stat.color)}>{stat.value}</p>
-                    </CardContent>
-                  </Card>
+                  <SpotlightCard key={stat.label} className="p-4" spotlightColor="rgba(16, 185, 129, 0.08)">
+                    <p className="text-xs text-muted-foreground mb-1">{stat.label}</p>
+                    <p className={cn("text-xl font-bold truncate", stat.color)}>
+                      {stat.isNum ? <CountUp to={stat.value as number} duration={1.5} /> : stat.value}
+                    </p>
+                  </SpotlightCard>
                 ))}
               </div>
 

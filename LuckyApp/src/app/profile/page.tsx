@@ -9,6 +9,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getProfile, setProfile } from "@/lib/firestore";
+import BlurText from "@/components/reactbits/BlurText";
+import SpotlightCard from "@/components/reactbits/SpotlightCard";
 
 export default function ProfilePage() {
   const account = useActiveAccount();
@@ -57,9 +59,9 @@ export default function ProfilePage() {
   return (
     <div className="min-h-screen bg-[#0a0a0a] p-6 md:p-10">
       <div className="max-w-lg mx-auto">
-        <Card className="border-[#1a1a2e] bg-[#0f0f1a]">
+        <SpotlightCard className="p-0 border-[#1a1a2e] bg-[#0f0f1a]" spotlightColor="rgba(212, 168, 83, 0.1)">
           <CardHeader>
-            <CardTitle className="text-[#d4a853] text-xl">👤 Profile</CardTitle>
+            <BlurText text="👤 Profile" className="text-[#d4a853] text-xl font-bold" delay={80} animateBy="letters" />
             <p className="text-sm text-muted-foreground font-mono">{truncated}</p>
           </CardHeader>
           <CardContent className="space-y-5">
@@ -96,7 +98,7 @@ export default function ProfilePage() {
               {saving ? "Saving..." : saved ? "✓ Saved!" : "Save Profile"}
             </Button>
           </CardContent>
-        </Card>
+        </SpotlightCard>
       </div>
     </div>
   );

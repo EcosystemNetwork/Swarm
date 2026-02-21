@@ -18,6 +18,8 @@ import {
   type Agent, 
   type Task 
 } from "@/lib/firestore";
+import BlurText from "@/components/reactbits/BlurText";
+import SpotlightCard from "@/components/reactbits/SpotlightCard";
 
 interface ProjectWithStats extends Project {
   agentCount: number;
@@ -120,7 +122,7 @@ export default function ProjectsPage() {
     return (
       <div className="space-y-6">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">📁 Projects</h1>
+          <BlurText text="📁 Projects" className="text-3xl font-bold tracking-tight" delay={80} animateBy="letters" />
           <p className="text-muted-foreground mt-1">No organization selected</p>
         </div>
       </div>
@@ -131,7 +133,7 @@ export default function ProjectsPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">📁 Projects</h1>
+          <BlurText text="📁 Projects" className="text-3xl font-bold tracking-tight" delay={80} animateBy="letters" />
           <p className="text-muted-foreground mt-1">
             Manage your agent projects and workflows
           </p>
@@ -163,7 +165,7 @@ export default function ProjectsPage() {
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {projects.map((project) => (
             <Link key={project.id} href={`/swarms/${project.id}`}>
-              <Card className="hover:border-amber-300 transition-colors cursor-pointer h-full">
+              <SpotlightCard className="p-0 hover:border-amber-300 transition-colors cursor-pointer h-full" spotlightColor="rgba(255, 191, 0, 0.08)">
                 <CardHeader>
                   <div className="flex items-start justify-between">
                     <div className="space-y-1">
@@ -209,7 +211,7 @@ export default function ProjectsPage() {
                     )}
                   </div>
                 </CardContent>
-              </Card>
+              </SpotlightCard>
             </Link>
           ))}
         </div>

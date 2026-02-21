@@ -8,6 +8,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { useOrg } from '@/contexts/OrgContext';
 import { useActiveAccount } from 'thirdweb/react';
 import { updateOrganization } from '@/lib/firestore';
+import BlurText from "@/components/reactbits/BlurText";
+import SpotlightCard from "@/components/reactbits/SpotlightCard";
 
 export default function SettingsPage() {
   const { currentOrg, refreshOrgs } = useOrg();
@@ -130,7 +132,7 @@ export default function SettingsPage() {
     return (
       <div className="space-y-6">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">⚙️ Settings</h1>
+          <BlurText text="⚙️ Settings" className="text-3xl font-bold tracking-tight" delay={80} animateBy="letters" />
           <p className="text-muted-foreground mt-1">No organization selected</p>
         </div>
       </div>
@@ -140,7 +142,7 @@ export default function SettingsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">⚙️ Settings</h1>
+        <BlurText text="⚙️ Settings" className="text-3xl font-bold tracking-tight" delay={80} animateBy="letters" />
         <p className="text-muted-foreground mt-1">Manage your organization settings</p>
       </div>
 

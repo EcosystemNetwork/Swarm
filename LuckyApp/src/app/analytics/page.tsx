@@ -14,6 +14,8 @@ import {
   type SwarmPerformance,
 } from "@/lib/mock-data";
 import { cn } from "@/lib/utils";
+import BlurText from "@/components/reactbits/BlurText";
+import SpotlightCard from "@/components/reactbits/SpotlightCard";
 
 const agentColumns = [
   {
@@ -132,7 +134,7 @@ export default function AnalyticsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Analytics</h1>
+        <BlurText text="Analytics" className="text-3xl font-bold tracking-tight" delay={80} animateBy="letters" />
         <p className="text-muted-foreground mt-1">Performance metrics and leaderboards</p>
       </div>
 
@@ -171,7 +173,7 @@ export default function AnalyticsPage() {
       {/* Agent Performance + Leaderboard */}
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2">
-          <Card>
+          <SpotlightCard className="p-0" spotlightColor="rgba(255, 191, 0, 0.06)">
             <CardHeader>
               <CardTitle className="text-lg">🤖 Agent Performance</CardTitle>
             </CardHeader>
@@ -182,13 +184,13 @@ export default function AnalyticsPage() {
                 defaultSortKey="pnl"
               />
             </CardContent>
-          </Card>
+          </SpotlightCard>
         </div>
         <Leaderboard />
       </div>
 
       {/* Swarm Performance */}
-      <Card>
+      <SpotlightCard className="p-0" spotlightColor="rgba(255, 191, 0, 0.06)">
         <CardHeader>
           <CardTitle className="text-lg">📁 Project Performance</CardTitle>
         </CardHeader>
@@ -199,10 +201,10 @@ export default function AnalyticsPage() {
             defaultSortKey="totalPnl"
           />
         </CardContent>
-      </Card>
+      </SpotlightCard>
 
       {/* Market Breakdown */}
-      <Card>
+      <SpotlightCard className="p-0" spotlightColor="rgba(255, 191, 0, 0.06)">
         <CardHeader>
           <CardTitle className="text-lg">📊 Market Breakdown</CardTitle>
         </CardHeader>
@@ -243,7 +245,7 @@ export default function AnalyticsPage() {
             ))}
           </div>
         </CardContent>
-      </Card>
+      </SpotlightCard>
     </div>
   );
 }

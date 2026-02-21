@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useActiveAccount } from 'thirdweb/react';
 import { useOrg } from "@/contexts/OrgContext";
+import BlurText from "@/components/reactbits/BlurText";
 import {
   getChannelsByOrg,
   onMessagesByChannel,
@@ -133,7 +134,7 @@ export default function ChatPage() {
     return (
       <div className="space-y-6">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">💬 Chat</h1>
+          <BlurText text="💬 Chat" className="text-3xl font-bold tracking-tight" delay={80} animateBy="letters" />
           <p className="text-muted-foreground mt-1">No organization selected</p>
         </div>
       </div>
@@ -144,7 +145,7 @@ export default function ChatPage() {
     return (
       <div className="space-y-6">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">💬 Chat</h1>
+          <BlurText text="💬 Chat" className="text-3xl font-bold tracking-tight" delay={80} animateBy="letters" />
           <p className="text-muted-foreground mt-1">Connect your wallet to start chatting</p>
         </div>
       </div>
@@ -154,7 +155,7 @@ export default function ChatPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">💬 Chat</h1>
+        <BlurText text="💬 Chat" className="text-3xl font-bold tracking-tight" delay={80} animateBy="letters" />
         <p className="text-muted-foreground mt-1">Real-time communication channels</p>
       </div>
 

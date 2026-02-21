@@ -502,10 +502,11 @@ export async function deleteJob(jobId: string): Promise<void> {
 // ─── Statistics & Analytics ─────────────────────────────
 
 export async function getOrgStats(orgId: string) {
-  const [projects, agents, tasks] = await Promise.all([
+  const [projects, agents, tasks, jobs] = await Promise.all([
     getProjectsByOrg(orgId),
     getAgentsByOrg(orgId),
-    getTasksByOrg(orgId)
+    getTasksByOrg(orgId),
+    getJobsByOrg(orgId),
   ]);
 
   return {
@@ -515,5 +516,9 @@ export async function getOrgStats(orgId: string) {
     completedTasks: tasks.filter(t => t.status === 'done').length,
     activeTasks: tasks.filter(t => t.status === 'in_progress').length,
     todoTasks: tasks.filter(t => t.status === 'todo').length,
+    jobCount: jobs.length,
+    openJobs: jobs.filter(j => j.status === 'open').length,
+    claimedJobs: jobs.filter(j => j.status === 'claimed').length,
+    closedJobs: jobs.filter(j => j.status === 'closed').length,
   };
 }

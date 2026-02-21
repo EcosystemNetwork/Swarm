@@ -21,6 +21,8 @@ import {
 } from "@/lib/firestore";
 import { collection, query, where, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import BlurText from "@/components/reactbits/BlurText";
+import SpotlightCard from "@/components/reactbits/SpotlightCard";
 
 const columns = [
   { status: "todo" as const, label: "To Do", icon: "📋", bg: "bg-muted", border: "border-border" },
@@ -173,7 +175,7 @@ export default function TasksPage() {
     return (
       <div className="space-y-6">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">📋 Tasks</h1>
+          <BlurText text="📋 Tasks" className="text-3xl font-bold tracking-tight" delay={80} animateBy="letters" />
           <p className="text-muted-foreground mt-1">No organization selected</p>
         </div>
       </div>
@@ -184,7 +186,7 @@ export default function TasksPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">📋 Tasks</h1>
+          <BlurText text="📋 Tasks" className="text-3xl font-bold tracking-tight" delay={80} animateBy="letters" />
           <p className="text-muted-foreground mt-1">Track agent tasks and deliverables</p>
         </div>
         <Button 
@@ -228,9 +230,10 @@ export default function TasksPage() {
 
                 <div className="space-y-3 min-h-[200px]">
                   {colTasks.map((task) => (
-                    <Card
+                    <SpotlightCard
                       key={task.id}
-                      className="cursor-pointer hover:shadow-md transition-shadow border-border"
+                      className="p-0 cursor-pointer hover:shadow-md transition-shadow"
+                      spotlightColor="rgba(255, 191, 0, 0.08)"
                       onClick={() => { setSelectedTask(task); setDetailOpen(true); }}
                     >
                       <CardContent className="p-4 space-y-3">
@@ -258,7 +261,7 @@ export default function TasksPage() {
                           Created {formatTime(task.createdAt)}
                         </div>
                       </CardContent>
-                    </Card>
+                    </SpotlightCard>
                   ))}
 
                   {colTasks.length === 0 && (

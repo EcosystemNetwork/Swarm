@@ -9,14 +9,20 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { StatCard } from "@/components/analytics/stat-card";
 import { useOrg } from "@/contexts/OrgContext";
+import BlurText from "@/components/reactbits/BlurText";
+import GradientText from "@/components/reactbits/GradientText";
+import SpotlightCard from "@/components/reactbits/SpotlightCard";
+import ShinyText from "@/components/reactbits/ShinyText";
 import {
   getOrgStats,
   getTasksByOrg,
   getProjectsByOrg,
   getAgentsByOrg,
+  getJobsByOrg,
   type Task,
   type Project,
-  type Agent
+  type Agent,
+  type Job,
 } from "@/lib/firestore";
 
 const SwarmCanvas = dynamic(
@@ -38,6 +44,10 @@ interface OrgStats {
   completedTasks: number;
   activeTasks: number;
   todoTasks: number;
+  jobCount: number;
+  openJobs: number;
+  claimedJobs: number;
+  closedJobs: number;
 }
 
 const statusColors: Record<string, string> = {
@@ -52,10 +62,23 @@ const statusLabels: Record<string, string> = {
   done: "Done",
 };
 
+const jobStatusColors: Record<string, string> = {
+  open: "bg-emerald-100 text-emerald-800",
+  claimed: "bg-amber-100 text-amber-800",
+  closed: "bg-muted text-foreground",
+};
+
+const jobStatusLabels: Record<string, string> = {
+  open: "Open",
+  claimed: "Claimed",
+  closed: "Closed",
+};
+
 export default function DashboardPage() {
   const { currentOrg } = useOrg();
   const [stats, setStats] = useState<OrgStats | null>(null);
   const [recentTasks, setRecentTasks] = useState<(Task & { agentName?: string; projectName?: string })[]>([]);
+  const [recentJobs, setRecentJobs] = useState<Job[]>([]);
   const [agents, setAgents] = useState<Agent[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -72,11 +95,12 @@ export default function DashboardPage() {
         const orgStats = await getOrgStats(currentOrg.id);
         setStats(orgStats);
 
-        // Load recent tasks
-        const [tasks, projects, agentsData] = await Promise.all([
+        // Load recent tasks and jobs
+        const [tasks, projects, agentsData, jobs] = await Promise.all([
           getTasksByOrg(currentOrg.id),
           getProjectsByOrg(currentOrg.id),
-          getAgentsByOrg(currentOrg.id)
+          getAgentsByOrg(currentOrg.id),
+          getJobsByOrg(currentOrg.id),
         ]);
 
         // Store agents for the swarm workflow tab
@@ -106,6 +130,20 @@ export default function DashboardPage() {
           .slice(0, 5);
 
         setRecentTasks(enrichedTasks);
+
+        // Sort jobs by most recent and take top 5
+        const sortedJobs = jobs
+          .sort((a, b) => {
+            const aTime = a.createdAt && typeof a.createdAt === 'object' && 'seconds' in a.createdAt
+              ? (a.createdAt as any).seconds * 1000
+              : new Date(a.createdAt as any).getTime();
+            const bTime = b.createdAt && typeof b.createdAt === 'object' && 'seconds' in b.createdAt
+              ? (b.createdAt as any).seconds * 1000
+              : new Date(b.createdAt as any).getTime();
+            return bTime - aTime;
+          })
+          .slice(0, 5);
+        setRecentJobs(sortedJobs);
       } catch (err) {
         console.error('Failed to load dashboard data:', err);
         setError(err instanceof Error ? err.message : 'Failed to load dashboard data');
@@ -154,8 +192,18 @@ export default function DashboardPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="min-w-0">
-          <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
-          <p className="text-muted-foreground mt-1 truncate">{currentOrg.name} operations overview</p>
+          <BlurText
+            text="Dashboard"
+            className="text-3xl font-bold tracking-tight"
+            delay={80}
+            animateBy="letters"
+          />
+          <p className="text-muted-foreground mt-1 truncate">
+            <GradientText colors={['#FFD700', '#FFA500', '#FF8C00']} animationSpeed={6} className="text-base font-medium">
+              {currentOrg.name}
+            </GradientText>
+            <span className="ml-1">operations overview</span>
+          </p>
         </div>
         <div className="flex gap-2 shrink-0">
           <Button asChild variant="outline">
@@ -175,7 +223,7 @@ export default function DashboardPage() {
 
         <TabsContent value="overview">
           <div className="space-y-6">
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
               <StatCard
                 title="Projects"
                 value={String(stats?.projectCount || 0)}
@@ -204,17 +252,26 @@ export default function DashboardPage() {
                 change={0}
                 changeLabel="total completed"
               />
+              <StatCard
+                title="Open Jobs"
+                value={String(stats?.openJobs || 0)}
+                icon="💼"
+                change={0}
+                changeLabel={`${stats?.jobCount || 0} total jobs`}
+              />
             </div>
 
             <div className="grid gap-6 lg:grid-cols-3">
               <div className="lg:col-span-2 space-y-6">
                 {/* Recent Tasks */}
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between">
+                <SpotlightCard className="p-0" spotlightColor="rgba(255, 191, 0, 0.06)">
+                  <CardHeader className="flex flex-row items-center justify-between px-6 pt-6">
                     <CardTitle className="text-lg">📋 Recent Tasks</CardTitle>
-                    <Link href="/missions" className="text-sm text-amber-600 hover:underline">View all →</Link>
+                    <Link href="/missions" className="text-sm">
+                      <ShinyText text="View all →" speed={3} color="#b5954a" shineColor="#FFD700" className="text-sm" />
+                    </Link>
                   </CardHeader>
-                  <CardContent className="space-y-3">
+                  <CardContent className="space-y-3 px-6 pb-6">
                     {recentTasks.length === 0 ? (
                       <div className="text-center py-8 text-muted-foreground">
                         <p>No tasks yet</p>
@@ -223,8 +280,12 @@ export default function DashboardPage() {
                         </Link>
                       </div>
                     ) : (
-                      recentTasks.map((task) => (
-                        <div key={task.id} className="flex items-center justify-between py-2 border-b border-border last:border-0">
+                      recentTasks.map((task, index) => (
+                        <div
+                          key={task.id}
+                          className="flex items-center justify-between py-2 border-b border-border last:border-0 animate-in fade-in slide-in-from-bottom-2"
+                          style={{ animationDelay: `${index * 100}ms`, animationFillMode: 'both' }}
+                        >
                           <div className="min-w-0 flex-1">
                             <p className="text-sm font-medium truncate">{task.title}</p>
                             <p className="text-xs text-muted-foreground truncate">
@@ -238,25 +299,51 @@ export default function DashboardPage() {
                       ))
                     )}
                   </CardContent>
-                </Card>
+                </SpotlightCard>
 
-                {/* Activity Feed Placeholder */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-lg">📈 Recent Activity</CardTitle>
+                {/* Recent Jobs */}
+                <SpotlightCard className="p-0" spotlightColor="rgba(255, 191, 0, 0.06)">
+                  <CardHeader className="flex flex-row items-center justify-between px-6 pt-6">
+                    <CardTitle className="text-lg">💼 Recent Jobs</CardTitle>
+                    <Link href="/jobs" className="text-sm">
+                      <ShinyText text="View all →" speed={3} color="#b5954a" shineColor="#FFD700" className="text-sm" />
+                    </Link>
                   </CardHeader>
-                  <CardContent>
-                    <div className="text-center py-8 text-muted-foreground">
-                      <p>Activity feed coming soon</p>
-                      <p className="text-sm">Track agent actions and task updates here</p>
-                    </div>
+                  <CardContent className="space-y-3 px-6 pb-6">
+                    {recentJobs.length === 0 ? (
+                      <div className="text-center py-8 text-muted-foreground">
+                        <p>No jobs posted yet</p>
+                        <Link href="/jobs" className="text-amber-600 hover:underline text-sm">
+                          Post your first job →
+                        </Link>
+                      </div>
+                    ) : (
+                      recentJobs.map((job, index) => (
+                        <div
+                          key={job.id}
+                          className="flex items-center justify-between py-2 border-b border-border last:border-0 animate-in fade-in slide-in-from-bottom-2"
+                          style={{ animationDelay: `${index * 100}ms`, animationFillMode: 'both' }}
+                        >
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm font-medium truncate">{job.title}</p>
+                            <p className="text-xs text-muted-foreground truncate">
+                              {job.reward && <span>💰 {job.reward} · </span>}
+                              {job.priority} priority
+                            </p>
+                          </div>
+                          <Badge className={`text-[10px] ${jobStatusColors[job.status]}`}>
+                            {jobStatusLabels[job.status]}
+                          </Badge>
+                        </div>
+                      ))
+                    )}
                   </CardContent>
-                </Card>
+                </SpotlightCard>
               </div>
 
               {/* Quick Actions */}
               <div className="space-y-6">
-                <Card>
+                <SpotlightCard className="p-0" spotlightColor="rgba(255, 191, 0, 0.06)">
                   <CardHeader>
                     <CardTitle className="text-lg">⚡ Quick Actions</CardTitle>
                   </CardHeader>
@@ -277,15 +364,20 @@ export default function DashboardPage() {
                       </Link>
                     </Button>
                     <Button asChild className="w-full" variant="outline">
+                      <Link href="/jobs">
+                        💼 Post Job
+                      </Link>
+                    </Button>
+                    <Button asChild className="w-full" variant="outline">
                       <Link href="/chat">
                         💬 Open Chat
                       </Link>
                     </Button>
                   </CardContent>
-                </Card>
+                </SpotlightCard>
 
                 {/* Org Info */}
-                <Card>
+                <SpotlightCard className="p-0" spotlightColor="rgba(255, 191, 0, 0.06)">
                   <CardHeader>
                     <CardTitle className="text-lg">🏢 Organization</CardTitle>
                   </CardHeader>
@@ -308,7 +400,7 @@ export default function DashboardPage() {
                       </div>
                     </div>
                   </CardContent>
-                </Card>
+                </SpotlightCard>
               </div>
             </div>
           </div>
