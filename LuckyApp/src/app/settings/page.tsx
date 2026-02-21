@@ -17,6 +17,12 @@ export default function SettingsPage() {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [saving, setSaving] = useState(false);
+  const [savingSocials, setSavingSocials] = useState(false);
+  const [website, setWebsite] = useState('');
+  const [twitter, setTwitter] = useState('');
+  const [discord, setDiscord] = useState('');
+  const [telegram, setTelegram] = useState('');
+
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -27,6 +33,10 @@ export default function SettingsPage() {
       setName(currentOrg.name);
       setDescription(currentOrg.description || '');
       setLogoPreview(currentOrg.logoUrl || null);
+      setWebsite(currentOrg.website || '');
+      setTwitter(currentOrg.twitter || '');
+      setDiscord(currentOrg.discord || '');
+      setTelegram(currentOrg.telegram || '');
     }
   }, [currentOrg]);
 
@@ -53,6 +63,27 @@ export default function SettingsPage() {
     };
     reader.readAsDataURL(file);
     e.target.value = '';
+  };
+
+  const handleSaveSocials = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!currentOrg) return;
+    setSavingSocials(true);
+    setMessage(null);
+    try {
+      await updateOrganization(currentOrg.id, {
+        website: website.trim(),
+        twitter: twitter.trim(),
+        discord: discord.trim(),
+        telegram: telegram.trim(),
+      });
+      await refreshOrgs();
+      setMessage({ type: 'success', text: 'Social links updated!' });
+    } catch (err) {
+      setMessage({ type: 'error', text: err instanceof Error ? err.message : 'Failed to update social links' });
+    } finally {
+      setSavingSocials(false);
+    }
   };
 
   const handleSave = async (e: React.FormEvent) => {
@@ -211,6 +242,38 @@ export default function SettingsPage() {
                   className="bg-amber-600 hover:bg-amber-600 text-white"
                 >
                   {saving ? 'Saving...' : 'Save Changes'}
+                </Button>
+              </div>
+            </form>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Social Links</CardTitle>
+            <CardDescription>Add links for the organization marketplace</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleSaveSocials} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-1.5">🌐 Website</label>
+                <Input type="url" value={website} onChange={(e) => setWebsite(e.target.value)} placeholder="https://yoursite.com" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1.5">𝕏 Twitter / X</label>
+                <Input value={twitter} onChange={(e) => setTwitter(e.target.value)} placeholder="@yourhandle" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1.5">💬 Discord</label>
+                <Input value={discord} onChange={(e) => setDiscord(e.target.value)} placeholder="https://discord.gg/invite" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1.5">✈️ Telegram</label>
+                <Input value={telegram} onChange={(e) => setTelegram(e.target.value)} placeholder="https://t.me/yourchannel" />
+              </div>
+              <div className="flex justify-end">
+                <Button type="submit" disabled={savingSocials} className="bg-amber-600 hover:bg-amber-600 text-white">
+                  {savingSocials ? 'Saving...' : 'Save Social Links'}
                 </Button>
               </div>
             </form>

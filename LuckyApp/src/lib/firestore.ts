@@ -26,6 +26,10 @@ export interface Organization {
   inviteCode?: string;
   ownerAddress: string;
   logoUrl?: string;
+  website?: string;
+  twitter?: string;
+  discord?: string;
+  telegram?: string;
   members: string[];
   createdAt: unknown;
 }
