@@ -86,6 +86,28 @@ function arg(flag) {
 // Commands
 // ---------------------------------------------------------------------------
 
+async function cmdHeartbeat() {
+  const creds = loadCreds();
+  const db = getDb();
+  await updateDoc(doc(db, "agents", creds.agentId), {
+    lastSeen: serverTimestamp(),
+    status: "online",
+  });
+  console.log("💓 Heartbeat sent");
+}
+
+async function cmdLog(level, message) {
+  const creds = loadCreds();
+  const db = getDb();
+  await addDoc(collection(db, "agent-logs"), {
+    agentId: creds.agentId,
+    orgId: creds.orgId,
+    level,
+    message,
+    createdAt: serverTimestamp(),
+  });
+}
+
 async function cmdRegister() {
   const orgId = arg("--org");
   const name = arg("--name");
@@ -120,11 +142,14 @@ async function cmdRegister() {
       const db = getDb();
       await updateDoc(doc(db, "agents", agentId), { status: "online" });
       console.log(`✅ Registered and connected as "${name}" (${type})`);
+      await cmdLog("info", `Agent "${name}" registered and connected`);
     } catch {
       console.log(`✅ Registered as "${name}" (${type}) (could not update Firestore status)`);
+      await cmdLog("error", `Agent "${name}" registered but failed to update Firestore status`);
     }
   } else {
     console.log(`✅ Registered as "${name}" (${type})`);
+    try { await cmdLog("info", `Agent "${name}" registered (no Firestore ID)`); } catch {}
   }
 
   console.log(`   Org:      ${orgId}`);
@@ -363,6 +388,18 @@ async function cmdChatPoll() {
   // Save poll state
   mkdirSync(SWARM_DIR, { recursive: true });
   writeFileSync(STATE_PATH, JSON.stringify(pollState, null, 2) + "\n");
+
+  // Heartbeat + log
+  try {
+    await updateDoc(doc(db, "agents", creds.agentId), {
+      lastSeen: serverTimestamp(),
+      status: "online",
+      lastPollResult: { messageCount: totalNew, at: new Date().toISOString() },
+    });
+    if (totalNew > 0) {
+      await cmdLog("info", `Poll found ${totalNew} new message(s)`);
+    }
+  } catch {}
 }
 
 async function cmdChatListen() {
@@ -424,6 +461,8 @@ const sub = process.argv[3];
 
 try {
   if (cmd === "register") await cmdRegister();
+  else if (cmd === "heartbeat") await cmdHeartbeat();
+  else if (cmd === "log") await cmdLog(process.argv[3] || "info", process.argv.slice(4).join(" "));
   else if (cmd === "status") await cmdStatus();
   else if (cmd === "tasks" && sub === "list") await cmdTasksList();
   else if (cmd === "tasks" && sub === "update") await cmdTasksUpdate();
@@ -437,6 +476,8 @@ try {
 
 Commands:
   register  --org <id> --name <n> --type <t> --api-key <k>
+  heartbeat
+  log <level> <message>
   status
   tasks list
   tasks update <taskId> --status <status>
