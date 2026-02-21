@@ -2,26 +2,18 @@
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAccount } from 'wagmi';
+import { useActiveAccount } from 'thirdweb/react';
 
 export function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { isConnected, status } = useAccount();
+  const account = useActiveAccount();
+  const isConnected = !!account;
   const router = useRouter();
-  const isLoading = status === 'connecting' || status === 'reconnecting';
 
   useEffect(() => {
-    if (!isLoading && !isConnected) {
+    if (!isConnected) {
       router.push('/');
     }
-  }, [isLoading, isConnected, router]);
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <p className="text-gray-500">Loading...</p>
-      </div>
-    );
-  }
+  }, [isConnected, router]);
 
   if (!isConnected) {
     return null;

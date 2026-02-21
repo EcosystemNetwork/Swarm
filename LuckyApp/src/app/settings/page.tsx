@@ -4,11 +4,12 @@ import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useTeam } from '@/contexts/TeamContext';
-import { useAccount } from 'wagmi';
+import { useActiveAccount } from 'thirdweb/react';
 
 export default function SettingsPage() {
   const { currentTeam } = useTeam();
-  const { address } = useAccount();
+  const account = useActiveAccount();
+  const address = account?.address;
   const [name, setName] = useState(currentTeam?.name || '');
   const [description, setDescription] = useState(currentTeam?.description || '');
   const [saving, setSaving] = useState(false);

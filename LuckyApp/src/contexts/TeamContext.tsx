@@ -1,7 +1,7 @@
 'use client';
 
 import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react';
-import { useAccount } from 'wagmi';
+import { useActiveAccount } from 'thirdweb/react';
 
 export interface Team {
   id: string;
@@ -53,7 +53,8 @@ function saveTeamsToStorage(teams: Team[]) {
 }
 
 export function TeamProvider({ children }: { children: ReactNode }) {
-  const { address } = useAccount();
+  const account = useActiveAccount();
+  const address = account?.address;
   const [teams, setTeams] = useState<Team[]>([]);
   const [currentTeam, setCurrentTeam] = useState<Team | null>(null);
 

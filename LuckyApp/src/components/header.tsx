@@ -2,9 +2,20 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { ConnectButton } from '@rainbow-me/rainbowkit';
-import { useAccount } from 'wagmi';
+import { ConnectButton, useActiveAccount } from 'thirdweb/react';
+import { createThirdwebClient } from 'thirdweb';
+import { base, defineChain } from 'thirdweb/chains';
 import { useTeam } from '@/contexts/TeamContext';
+
+const client = createThirdwebClient({
+  clientId: process.env.NEXT_PUBLIC_THIRDWEB_CLIENT_ID || 'e0a1622f71794f48ce9902e92a207ea8',
+});
+
+const hedera = defineChain({
+  id: 295,
+  name: 'Hedera',
+  rpc: 'https://mainnet.hashio.io/api',
+});
 
 const navLinks = [
   { href: '/dashboard', label: 'Dashboard' },
@@ -16,7 +27,8 @@ const navLinks = [
 
 export function Header() {
   const pathname = usePathname();
-  const { isConnected } = useAccount();
+  const account = useActiveAccount();
+  const isConnected = !!account;
   const { currentTeam, teams, selectTeam } = useTeam();
 
   return (
@@ -57,7 +69,7 @@ export function Header() {
               ))}
             </select>
           )}
-          <ConnectButton />
+          <ConnectButton client={client} chains={[base, hedera]} />
         </div>
       </div>
     </header>
