@@ -24,14 +24,42 @@ export interface Prediction {
   timestamp: number;
 }
 
+export type MarketType = "crypto" | "sports" | "esports" | "events";
+
+export interface MissionPrediction {
+  market: string;
+  position: string;
+  confidence: number;
+  stake: number;
+  odds: number;
+}
+
+export interface MissionOutcome {
+  result: "win" | "loss";
+  pnl: number;
+  resolvedAt: number;
+}
+
+export interface MissionEvent {
+  id: string;
+  type: "created" | "assigned" | "analysis" | "prediction" | "resolved";
+  description: string;
+  timestamp: number;
+}
+
 export interface Mission {
   id: string;
   title: string;
   description: string;
-  status: "backlog" | "active" | "completed" | "failed";
+  status: "pending" | "active" | "resolved";
   priority: "low" | "normal" | "high" | "urgent";
+  marketType: MarketType;
   assigneeId: string | null;
   swarmId: string;
+  prediction: MissionPrediction | null;
+  outcome: MissionOutcome | null;
+  timeline: MissionEvent[];
+  targetDate: number;
   createdAt: number;
   updatedAt: number;
 }
@@ -149,14 +177,126 @@ export const mockAgents: Agent[] = [
 
 // ─── Mock Missions ──────────────────────────────────────
 export const mockMissions: Mission[] = [
-  { id: "m-001", title: "Monitor BTC whale movements", description: "Track large BTC transfers and correlate with market movements", status: "active", priority: "high", assigneeId: "agent-001", swarmId: "swarm-001", createdAt: Date.now() - 86400000, updatedAt: Date.now() - 3600000 },
-  { id: "m-002", title: "Analyze Fed meeting sentiment", description: "Process FOMC minutes and predict rate decision impact", status: "active", priority: "urgent", assigneeId: "agent-005", swarmId: "swarm-001", createdAt: Date.now() - 172800000, updatedAt: Date.now() - 7200000 },
-  { id: "m-003", title: "Scan new Polymarket listings", description: "Identify mispriced markets within first 24h of listing", status: "completed", priority: "normal", assigneeId: "agent-004", swarmId: "swarm-001", createdAt: Date.now() - 604800000, updatedAt: Date.now() - 259200000 },
-  { id: "m-004", title: "NBA playoff matchup analysis", description: "Build prediction models for playoff series outcomes", status: "active", priority: "high", assigneeId: "agent-002", swarmId: "swarm-002", createdAt: Date.now() - 259200000, updatedAt: Date.now() - 14400000 },
-  { id: "m-005", title: "Track LoL roster swaps", description: "Monitor off-season transfers and evaluate team strength changes", status: "backlog", priority: "low", assigneeId: "agent-003", swarmId: "swarm-002", createdAt: Date.now() - 432000000, updatedAt: Date.now() - 432000000 },
-  { id: "m-006", title: "Crypto correlation matrix update", description: "Rebuild cross-asset correlation models with latest data", status: "active", priority: "normal", assigneeId: "agent-005", swarmId: "swarm-003", createdAt: Date.now() - 345600000, updatedAt: Date.now() - 43200000 },
-  { id: "m-007", title: "Discover new Kalshi markets", description: "Scout for high-volume Kalshi markets with good spreads", status: "active", priority: "normal", assigneeId: "agent-006", swarmId: "swarm-003", createdAt: Date.now() - 518400000, updatedAt: Date.now() - 86400000 },
-  { id: "m-008", title: "Backtest momentum strategy", description: "Run backtests on new momentum-based prediction strategy", status: "failed", priority: "high", assigneeId: "agent-001", swarmId: "swarm-003", createdAt: Date.now() - 691200000, updatedAt: Date.now() - 172800000 },
+  {
+    id: "m-001", title: "Monitor BTC whale movements", description: "Track large BTC transfers and correlate with market movements",
+    status: "active", priority: "high", marketType: "crypto", assigneeId: "agent-001", swarmId: "swarm-001",
+    prediction: { market: "BTC > $105k by March", position: "Yes", confidence: 72, stake: 500, odds: 1.85 },
+    outcome: null,
+    timeline: [
+      { id: "e1", type: "created", description: "Mission created", timestamp: Date.now() - 86400000 },
+      { id: "e2", type: "assigned", description: "Assigned to CryptoHawk", timestamp: Date.now() - 82800000 },
+      { id: "e3", type: "analysis", description: "Detected 2,500 BTC moved from Binance cold wallet", timestamp: Date.now() - 3600000 },
+    ],
+    targetDate: Date.now() + 604800000, createdAt: Date.now() - 86400000, updatedAt: Date.now() - 3600000,
+  },
+  {
+    id: "m-002", title: "Analyze Fed meeting sentiment", description: "Process FOMC minutes and predict rate decision impact on markets",
+    status: "active", priority: "urgent", marketType: "events", assigneeId: "agent-005", swarmId: "swarm-001",
+    prediction: { market: "Fed rate cut March 2026", position: "Yes", confidence: 82, stake: 1000, odds: 1.45 },
+    outcome: null,
+    timeline: [
+      { id: "e4", type: "created", description: "Mission created", timestamp: Date.now() - 172800000 },
+      { id: "e5", type: "assigned", description: "Assigned to QuantEdge", timestamp: Date.now() - 172000000 },
+      { id: "e6", type: "analysis", description: "FOMC minutes show dovish lean, 82% confidence on rate cut", timestamp: Date.now() - 7200000 },
+    ],
+    targetDate: Date.now() + 1209600000, createdAt: Date.now() - 172800000, updatedAt: Date.now() - 7200000,
+  },
+  {
+    id: "m-003", title: "Scan new Polymarket listings", description: "Identify mispriced markets within first 24h of listing",
+    status: "resolved", priority: "normal", marketType: "events", assigneeId: "agent-004", swarmId: "swarm-001",
+    prediction: { market: "Oscar Best Picture 2026 - Dune Part 3", position: "Yes", confidence: 45, stake: 200, odds: 3.20 },
+    outcome: { result: "win", pnl: 440, resolvedAt: Date.now() - 259200000 },
+    timeline: [
+      { id: "e7", type: "created", description: "Mission created", timestamp: Date.now() - 604800000 },
+      { id: "e8", type: "assigned", description: "Assigned to EventPulse", timestamp: Date.now() - 600000000 },
+      { id: "e9", type: "prediction", description: "Placed position on Dune Part 3 at 3.20 odds", timestamp: Date.now() - 432000000 },
+      { id: "e10", type: "resolved", description: "Market resolved — Dune Part 3 won Best Picture", timestamp: Date.now() - 259200000 },
+    ],
+    targetDate: Date.now() - 259200000, createdAt: Date.now() - 604800000, updatedAt: Date.now() - 259200000,
+  },
+  {
+    id: "m-004", title: "NBA playoff matchup analysis", description: "Build prediction models for playoff series outcomes",
+    status: "active", priority: "high", marketType: "sports", assigneeId: "agent-002", swarmId: "swarm-002",
+    prediction: { market: "Lakers vs Celtics - Lakers win series", position: "Yes", confidence: 58, stake: 750, odds: 2.10 },
+    outcome: null,
+    timeline: [
+      { id: "e11", type: "created", description: "Mission created", timestamp: Date.now() - 259200000 },
+      { id: "e12", type: "assigned", description: "Assigned to SportOracle", timestamp: Date.now() - 255600000 },
+      { id: "e13", type: "analysis", description: "LeBron questionable — adjusting model probabilities", timestamp: Date.now() - 14400000 },
+    ],
+    targetDate: Date.now() + 2592000000, createdAt: Date.now() - 259200000, updatedAt: Date.now() - 14400000,
+  },
+  {
+    id: "m-005", title: "Track LoL roster swaps", description: "Monitor off-season transfers and evaluate team strength changes for Worlds betting",
+    status: "pending", priority: "low", marketType: "esports", assigneeId: "agent-003", swarmId: "swarm-002",
+    prediction: null, outcome: null,
+    timeline: [
+      { id: "e14", type: "created", description: "Mission created — awaiting agent analysis", timestamp: Date.now() - 432000000 },
+    ],
+    targetDate: Date.now() + 5184000000, createdAt: Date.now() - 432000000, updatedAt: Date.now() - 432000000,
+  },
+  {
+    id: "m-006", title: "Crypto correlation matrix update", description: "Rebuild cross-asset correlation models with latest data",
+    status: "active", priority: "normal", marketType: "crypto", assigneeId: "agent-005", swarmId: "swarm-003",
+    prediction: { market: "SOL/ETH decorrelation trade", position: "Long SOL / Short ETH", confidence: 68, stake: 1200, odds: 1.75 },
+    outcome: null,
+    timeline: [
+      { id: "e15", type: "created", description: "Mission created", timestamp: Date.now() - 345600000 },
+      { id: "e16", type: "assigned", description: "Assigned to QuantEdge", timestamp: Date.now() - 342000000 },
+      { id: "e17", type: "analysis", description: "Notable decorrelation between SOL and ETH in last 7 days", timestamp: Date.now() - 43200000 },
+    ],
+    targetDate: Date.now() + 604800000, createdAt: Date.now() - 345600000, updatedAt: Date.now() - 43200000,
+  },
+  {
+    id: "m-007", title: "Discover new Kalshi markets", description: "Scout for high-volume Kalshi markets with good spreads",
+    status: "pending", priority: "normal", marketType: "events", assigneeId: null, swarmId: "swarm-003",
+    prediction: null, outcome: null,
+    timeline: [
+      { id: "e18", type: "created", description: "Mission created — no agent assigned yet", timestamp: Date.now() - 518400000 },
+    ],
+    targetDate: Date.now() + 1209600000, createdAt: Date.now() - 518400000, updatedAt: Date.now() - 86400000,
+  },
+  {
+    id: "m-008", title: "Backtest momentum strategy", description: "Run backtests on new momentum-based prediction strategy across crypto markets",
+    status: "resolved", priority: "high", marketType: "crypto", assigneeId: "agent-001", swarmId: "swarm-003",
+    prediction: { market: "Momentum strategy alpha > 5%", position: "Yes", confidence: 65, stake: 800, odds: 1.90 },
+    outcome: { result: "loss", pnl: -800, resolvedAt: Date.now() - 172800000 },
+    timeline: [
+      { id: "e19", type: "created", description: "Mission created", timestamp: Date.now() - 691200000 },
+      { id: "e20", type: "assigned", description: "Assigned to CryptoHawk", timestamp: Date.now() - 688000000 },
+      { id: "e21", type: "analysis", description: "Running backtests on 6-month historical data", timestamp: Date.now() - 345600000 },
+      { id: "e22", type: "prediction", description: "Strategy showed 3.2% alpha — below 5% threshold", timestamp: Date.now() - 259200000 },
+      { id: "e23", type: "resolved", description: "Mission failed — strategy did not meet alpha target", timestamp: Date.now() - 172800000 },
+    ],
+    targetDate: Date.now() - 172800000, createdAt: Date.now() - 691200000, updatedAt: Date.now() - 172800000,
+  },
+  {
+    id: "m-009", title: "Super Bowl LVIII totals analysis", description: "Analyze historical Super Bowl scoring and predict total points",
+    status: "resolved", priority: "high", marketType: "sports", assigneeId: "agent-002", swarmId: "swarm-002",
+    prediction: { market: "Super Bowl LVIII Total > 45.5", position: "Yes", confidence: 67, stake: 600, odds: 1.95 },
+    outcome: { result: "win", pnl: 570, resolvedAt: Date.now() - 1209600000 },
+    timeline: [
+      { id: "e24", type: "created", description: "Mission created", timestamp: Date.now() - 2592000000 },
+      { id: "e25", type: "assigned", description: "Assigned to SportOracle", timestamp: Date.now() - 2588400000 },
+      { id: "e26", type: "prediction", description: "Model predicts 48.3 total points — taking Over 45.5", timestamp: Date.now() - 1814400000 },
+      { id: "e27", type: "resolved", description: "Final score 34-22 = 56 total. Over hits!", timestamp: Date.now() - 1209600000 },
+    ],
+    targetDate: Date.now() - 1209600000, createdAt: Date.now() - 2592000000, updatedAt: Date.now() - 1209600000,
+  },
+  {
+    id: "m-010", title: "NVDA earnings prediction", description: "Predict NVIDIA Q1 earnings beat/miss using options flow and analyst consensus",
+    status: "resolved", priority: "urgent", marketType: "events", assigneeId: "agent-005", swarmId: "swarm-001",
+    prediction: { market: "NVDA earnings beat Q1", position: "Yes", confidence: 77, stake: 1500, odds: 1.55 },
+    outcome: { result: "win", pnl: 825, resolvedAt: Date.now() - 604800000 },
+    timeline: [
+      { id: "e28", type: "created", description: "Mission created", timestamp: Date.now() - 1209600000 },
+      { id: "e29", type: "assigned", description: "Assigned to QuantEdge", timestamp: Date.now() - 1206000000 },
+      { id: "e30", type: "analysis", description: "Options flow heavily skewed bullish, 77% confidence", timestamp: Date.now() - 864000000 },
+      { id: "e31", type: "prediction", description: "Placed $1500 on earnings beat at 1.55 odds", timestamp: Date.now() - 691200000 },
+      { id: "e32", type: "resolved", description: "NVDA beat by 12% — position wins!", timestamp: Date.now() - 604800000 },
+    ],
+    targetDate: Date.now() - 604800000, createdAt: Date.now() - 1209600000, updatedAt: Date.now() - 604800000,
+  },
 ];
 
 // ─── Mock Swarms ────────────────────────────────────────

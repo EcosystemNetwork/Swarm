@@ -10,10 +10,9 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { getSwarmById, getSwarmAgents, getSwarmMissions, mockMessages, getAgentById } from "@/lib/mock-data";
 
 const MISSION_STATUS_COLORS: Record<string, string> = {
-  backlog: "bg-gray-100 text-gray-600",
+  pending: "bg-yellow-100 text-yellow-700",
   active: "bg-blue-100 text-blue-700",
-  completed: "bg-green-100 text-green-700",
-  failed: "bg-red-100 text-red-700",
+  resolved: "bg-green-100 text-green-700",
 };
 
 const PRIORITY_LABELS: Record<string, { label: string; color: string }> = {

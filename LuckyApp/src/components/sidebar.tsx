@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 
 const sidebarLinks = [
   { href: "/dashboard", label: "Overview", icon: "📊" },
+  { href: "/missions", label: "Missions", icon: "🎯" },
   { href: "/swarms", label: "Swarms", icon: "🐝" },
   { href: "/agents", label: "Agents", icon: "🤖" },
   { href: "/chat", label: "Command", icon: "💬" },
