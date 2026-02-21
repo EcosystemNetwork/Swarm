@@ -128,14 +128,14 @@ export function MessageInput({ onSend, channelName }: MessageInputProps) {
               <button
                 key={m.id}
                 className={`w-full flex items-center gap-2 px-3 py-2 text-sm text-left transition-colors ${
-                  idx === selectedIndex ? "bg-amber-50" : "hover:bg-muted"
+                  idx === selectedIndex ? "bg-amber-50 dark:bg-amber-900/50" : "hover:bg-muted"
                 }`}
                 onMouseDown={(e) => {
                   e.preventDefault();
                   insertMention(m.name);
                 }}
               >
-                <span className="w-5 h-5 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center text-[10px]">
+                <span className="w-5 h-5 rounded-full bg-amber-100 text-amber-600 dark:bg-amber-950/40 dark:text-amber-400 flex items-center justify-center text-[10px]">
                   🤖
                 </span>
                 <span className="text-foreground">{m.name}</span>

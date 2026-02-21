@@ -488,7 +488,7 @@ export default function AgentsPage() {
                   <div className="grid grid-cols-2 gap-3 pt-3 border-t border-border">
                     <div>
                       <div className="text-xs text-muted-foreground">Projects</div>
-                      <div className="text-lg font-bold text-amber-600">
+                      <div className="text-lg font-bold text-amber-600 dark:text-amber-400">
                         {(agent.projectIds ?? []).length}
                       </div>
                     </div>
@@ -501,7 +501,7 @@ export default function AgentsPage() {
                     <Button
                       variant="outline"
                       size="sm"
-                      className="flex-1 text-amber-600 border-amber-300 hover:bg-amber-50 hover:text-amber-700"
+                      className="flex-1 text-amber-600 dark:text-amber-400 border-amber-300 dark:border-amber-700 hover:bg-amber-50 dark:hover:bg-amber-950/30 hover:text-amber-700 dark:hover:text-amber-300"
                       onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleReinvite(agent); }}
                     >
                       🔗 Re-invite

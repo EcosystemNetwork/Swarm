@@ -22,7 +22,7 @@ export function ChannelList({
       {/* Header */}
       <div className="p-4 border-b border-border">
         <h2 className="font-semibold text-sm text-foreground flex items-center gap-2">
-          <MessageSquare className="w-4 h-4 text-amber-600" />
+          <MessageSquare className="w-4 h-4 text-amber-600 dark:text-amber-400" />
           Channels
         </h2>
       </div>
@@ -112,8 +112,8 @@ function DMItem({
       <div
         className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] shrink-0 ${
           dm.participantType === "agent"
-            ? "bg-amber-100 text-amber-600"
-            : "bg-amber-100 text-amber-600"
+            ? "bg-amber-100 text-amber-600 dark:bg-amber-950/40 dark:text-amber-400"
+            : "bg-amber-100 text-amber-600 dark:bg-amber-950/40 dark:text-amber-400"
         }`}
       >
         {dm.participantType === "agent" ? "🤖" : dm.participantName[0]}

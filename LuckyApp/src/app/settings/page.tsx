@@ -171,7 +171,7 @@ export default function SettingsPage() {
                     {logoPreview ? (
                       <img src={logoPreview} alt="Logo" className="w-full h-full object-cover" />
                     ) : (
-                      <span className="text-2xl font-bold text-amber-600">{currentOrg.name.charAt(0).toUpperCase()}</span>
+                      <span className="text-2xl font-bold text-amber-600 dark:text-amber-400">{currentOrg.name.charAt(0).toUpperCase()}</span>
                     )}
                   </button>
                   <button type="button" onClick={() => fileInputRef.current?.click()} className="text-[10px] text-muted-foreground hover:text-foreground">📷 Change Logo</button>

@@ -264,7 +264,7 @@ export default function AgentDetailPage() {
       <div className="grid gap-4 md:grid-cols-4">
         <Card>
           <CardContent className="p-4 text-center">
-            <div className="text-2xl font-bold text-amber-600">{assignedProjects.length}</div>
+            <div className="text-2xl font-bold text-amber-600 dark:text-amber-400">{assignedProjects.length}</div>
             <div className="text-xs text-muted-foreground mt-1">Assigned Projects</div>
           </CardContent>
         </Card>

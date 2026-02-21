@@ -53,8 +53,8 @@ const TASK_STATUS_COLORS: Record<string, string> = {
 
 const PRIORITY_LABELS: Record<string, { label: string; color: string }> = {
   low: { label: "Low", color: "text-muted-foreground" },
-  medium: { label: "Medium", color: "text-amber-600" },
-  high: { label: "High", color: "text-orange-600" },
+  medium: { label: "Medium", color: "text-amber-600 dark:text-amber-400" },
+  high: { label: "High", color: "text-orange-600 dark:text-orange-400" },
 };
 
 export default function ProjectDetailPage() {

@@ -271,7 +271,7 @@ export default function DashboardPage() {
                     {recentTasks.length === 0 ? (
                       <div className="text-center py-8 text-muted-foreground">
                         <p>No tasks yet</p>
-                        <Link href="/missions" className="text-amber-600 hover:underline text-sm">
+                        <Link href="/missions" className="text-amber-600 dark:text-amber-400 hover:underline text-sm">
                           Create your first task →
                         </Link>
                       </div>
@@ -311,7 +311,7 @@ export default function DashboardPage() {
                     {recentJobs.length === 0 ? (
                       <div className="text-center py-8 text-muted-foreground">
                         <p>No jobs posted yet</p>
-                        <Link href="/jobs" className="text-amber-600 hover:underline text-sm">
+                        <Link href="/jobs" className="text-amber-600 dark:text-amber-400 hover:underline text-sm">
                           Post your first job →
                         </Link>
                       </div>

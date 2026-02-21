@@ -183,7 +183,7 @@ export default function ChatPage() {
                     key={channel.id}
                     onClick={() => handleSelectChannel(channel)}
                     className={`w-full text-left px-4 py-2 text-sm hover:bg-card transition-colors ${
-                      activeChannel?.id === channel.id ? 'bg-card border-r-2 border-amber-500 text-amber-600' : 'text-muted-foreground'
+                      activeChannel?.id === channel.id ? 'bg-card border-r-2 border-amber-500 text-amber-600 dark:text-amber-400' : 'text-muted-foreground'
                     }`}
                   >
                     <div className="flex items-center gap-2">

@@ -85,7 +85,7 @@ export function NodePalette({ agents }: NodePaletteProps) {
                       <span className="text-xs text-muted-foreground">
                         {AGENT_TYPE_ICONS[agent.type]} {agent.type}
                       </span>
-                      <span className="text-xs text-amber-600 font-medium ml-auto">
+                      <span className="text-xs text-amber-600 dark:text-amber-400 font-medium ml-auto">
                         {formatCostCents(AGENT_TYPE_COSTS[agent.type])}
                       </span>
                     </div>

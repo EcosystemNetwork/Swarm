@@ -43,7 +43,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
             {message.senderName}
           </span>
           {isAgent && (
-            <span className="text-[10px] bg-amber-100 text-amber-600 px-1.5 py-0.5 rounded-full font-medium">
+            <span className="text-[10px] bg-amber-100 text-amber-600 dark:bg-amber-950/40 dark:text-amber-400 px-1.5 py-0.5 rounded-full font-medium">
               Agent
             </span>
           )}

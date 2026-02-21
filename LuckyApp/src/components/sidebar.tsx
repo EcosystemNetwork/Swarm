@@ -30,8 +30,8 @@ export function Sidebar() {
               className={cn(
                 "relative flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-all duration-300 btn-glow",
                 isActive
-                  ? "text-amber-400 bg-amber-500/10 border border-amber-500/20 neon-glow-gold"
-                  : "text-muted-foreground hover:text-amber-300 hover:bg-amber-500/5"
+                  ? "text-amber-700 dark:text-amber-400 bg-amber-500/10 border border-amber-500/20 neon-glow-gold"
+                  : "text-muted-foreground hover:text-amber-600 dark:hover:text-amber-300 hover:bg-amber-500/5"
               )}
             >
               {isActive && (

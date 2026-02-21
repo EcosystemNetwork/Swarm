@@ -63,7 +63,7 @@ export function PerformanceTable<T>({
                 <span className="flex items-center gap-1">
                   {col.label}
                   {col.sortable && sortKey === col.key && (
-                    <span className="text-amber-600">
+                    <span className="text-amber-600 dark:text-amber-400">
                       {sortDir === "desc" ? "▼" : "▲"}
                     </span>
                   )}
@@ -97,7 +97,7 @@ export function PnlDisplay({ value, currency = "$" }: { value: number; currency?
   const abs = Math.abs(value).toLocaleString(undefined, { minimumFractionDigits: currency === "HBAR" ? 2 : 0, maximumFractionDigits: 2 });
   const display = currency === "HBAR" ? `${sign}${abs} HBAR` : `${sign}$${abs}`;
   return (
-    <span className={cn("font-semibold", isPositive ? "text-amber-600" : "text-red-500")}>
+    <span className={cn("font-semibold", isPositive ? "text-amber-600 dark:text-amber-400" : "text-red-500")}>
       {display}
     </span>
   );

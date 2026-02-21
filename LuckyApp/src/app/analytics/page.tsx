@@ -162,7 +162,7 @@ export default function AnalyticsPage() {
       render: (a: AgentPerformance) => {
         const isWin = a.streak > 0;
         return (
-          <span className={cn("text-sm font-medium", isWin ? "text-amber-600" : a.streak === 0 ? "text-muted-foreground" : "text-red-500")}>
+          <span className={cn("text-sm font-medium", isWin ? "text-amber-600 dark:text-amber-400" : a.streak === 0 ? "text-muted-foreground" : "text-red-500")}>
             {a.streak === 0 ? "—" : isWin ? `🔥 ${a.streak}W` : `${Math.abs(a.streak)}L`}
           </span>
         );
@@ -179,7 +179,7 @@ export default function AnalyticsPage() {
           <span className="font-medium truncate">{s.name}</span>
           <Badge className={cn(
             "text-[10px]",
-            s.status === "active" ? "bg-amber-50 text-amber-700" : "bg-muted text-muted-foreground"
+            s.status === "active" ? "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400" : "bg-muted text-muted-foreground"
           )}>
             {s.status}
           </Badge>
@@ -394,7 +394,7 @@ export default function AnalyticsPage() {
                       )}
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">{view === "live" ? "Balance" : "P&L"}</span>
-                        <span className={cn("font-semibold", m.totalPnl >= 0 ? "text-amber-600" : "text-red-500")}>
+                        <span className={cn("font-semibold", m.totalPnl >= 0 ? "text-amber-600 dark:text-amber-400" : "text-red-500")}>
                           {m.totalPnl >= 0 ? "+" : "-"}
                           {currency === "HBAR"
                             ? `${Math.abs(m.totalPnl).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} HBAR`

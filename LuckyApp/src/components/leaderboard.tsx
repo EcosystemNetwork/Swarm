@@ -25,7 +25,7 @@ export function Leaderboard({ agents: rawAgents, currency = "$", limit = 6, comp
         <CardTitle className={cn(compact ? "text-lg" : "text-xl")}>
           🏆 Top Agents
         </CardTitle>
-        <Badge className="bg-amber-50 text-amber-700 text-xs">
+        <Badge className="bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400 text-xs">
           By P&L
         </Badge>
       </CardHeader>
@@ -57,7 +57,7 @@ export function Leaderboard({ agents: rawAgents, currency = "$", limit = 6, comp
                   <span
                     className={cn(
                       "font-semibold text-sm tabular-nums",
-                      isPositive ? "text-amber-600" : "text-red-500"
+                      isPositive ? "text-amber-600 dark:text-amber-400" : "text-red-500"
                     )}
                   >
                     {isPositive ? "+" : "-"}
