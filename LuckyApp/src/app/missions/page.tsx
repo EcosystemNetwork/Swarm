@@ -52,7 +52,7 @@ export default function TasksPage() {
   const [taskTitle, setTaskTitle] = useState('');
   const [taskDescription, setTaskDescription] = useState('');
   const [taskProject, setTaskProject] = useState('');
-  const [taskAssignee, setTaskAssignee] = useState('');
+  const [taskAssignee, setTaskAssignee] = useState('__none__');
   const [taskPriority, setTaskPriority] = useState<Task['priority']>('medium');
   const [creating, setCreating] = useState(false);
   const [updating, setUpdating] = useState(false);
@@ -115,7 +115,7 @@ export default function TasksPage() {
         projectId: taskProject,
         title: taskTitle.trim(),
         description: taskDescription.trim(),
-        assigneeAgentId: taskAssignee || undefined,
+        assigneeAgentId: taskAssignee === "__none__" ? undefined : taskAssignee || undefined,
         status: 'todo',
         priority: taskPriority,
         createdAt: new Date(),
@@ -125,7 +125,7 @@ export default function TasksPage() {
       setTaskTitle('');
       setTaskDescription('');
       setTaskProject('');
-      setTaskAssignee('');
+      setTaskAssignee('__none__');
       setTaskPriority('medium');
       setCreateOpen(false);
 
@@ -398,7 +398,7 @@ export default function TasksPage() {
                   <SelectValue placeholder="Unassigned" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Unassigned</SelectItem>
+                  <SelectItem value="__none__">Unassigned</SelectItem>
                   {agents.map((agent) => (
                     <SelectItem key={agent.id} value={agent.id}>
                       {agent.name} ({agent.type})

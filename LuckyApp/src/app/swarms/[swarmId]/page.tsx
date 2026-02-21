@@ -93,7 +93,7 @@ export default function ProjectDetailPage() {
   const [editName, setEditName] = useState('');
   const [editDescription, setEditDescription] = useState('');
   const router = useRouter();
-  const [taskAssignee, setTaskAssignee] = useState<string>('');
+  const [taskAssignee, setTaskAssignee] = useState<string>('__none__');
   const [creating, setCreating] = useState(false);
   const [updating, setUpdating] = useState(false);
 
@@ -315,7 +315,7 @@ export default function ProjectDetailPage() {
         projectId,
         title: taskTitle.trim(),
         description: taskDescription.trim(),
-        assigneeAgentId: taskAssignee || undefined,
+        assigneeAgentId: taskAssignee === "__none__" ? undefined : taskAssignee || undefined,
         status: 'todo',
         priority: taskPriority,
         createdAt: new Date(),
@@ -325,7 +325,7 @@ export default function ProjectDetailPage() {
       setTaskTitle('');
       setTaskDescription('');
       setTaskPriority('medium');
-      setTaskAssignee('');
+      setTaskAssignee('__none__');
       setShowCreateTask(false);
 
       await loadProjectData();
@@ -974,7 +974,7 @@ export default function ProjectDetailPage() {
                     <SelectValue placeholder="Unassigned" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Unassigned</SelectItem>
+                    <SelectItem value="__none__">Unassigned</SelectItem>
                     {assignedAgents.map((agent) => (
                       <SelectItem key={agent.id} value={agent.id}>
                         {agent.name}
