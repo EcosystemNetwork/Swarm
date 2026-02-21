@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useOrg } from "@/contexts/OrgContext";
-import { getAgentsByOrg, createAgent, type Agent } from "@/lib/firestore";
+import { getAgentsByOrg, createAgent, updateAgent, deleteAgent, type Agent } from "@/lib/firestore";
 
 const TYPE_COLORS: Record<string, string> = {
   Research: "bg-amber-100 text-amber-700 border-amber-200",
@@ -80,6 +80,19 @@ export default function AgentsPage() {
   const [agentType, setAgentType] = useState<Agent['type']>('Research');
   const [agentDescription, setAgentDescription] = useState('');
 
+  // Edit state
+  const [showEdit, setShowEdit] = useState(false);
+  const [editAgent, setEditAgent] = useState<Agent | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editType, setEditType] = useState<Agent['type']>('Research');
+  const [editDescription, setEditDescription] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  // Delete state
+  const [showDelete, setShowDelete] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<Agent | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
   const handleReinvite = (agent: Agent) => {
     const key = agent.apiKey || crypto.randomUUID();
     const prompt = buildSetupPrompt({
@@ -96,6 +109,54 @@ export default function AgentsPage() {
     setSetupAgentId(agent.id);
     setShowSetup(true);
     setCopied(false);
+  };
+
+  const handleEditOpen = (agent: Agent) => {
+    setEditAgent(agent);
+    setEditName(agent.name);
+    setEditType(agent.type);
+    setEditDescription(agent.description);
+    setShowEdit(true);
+  };
+
+  const handleEditSave = async () => {
+    if (!editAgent || !editName.trim()) return;
+    try {
+      setSaving(true);
+      await updateAgent(editAgent.id, {
+        name: editName.trim(),
+        type: editType,
+        description: editDescription.trim(),
+      });
+      setShowEdit(false);
+      await loadAgents();
+    } catch (err) {
+      console.error('Failed to update agent:', err);
+      setError(err instanceof Error ? err.message : 'Failed to update agent');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDeleteOpen = (agent: Agent) => {
+    setDeleteTarget(agent);
+    setShowDelete(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!deleteTarget) return;
+    try {
+      setDeleting(true);
+      await deleteAgent(deleteTarget.id);
+      setShowDelete(false);
+      setDeleteTarget(null);
+      await loadAgents();
+    } catch (err) {
+      console.error('Failed to delete agent:', err);
+      setError(err instanceof Error ? err.message : 'Failed to delete agent');
+    } finally {
+      setDeleting(false);
+    }
   };
 
   // Setup prompt state (shown after successful registration)
@@ -304,14 +365,32 @@ export default function AgentsPage() {
                       <div className="text-lg font-bold text-foreground">{agent.capabilities.length}</div>
                     </div>
                   </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="w-full mt-3 text-amber-600 border-amber-300 hover:bg-amber-50 hover:text-amber-700"
-                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleReinvite(agent); }}
-                  >
-                    🔗 Re-invite Agent
-                  </Button>
+                  <div className="flex gap-2 mt-3">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="flex-1 text-amber-600 border-amber-300 hover:bg-amber-50 hover:text-amber-700"
+                      onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleReinvite(agent); }}
+                    >
+                      🔗 Re-invite
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="flex-1"
+                      onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleEditOpen(agent); }}
+                    >
+                      ✏️ Edit
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="flex-1 text-red-600 border-red-300 hover:bg-red-50 hover:text-red-700"
+                      onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleDeleteOpen(agent); }}
+                    >
+                      🗑️ Remove
+                    </Button>
+                  </div>
                 </CardContent>
               </Card>
             </Link>
@@ -381,6 +460,74 @@ export default function AgentsPage() {
                 {creating ? 'Registering...' : 'Register Agent'}
               </Button>
             </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Agent Dialog */}
+      <Dialog open={showEdit} onOpenChange={setShowEdit}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Agent</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-medium mb-1 block">Agent Name *</label>
+              <Input
+                value={editName}
+                onChange={e => setEditName(e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-1 block">Agent Type *</label>
+              <Select value={editType} onValueChange={(value: Agent['type']) => setEditType(value)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {AGENT_TYPES.map((type) => (
+                    <SelectItem key={type} value={type}>
+                      <div className="flex flex-col items-start">
+                        <span className="font-medium">{type}</span>
+                        <span className="text-xs text-muted-foreground">{TYPE_DESCRIPTIONS[type]}</span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-1 block">Description</label>
+              <Textarea
+                value={editDescription}
+                onChange={e => setEditDescription(e.target.value)}
+                rows={3}
+              />
+            </div>
+            <div className="flex gap-2 justify-end">
+              <Button variant="outline" onClick={() => setShowEdit(false)} disabled={saving}>Cancel</Button>
+              <Button onClick={handleEditSave} disabled={saving || !editName.trim()} className="bg-amber-600 hover:bg-amber-700">
+                {saving ? 'Saving...' : 'Save'}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Agent Dialog */}
+      <Dialog open={showDelete} onOpenChange={setShowDelete}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Remove Agent</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Are you sure you want to remove <strong>{deleteTarget?.name}</strong>? This action cannot be undone.
+          </p>
+          <div className="flex gap-2 justify-end mt-4">
+            <Button variant="outline" onClick={() => setShowDelete(false)} disabled={deleting}>Cancel</Button>
+            <Button onClick={handleDeleteConfirm} disabled={deleting} className="bg-red-600 hover:bg-red-700 text-white">
+              {deleting ? 'Removing...' : '🗑️ Remove'}
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
