@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -198,7 +198,9 @@ export default function AgentsPage() {
   const [editName, setEditName] = useState('');
   const [editType, setEditType] = useState<Agent['type']>('Research');
   const [editDescription, setEditDescription] = useState('');
+  const [editAvatarPreview, setEditAvatarPreview] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
 
   // Delete state
   const [showDelete, setShowDelete] = useState(false);
@@ -228,18 +230,36 @@ export default function AgentsPage() {
     setEditName(agent.name);
     setEditType(agent.type);
     setEditDescription(agent.description);
+    setEditAvatarPreview(agent.avatarUrl || null);
     setShowEdit(true);
+  };
+
+  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 500 * 1024) {
+      setError('Image must be under 500KB');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => setEditAvatarPreview(reader.result as string);
+    reader.readAsDataURL(file);
+    e.target.value = '';
   };
 
   const handleEditSave = async () => {
     if (!editAgent || !editName.trim()) return;
     try {
       setSaving(true);
-      await updateAgent(editAgent.id, {
+      const updates: Record<string, unknown> = {
         name: editName.trim(),
         type: editType,
         description: editDescription.trim(),
-      });
+      };
+      if (editAvatarPreview !== (editAgent.avatarUrl || null)) {
+        updates.avatarUrl = editAvatarPreview || '';
+      }
+      await updateAgent(editAgent.id, updates);
       setShowEdit(false);
       
     } catch (err) {
@@ -461,8 +481,12 @@ export default function AgentsPage() {
                 <CardHeader>
                   <div className="flex items-start justify-between">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center text-lg font-bold text-amber-700">
-                        {agent.name.charAt(0)}
+                      <div className="w-10 h-10 rounded-full bg-amber-100 dark:bg-amber-950/40 flex items-center justify-center text-lg font-bold text-amber-700 dark:text-amber-400 overflow-hidden">
+                        {agent.avatarUrl ? (
+                          <img src={agent.avatarUrl} alt={agent.name} className="w-full h-full object-cover" />
+                        ) : (
+                          agent.name.charAt(0)
+                        )}
                       </div>
                       <div>
                         <CardTitle className="text-lg truncate">{agent.name}</CardTitle>
@@ -603,6 +627,37 @@ export default function AgentsPage() {
             <DialogTitle>Edit Agent</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
+            <div className="flex items-center gap-4">
+              <input
+                ref={avatarInputRef}
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                className="hidden"
+                onChange={handleAvatarChange}
+              />
+              <button
+                type="button"
+                onClick={() => avatarInputRef.current?.click()}
+                className="w-16 h-16 rounded-full border border-amber-200 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/30 flex items-center justify-center overflow-hidden cursor-pointer hover:opacity-80 transition-opacity shrink-0"
+              >
+                {editAvatarPreview ? (
+                  <img src={editAvatarPreview} alt="Avatar" className="w-full h-full object-cover" />
+                ) : (
+                  <span className="text-2xl font-bold text-amber-600 dark:text-amber-400">{editName?.charAt(0)?.toUpperCase() || '?'}</span>
+                )}
+              </button>
+              <div className="flex-1 min-w-0">
+                <button type="button" onClick={() => avatarInputRef.current?.click()} className="text-xs text-muted-foreground hover:text-foreground transition-colors">
+                  📷 Change Avatar
+                </button>
+                {editAvatarPreview && (
+                  <button type="button" onClick={() => setEditAvatarPreview(null)} className="text-xs text-red-500 hover:text-red-400 ml-3">
+                    Remove
+                  </button>
+                )}
+                <p className="text-[10px] text-muted-foreground mt-0.5">PNG, JPG or WebP, max 500KB</p>
+              </div>
+            </div>
             <div>
               <label className="text-sm font-medium mb-1 block">Agent Name *</label>
               <Input

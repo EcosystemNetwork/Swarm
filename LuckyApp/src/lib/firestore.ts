@@ -56,6 +56,7 @@ export interface Agent {
   status: 'online' | 'offline' | 'busy';
   projectIds: string[];
   apiKey?: string;
+  avatarUrl?: string;
   createdAt: unknown;
 }
 

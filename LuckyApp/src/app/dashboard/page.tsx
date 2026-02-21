@@ -211,7 +211,7 @@ export default function DashboardPage() {
           <Button asChild variant="outline">
             <Link href="/swarms">Create Project</Link>
           </Button>
-          <Button asChild>
+          <Button asChild className="bg-amber-600 hover:bg-amber-700 text-black">
             <Link href="/agents">Register Agent</Link>
           </Button>
         </div>
