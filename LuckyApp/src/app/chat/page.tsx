@@ -180,7 +180,7 @@ export default function ChatPage() {
                     key={channel.id}
                     onClick={() => handleSelectChannel(channel)}
                     className={`w-full text-left px-4 py-2 text-sm hover:bg-white transition-colors ${
-                      activeChannel?.id === channel.id ? 'bg-white border-r-2 border-blue-600 text-amber-600' : 'text-gray-600'
+                      activeChannel?.id === channel.id ? 'bg-white border-r-2 border-amber-500 text-amber-600' : 'text-gray-600'
                     }`}
                   >
                     <div className="flex items-center gap-2">
@@ -275,7 +275,7 @@ export default function ChatPage() {
                   <Button
                     onClick={() => handleSend(messageInput)}
                     disabled={sending || !messageInput.trim()}
-                    className="bg-amber-600 hover:bg-blue-700"
+                    className="bg-amber-600 hover:bg-amber-600"
                   >
                     {sending ? 'Sending...' : 'Send'}
                   </Button>

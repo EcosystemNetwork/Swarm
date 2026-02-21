@@ -185,7 +185,7 @@ export default function TasksPage() {
         </div>
         <Button 
           onClick={() => setCreateOpen(true)} 
-          className="bg-amber-600 hover:bg-blue-700 text-white"
+          className="bg-amber-600 hover:bg-amber-600 text-white"
           disabled={projects.length === 0}
         >
           + New Task
@@ -408,7 +408,7 @@ export default function TasksPage() {
               <Button
                 onClick={handleCreateTask}
                 disabled={creating || !taskTitle.trim() || !taskProject}
-                className="bg-amber-600 hover:bg-blue-700"
+                className="bg-amber-600 hover:bg-amber-600"
               >
                 {creating ? 'Creating...' : 'Create Task'}
               </Button>

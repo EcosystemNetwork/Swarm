@@ -195,7 +195,7 @@ export default function AgentsPage() {
         </div>
         <Button
           onClick={() => setShowRegister(true)}
-          className="bg-amber-600 hover:bg-blue-700 text-white"
+          className="bg-amber-600 hover:bg-amber-600 text-white"
         >
           + Register Agent
         </Button>
@@ -227,7 +227,7 @@ export default function AgentsPage() {
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {agents.map((agent) => (
             <Link key={agent.id} href={`/agents/${agent.id}`}>
-              <Card className="hover:border-blue-300 transition-colors cursor-pointer h-full">
+              <Card className="hover:border-amber-300 transition-colors cursor-pointer h-full">
                 <CardHeader>
                   <div className="flex items-start justify-between">
                     <div className="flex items-center gap-3">
@@ -331,7 +331,7 @@ export default function AgentsPage() {
               <Button
                 onClick={handleRegisterAgent}
                 disabled={creating || !agentName.trim()}
-                className="bg-amber-600 hover:bg-blue-700"
+                className="bg-amber-600 hover:bg-amber-600"
               >
                 {creating ? 'Registering...' : 'Register Agent'}
               </Button>
@@ -379,7 +379,7 @@ export default function AgentsPage() {
               </Button>
               <Button
                 onClick={handleCopyPrompt}
-                className="bg-blue-600 hover:bg-blue-700"
+                className="bg-amber-500 hover:bg-amber-600"
               >
                 {copied ? '✅ Copied!' : '📋 Copy Prompt'}
               </Button>

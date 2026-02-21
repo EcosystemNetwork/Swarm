@@ -155,13 +155,13 @@ export function MessageInput({ onSend, channelName }: MessageInputProps) {
             onKeyDown={handleKeyDown}
             placeholder={`Message #${channelName}... (@ to mention)`}
             rows={1}
-            className="flex-1 rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent placeholder:text-gray-400"
+            className="flex-1 rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent placeholder:text-gray-400"
             style={{ overflow: "hidden" }}
           />
           <Button
             onClick={handleSend}
             disabled={!input.trim()}
-            className="shrink-0 bg-amber-600 hover:bg-blue-700 text-white h-10 px-4"
+            className="shrink-0 bg-amber-600 hover:bg-amber-600 text-white h-10 px-4"
           >
             <Send className="w-4 h-4" />
           </Button>

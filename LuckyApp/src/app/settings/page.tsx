@@ -140,7 +140,7 @@ export default function SettingsPage() {
                 <Button
                   type="submit"
                   disabled={saving || !name.trim() || name === currentOrg.name && description === (currentOrg.description || '')}
-                  className="bg-amber-600 hover:bg-blue-700 text-white"
+                  className="bg-amber-600 hover:bg-amber-600 text-white"
                 >
                   {saving ? 'Saving...' : 'Save Changes'}
                 </Button>

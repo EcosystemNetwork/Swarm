@@ -138,7 +138,7 @@ export default function ProjectsPage() {
         </div>
         <Button
           onClick={() => setShowCreate(true)}
-          className="bg-amber-600 hover:bg-blue-700 text-white"
+          className="bg-amber-600 hover:bg-amber-600 text-white"
         >
           + Create Project
         </Button>
@@ -163,7 +163,7 @@ export default function ProjectsPage() {
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {projects.map((project) => (
             <Link key={project.id} href={`/swarms/${project.id}`}>
-              <Card className="hover:border-blue-300 transition-colors cursor-pointer h-full">
+              <Card className="hover:border-amber-300 transition-colors cursor-pointer h-full">
                 <CardHeader>
                   <div className="flex items-start justify-between">
                     <div className="space-y-1">
@@ -251,7 +251,7 @@ export default function ProjectsPage() {
               <Button
                 onClick={handleCreateProject}
                 disabled={creating || !name.trim()}
-                className="bg-amber-600 hover:bg-blue-700"
+                className="bg-amber-600 hover:bg-amber-600"
               >
                 {creating ? 'Creating...' : 'Create Project'}
               </Button>

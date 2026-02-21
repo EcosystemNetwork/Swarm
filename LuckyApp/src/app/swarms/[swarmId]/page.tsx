@@ -267,7 +267,7 @@ export default function ProjectDetailPage() {
             <Button 
               onClick={() => setShowAssignAgent(true)}
               disabled={unassignedAgents.length === 0}
-              className="bg-amber-600 hover:bg-blue-700"
+              className="bg-amber-600 hover:bg-amber-600"
             >
               + Assign Agent
             </Button>
@@ -332,7 +332,7 @@ export default function ProjectDetailPage() {
           <div className="flex justify-end">
             <Button 
               onClick={() => setShowCreateTask(true)}
-              className="bg-amber-600 hover:bg-blue-700"
+              className="bg-amber-600 hover:bg-amber-600"
             >
               + Create Task
             </Button>
@@ -343,7 +343,7 @@ export default function ProjectDetailPage() {
               const assignee = task.assigneeAgentId ? assignedAgents.find(a => a.id === task.assigneeAgentId) : null;
               const priority = PRIORITY_LABELS[task.priority] || PRIORITY_LABELS.medium;
               return (
-                <Card key={task.id} className="cursor-pointer hover:border-blue-300" 
+                <Card key={task.id} className="cursor-pointer hover:border-amber-300" 
                       onClick={() => { setSelectedTask(task); setShowTaskDetail(true); }}>
                   <CardContent className="p-4">
                     <div className="flex items-start justify-between gap-4">
