@@ -158,8 +158,7 @@ async function cmdTasksList() {
 
   const q = query(
     collection(db, "tasks"),
-    where("assignedTo", "==", creds.agentId),
-    orderBy("createdAt", "desc")
+    where("assignedTo", "==", creds.agentId)
   );
 
   const snap = await getDocs(q);
@@ -195,8 +194,7 @@ async function cmdInboxList() {
 
   const q = query(
     collection(db, "messages"),
-    where("recipientId", "==", creds.agentId),
-    orderBy("createdAt", "desc")
+    where("recipientId", "==", creds.agentId)
   );
 
   const snap = await getDocs(q);
