@@ -11,6 +11,7 @@ import Image from "next/image";
 import { ArrowRight } from "lucide-react";
 
 const Spline = lazy(() => import('@splinetool/react-spline'));
+const FoidMommy = lazy(() => import('@/components/FoidMommy'));
 
 const client = createThirdwebClient({
   clientId: process.env.NEXT_PUBLIC_THIRDWEB_CLIENT_ID || 'cbd8abcfa13db759ca2f5fa7d8a5a5e5',
@@ -105,6 +106,15 @@ export default function LandingPage() {
                   scene="https://prod.spline.design/Apa6K76Zg3Ki-VRj/scene.splinecode"
                   className="w-full h-full scale-[0.9] md:scale-[1.1] origin-center"
                 />
+              </Suspense>
+            </div>
+
+            {/* Right Asset: FoidMommy */}
+            <div className="absolute inset-0 z-[2] opacity-50 md:opacity-60">
+              <Suspense fallback={null}>
+                <div className="w-full h-full translate-x-[30%] md:translate-x-[35%] translate-y-[50%] md:translate-y-[55%] scale-[0.7] md:scale-[0.8]">
+                  <FoidMommy />
+                </div>
               </Suspense>
             </div>
 

@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { Web3Provider } from "@/lib/dynamic";
 import { OrgProvider } from "@/contexts/OrgContext";
+import SparkleTrail from "@/components/SparkleTrail";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 
@@ -29,6 +30,7 @@ export default function RootLayout({
       <body className={inter.className} suppressHydrationWarning>
         <Web3Provider>
           <OrgProvider>
+            <SparkleTrail />
             {children}
           </OrgProvider>
         </Web3Provider>

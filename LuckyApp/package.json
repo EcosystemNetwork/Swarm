@@ -12,8 +12,11 @@
     "@radix-ui/react-select": "^2.2.6",
     "@radix-ui/react-slot": "^1.2.4",
     "@radix-ui/react-tabs": "^1.1.13",
+    "@react-three/drei": "^10.7.7",
+    "@react-three/fiber": "^9.5.0",
     "@splinetool/react-spline": "^4.1.0",
     "@splinetool/runtime": "^1.12.58",
+    "@types/three": "^0.183.1",
     "@xyflow/react": "^12.10.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
@@ -23,7 +26,8 @@
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "tailwind-merge": "^3.4.0",
-    "thirdweb": "^5.118.2"
+    "thirdweb": "^5.118.2",
+    "three": "^0.183.1"
   },
   "devDependencies": {
     "@netlify/plugin-nextjs": "^5.15.7",

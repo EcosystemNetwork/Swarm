@@ -26,6 +26,7 @@
 
 * {
   border-color: hsl(var(--border));
+  cursor: url('/cursor.png'), auto;
 }
 
 body {
@@ -94,4 +95,24 @@ body {
   stroke: #fbbf24;
   stroke-width: 2;
   stroke-dasharray: 5 5;
+}
+
+/* Cursor sparkle trail */
+@keyframes sparkle-fade {
+  0% {
+    opacity: 1;
+    transform: scale(1) translate(0, 0);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0) translate(var(--drift-x), var(--drift-y));
+  }
+}
+
+.sparkle {
+  position: fixed;
+  pointer-events: none;
+  z-index: 9999;
+  border-radius: 50%;
+  animation: sparkle-fade 0.6s ease-out forwards;
 }
