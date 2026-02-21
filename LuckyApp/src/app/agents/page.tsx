@@ -73,10 +73,10 @@ kill $(cat ~/.swarm/daemon.pid 2>/dev/null) 2>/dev/null
 
 ### Step 1: Install Swarm Connect plugin
 \`\`\`bash
-curl -L -o /tmp/swarm-connect.zip https://swarm.perkos.xyz/plugins/swarm-connect.zip
-mkdir -p ~/.openclaw/skills/swarm-connect
+mkdir -p ~/.openclaw/skills/swarm-connect/scripts
 cd ~/.openclaw/skills/swarm-connect
-unzip -o /tmp/swarm-connect.zip
+curl -L -o scripts/swarm.mjs https://swarm.perkos.xyz/swarm-connect/swarm.mjs
+curl -L -o package.json https://swarm.perkos.xyz/swarm-connect/package.json
 npm install
 \`\`\`
 
