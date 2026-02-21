@@ -97,17 +97,17 @@ export default function LandingPage() {
             }>
               <Spline
                 scene="https://prod.spline.design/G9Uv2yhuZyhmrxRG/scene.splinecode"
-                className="w-full h-full pointer-events-none opacity-80"
+                className="w-full h-full opacity-80"
               />
             </Suspense>
-            {/* Gradient Overlay to fade Spline into background - adjusted for visibility */}
+            {/* Gradient Overlay to fade Spline into background - KEEP pointer-events-none so mouse events reach Spline underneath */}
             <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-transparent to-black pointer-events-none" />
           </div>
 
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-amber-500/5 rounded-full blur-[120px] pointer-events-none" />
 
-          <div className="max-w-5xl mx-auto px-6 text-center relative z-10">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-amber-500/20 bg-amber-500/5 text-amber-500 text-xs font-semibold mb-8 animate-in">
+          <div className="max-w-5xl mx-auto px-6 text-center relative z-10 pointer-events-none">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-amber-500/20 bg-amber-500/5 text-amber-500 text-xs font-semibold mb-8 animate-in pointer-events-auto">
               <span className="relative flex h-2 w-2">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
@@ -127,7 +127,7 @@ export default function LandingPage() {
               Deploy projects, assign tasks, and monitor performance with the ultimate enterprise command center.
             </p>
 
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-6 animate-in delay-300">
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-6 animate-in delay-300 pointer-events-auto">
               <ConnectButton client={client} chains={[base, hedera]} />
               <Link href="/dashboard">
                 <Button variant="outline" size="lg" className="h-12 px-8 rounded-full border-white/10 hover:bg-white/5 group bg-black/20">
