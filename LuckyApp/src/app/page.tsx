@@ -6,7 +6,7 @@ import { ConnectButton, useActiveAccount } from "thirdweb/react";
 import { createThirdwebClient } from "thirdweb";
 import { base, defineChain } from "thirdweb/chains";
 import { useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, Suspense, lazy } from "react";
 import Image from "next/image";
 import {
   Shield,
@@ -18,6 +18,8 @@ import {
   LayoutDashboard,
   ArrowRight
 } from "lucide-react";
+
+const Spline = lazy(() => import('@splinetool/react-spline'));
 
 const client = createThirdwebClient({
   clientId: process.env.NEXT_PUBLIC_THIRDWEB_CLIENT_ID || 'cbd8abcfa13db759ca2f5fa7d8a5a5e5',
@@ -85,11 +87,41 @@ export default function LandingPage() {
 
       <main className="flex-1">
         {/* Hero Section */}
-        <section className="relative pt-24 pb-32 overflow-hidden">
+        <section className="relative pt-24 pb-32 overflow-hidden min-h-[95vh] flex items-center justify-center">
+          {/* Dual Spline Background Container */}
+          <div className="absolute inset-0 z-0">
+            {/* Left Asset: Kitty Robot */}
+            <div className="absolute inset-0 z-0 opacity-60 pointer-events-auto">
+              <Suspense fallback={null}>
+                <Spline
+                  scene="https://prod.spline.design/G9Uv2yhuZyhmrxRG/scene.splinecode"
+                  className="w-full h-full scale-[0.8] translate-x-[-25%] md:translate-x-[-35%]"
+                />
+              </Suspense>
+            </div>
+
+            {/* Center Asset: New Robot */}
+            <div className="absolute inset-0 z-[1] opacity-90 pointer-events-auto">
+              <Suspense fallback={
+                <div className="w-full h-full flex items-center justify-center bg-black/20">
+                  <div className="w-12 h-12 border-4 border-amber-500/20 border-t-amber-500 rounded-full animate-spin" />
+                </div>
+              }>
+                <Spline
+                  scene="https://prod.spline.design/Apa6K76Zg3Ki-VRj/scene.splinecode"
+                  className="w-full h-full"
+                />
+              </Suspense>
+            </div>
+
+            {/* Gradient Overlay - ensuring mouse events still pass through to Spline elements */}
+            <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-transparent to-black pointer-events-none" />
+          </div>
+
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-amber-500/5 rounded-full blur-[120px] pointer-events-none" />
 
-          <div className="max-w-5xl mx-auto px-6 text-center relative z-10">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-amber-500/20 bg-amber-500/5 text-amber-500 text-xs font-semibold mb-8 animate-in">
+          <div className="max-w-5xl mx-auto px-6 text-center relative z-10 pointer-events-none">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-amber-500/20 bg-amber-500/5 text-amber-500 text-xs font-semibold mb-8 animate-in pointer-events-auto">
               <span className="relative flex h-2 w-2">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
@@ -109,7 +141,7 @@ export default function LandingPage() {
               Deploy projects, assign tasks, and monitor performance with the ultimate enterprise command center.
             </p>
 
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-6 animate-in delay-300">
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-6 animate-in delay-300 pointer-events-auto">
               <ConnectButton client={client} chains={[base, hedera]} />
               <Link href="/dashboard">
                 <Button variant="outline" size="lg" className="h-12 px-8 rounded-full border-white/10 hover:bg-white/5 group bg-black/20">
