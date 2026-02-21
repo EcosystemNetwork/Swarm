@@ -115,7 +115,7 @@ export default function TasksPage() {
         projectId: taskProject,
         title: taskTitle.trim(),
         description: taskDescription.trim(),
-        assigneeAgentId: taskAssignee === "__none__" ? undefined : taskAssignee || undefined,
+        assigneeAgentId: taskAssignee === "__none__" ? "" : taskAssignee || "",
         status: 'todo',
         priority: taskPriority,
         createdAt: new Date(),

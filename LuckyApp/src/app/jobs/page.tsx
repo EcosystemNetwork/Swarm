@@ -398,7 +398,7 @@ export default function JobBoardPage() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {orgColumns.map((col) => {
                 const colJobs = getJobsByStatus(col.status);
-                const colCost = colJobs.reduce((sum, j) => sum + (parseFloat(j.reward || "0") || 0), 0);
+                const colCost = colJobs.reduce((sum, j) => sum + parseRewardValue(j.reward), 0);
                 return (
                   <div key={col.status} className="space-y-3">
                     <div className={cn(
@@ -410,7 +410,7 @@ export default function JobBoardPage() {
                         <h2 className="font-semibold text-sm">{col.label}</h2>
                       </div>
                       <div className="flex items-center gap-2">
-                        {colCost > 0 && <span className="text-xs text-amber-600 dark:text-amber-400 font-medium">{colCost} HBAR</span>}
+                        <span className="text-xs text-amber-600 dark:text-amber-400 font-medium">{colCost.toLocaleString()} HBAR</span>
                         <Badge variant="secondary" className="text-xs">{colJobs.length}</Badge>
                       </div>
                     </div>
@@ -454,8 +454,9 @@ export default function JobBoardPage() {
                               <p className="text-xs text-muted-foreground line-clamp-2">{job.description}</p>
                             )}
                             {job.reward && (
-                              <div className="text-xs font-medium text-amber-600 dark:text-amber-400">
-                                💰 {job.reward} HBAR
+                              <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-amber-500/10 border border-amber-500/20 w-fit">
+                                <span className="text-sm font-bold text-amber-500">{job.reward}</span>
+                                <span className="text-[10px] text-amber-500/70">HBAR</span>
                               </div>
                             )}
                             {(job.requiredSkills ?? []).length > 0 && (
