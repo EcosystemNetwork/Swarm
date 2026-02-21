@@ -479,14 +479,14 @@ export const mockDMMessages: Record<string, CommandMessage[]> = {
 export interface AgentPerformance {
   agentId: string;
   name: string;
-  type: AgentType;
+  type: string;
   winRate: number;
   totalPredictions: number;
   wins: number;
   losses: number;
   pending: number;
   pnl: number;
-  pnlChange: number;
+  pnlChange?: number;
   streak: number;
 }
 
@@ -495,7 +495,7 @@ export interface SwarmPerformance {
   name: string;
   status: "active" | "paused";
   totalPnl: number;
-  pnlChange: number;
+  pnlChange?: number;
   missionsCompleted: number;
   missionsActive: number;
   winRate: number;
@@ -516,13 +516,13 @@ export interface MarketBreakdown {
 
 export interface OverviewStats {
   totalPnl: number;
-  pnlChange: number;
+  pnlChange?: number;
   winRate: number;
-  winRateChange: number;
+  winRateChange?: number;
   totalPredictions: number;
-  predictionsChange: number;
+  predictionsChange?: number;
   activeAgents: number;
-  agentsChange: number;
+  agentsChange?: number;
 }
 
 export const mockOverviewStats: OverviewStats = {

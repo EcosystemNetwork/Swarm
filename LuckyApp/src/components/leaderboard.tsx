@@ -1,17 +1,19 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { mockAgentPerformance } from "@/lib/mock-data";
+import type { AgentPerformance } from "@/lib/mock-data";
 
 const medals = ["🥇", "🥈", "🥉"];
 
 interface LeaderboardProps {
+  agents: AgentPerformance[];
+  currency?: string;
   limit?: number;
   compact?: boolean;
 }
 
-export function Leaderboard({ limit = 6, compact = false }: LeaderboardProps) {
-  const agents = mockAgentPerformance
+export function Leaderboard({ agents: rawAgents, currency = "$", limit = 6, compact = false }: LeaderboardProps) {
+  const agents = [...rawAgents]
     .sort((a, b) => b.pnl - a.pnl)
     .slice(0, limit);
 
@@ -58,7 +60,10 @@ export function Leaderboard({ limit = 6, compact = false }: LeaderboardProps) {
                       isPositive ? "text-amber-600" : "text-red-500"
                     )}
                   >
-                    {isPositive ? "+" : ""}${Math.abs(agent.pnl).toLocaleString()}
+                    {isPositive ? "+" : "-"}
+                    {currency === "HBAR"
+                      ? `${Math.abs(agent.pnl).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} HBAR`
+                      : `$${Math.abs(agent.pnl).toLocaleString()}`}
                   </span>
                 </div>
 
