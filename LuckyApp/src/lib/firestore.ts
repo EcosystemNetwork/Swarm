@@ -12,163 +12,208 @@ import {
   onSnapshot,
   serverTimestamp,
   type Unsubscribe,
+  arrayUnion,
+  arrayRemove,
 } from "firebase/firestore";
 import { db } from "./firebase";
-import type { AgentType, MarketType } from "./mock-data";
 
 // ─── Types ──────────────────────────────────────────────
 
-export interface FirestoreTeam {
-  id?: string;
+export interface Organization {
+  id: string;
   name: string;
   description?: string;
-  walletAddress: string;
-  createdAt?: unknown;
+  ownerAddress: string;
+  members: string[];
+  createdAt: unknown;
 }
 
-export interface FirestoreSwarm {
-  id?: string;
+export interface Project {
+  id: string;
+  orgId: string;
   name: string;
-  description: string;
-  status: "active" | "paused";
+  description?: string;
+  status: 'active' | 'paused' | 'completed';
   agentIds: string[];
-  teamId: string;
-  createdAt: number;
+  createdAt: unknown;
 }
 
-export interface FirestoreAgent {
-  id?: string;
+export interface Agent {
+  id: string;
+  orgId: string;
   name: string;
-  type: AgentType;
+  type: 'Research' | 'Trading' | 'Operations' | 'Support' | 'Analytics' | 'Scout';
   description: string;
   capabilities: string[];
-  status: "online" | "offline";
-  winRate: number;
-  totalPredictions: number;
-  teamId: string;
-  createdAt: number;
+  status: 'online' | 'offline' | 'busy';
+  projectIds: string[];
+  createdAt: unknown;
 }
 
-export interface FirestoreMission {
-  id?: string;
+export interface Task {
+  id: string;
+  orgId: string;
+  projectId: string;
   title: string;
   description: string;
-  status: "pending" | "active" | "resolved";
-  priority: "low" | "normal" | "high" | "urgent";
-  marketType: MarketType;
-  assigneeId: string | null;
-  swarmId: string;
-  teamId: string;
-  prediction: {
-    market: string;
-    position: string;
-    confidence: number;
-    stake: number;
-    odds: number;
-  } | null;
-  outcome: {
-    result: "win" | "loss";
-    pnl: number;
-    resolvedAt: number;
-  } | null;
-  targetDate: number;
-  createdAt: number;
-  updatedAt: number;
+  assigneeAgentId?: string;
+  status: 'todo' | 'in_progress' | 'done';
+  priority: 'low' | 'medium' | 'high';
+  createdAt: unknown;
 }
 
-export interface FirestoreMessage {
-  id?: string;
-  channelId: string;
-  senderId: string;
-  senderName: string;
-  senderType: "agent" | "operator";
-  content: string;
-  timestamp: number;
-  teamId: string;
-}
-
-export interface FirestoreChannel {
-  id?: string;
+export interface Channel {
+  id: string;
+  orgId: string;
+  projectId?: string;
   name: string;
-  type: "general" | "swarm" | "dm";
-  swarmId?: string;
-  teamId: string;
-  createdAt: number;
+  createdAt: unknown;
 }
 
-// ─── Teams ──────────────────────────────────────────────
+export interface Message {
+  id: string;
+  channelId: string;
+  senderAddress: string;
+  senderName: string;
+  content: string;
+  createdAt: unknown;
+}
 
-export async function createTeam(data: Omit<FirestoreTeam, "id">): Promise<string> {
-  const ref = await addDoc(collection(db, "teams"), {
+// ─── Organizations ──────────────────────────────────────
+
+export async function createOrganization(data: Omit<Organization, "id">): Promise<string> {
+  const ref = await addDoc(collection(db, "organizations"), {
     ...data,
     createdAt: serverTimestamp(),
   });
   return ref.id;
 }
 
-export async function getTeam(teamId: string): Promise<FirestoreTeam | null> {
-  const snap = await getDoc(doc(db, "teams", teamId));
+export async function getOrganization(orgId: string): Promise<Organization | null> {
+  const snap = await getDoc(doc(db, "organizations", orgId));
   if (!snap.exists()) return null;
-  return { id: snap.id, ...snap.data() } as FirestoreTeam;
+  return { id: snap.id, ...snap.data() } as Organization;
 }
 
-export async function updateTeam(teamId: string, data: Partial<FirestoreTeam>): Promise<void> {
-  await updateDoc(doc(db, "teams", teamId), data);
+export async function updateOrganization(orgId: string, data: Partial<Organization>): Promise<void> {
+  await updateDoc(doc(db, "organizations", orgId), data);
 }
 
-export async function getTeamsByWallet(walletAddress: string): Promise<FirestoreTeam[]> {
-  const q = query(collection(db, "teams"), where("walletAddress", "==", walletAddress));
-  const snap = await getDocs(q);
-  return snap.docs.map((d) => ({ id: d.id, ...d.data() } as FirestoreTeam));
+export async function getOrganizationsByWallet(walletAddress: string): Promise<Organization[]> {
+  // Get orgs where user is owner OR in members array
+  const ownerQuery = query(collection(db, "organizations"), where("ownerAddress", "==", walletAddress));
+  const memberQuery = query(collection(db, "organizations"), where("members", "array-contains", walletAddress));
+  
+  const [ownerSnap, memberSnap] = await Promise.all([
+    getDocs(ownerQuery),
+    getDocs(memberQuery)
+  ]);
+  
+  const orgMap = new Map<string, Organization>();
+  
+  // Add orgs where user is owner
+  ownerSnap.docs.forEach(d => {
+    orgMap.set(d.id, { id: d.id, ...d.data() } as Organization);
+  });
+  
+  // Add orgs where user is member (avoid duplicates)
+  memberSnap.docs.forEach(d => {
+    if (!orgMap.has(d.id)) {
+      orgMap.set(d.id, { id: d.id, ...d.data() } as Organization);
+    }
+  });
+  
+  return Array.from(orgMap.values());
 }
 
-// ─── Swarms ─────────────────────────────────────────────
+export async function addMemberToOrganization(orgId: string, walletAddress: string): Promise<void> {
+  await updateDoc(doc(db, "organizations", orgId), {
+    members: arrayUnion(walletAddress)
+  });
+}
 
-export async function createSwarm(data: Omit<FirestoreSwarm, "id">): Promise<string> {
-  const ref = await addDoc(collection(db, "swarms"), data);
+export async function removeMemberFromOrganization(orgId: string, walletAddress: string): Promise<void> {
+  await updateDoc(doc(db, "organizations", orgId), {
+    members: arrayRemove(walletAddress)
+  });
+}
+
+// ─── Projects ───────────────────────────────────────────
+
+export async function createProject(data: Omit<Project, "id">): Promise<string> {
+  const ref = await addDoc(collection(db, "projects"), {
+    ...data,
+    createdAt: serverTimestamp(),
+  });
   return ref.id;
 }
 
-export async function getSwarm(swarmId: string): Promise<FirestoreSwarm | null> {
-  const snap = await getDoc(doc(db, "swarms", swarmId));
+export async function getProject(projectId: string): Promise<Project | null> {
+  const snap = await getDoc(doc(db, "projects", projectId));
   if (!snap.exists()) return null;
-  return { id: snap.id, ...snap.data() } as FirestoreSwarm;
+  return { id: snap.id, ...snap.data() } as Project;
 }
 
-export async function getSwarmsByTeam(teamId: string): Promise<FirestoreSwarm[]> {
-  const q = query(collection(db, "swarms"), where("teamId", "==", teamId));
+export async function getProjectsByOrg(orgId: string): Promise<Project[]> {
+  const q = query(collection(db, "projects"), where("orgId", "==", orgId));
   const snap = await getDocs(q);
-  return snap.docs.map((d) => ({ id: d.id, ...d.data() } as FirestoreSwarm));
+  return snap.docs.map(d => ({ id: d.id, ...d.data() } as Project));
 }
 
-export async function updateSwarm(swarmId: string, data: Partial<FirestoreSwarm>): Promise<void> {
-  await updateDoc(doc(db, "swarms", swarmId), data);
+export async function updateProject(projectId: string, data: Partial<Project>): Promise<void> {
+  await updateDoc(doc(db, "projects", projectId), data);
 }
 
-export async function deleteSwarm(swarmId: string): Promise<void> {
-  await deleteDoc(doc(db, "swarms", swarmId));
+export async function deleteProject(projectId: string): Promise<void> {
+  await deleteDoc(doc(db, "projects", projectId));
+}
+
+export async function assignAgentToProject(projectId: string, agentId: string): Promise<void> {
+  await updateDoc(doc(db, "projects", projectId), {
+    agentIds: arrayUnion(agentId)
+  });
+  await updateDoc(doc(db, "agents", agentId), {
+    projectIds: arrayUnion(projectId)
+  });
+}
+
+export async function unassignAgentFromProject(projectId: string, agentId: string): Promise<void> {
+  await updateDoc(doc(db, "projects", projectId), {
+    agentIds: arrayRemove(agentId)
+  });
+  await updateDoc(doc(db, "agents", agentId), {
+    projectIds: arrayRemove(projectId)
+  });
 }
 
 // ─── Agents ─────────────────────────────────────────────
 
-export async function createAgent(data: Omit<FirestoreAgent, "id">): Promise<string> {
-  const ref = await addDoc(collection(db, "agents"), data);
+export async function createAgent(data: Omit<Agent, "id">): Promise<string> {
+  const ref = await addDoc(collection(db, "agents"), {
+    ...data,
+    createdAt: serverTimestamp(),
+  });
   return ref.id;
 }
 
-export async function getAgent(agentId: string): Promise<FirestoreAgent | null> {
+export async function getAgent(agentId: string): Promise<Agent | null> {
   const snap = await getDoc(doc(db, "agents", agentId));
   if (!snap.exists()) return null;
-  return { id: snap.id, ...snap.data() } as FirestoreAgent;
+  return { id: snap.id, ...snap.data() } as Agent;
 }
 
-export async function getAgentsByTeam(teamId: string): Promise<FirestoreAgent[]> {
-  const q = query(collection(db, "agents"), where("teamId", "==", teamId));
+export async function getAgentsByOrg(orgId: string): Promise<Agent[]> {
+  const q = query(collection(db, "agents"), where("orgId", "==", orgId));
   const snap = await getDocs(q);
-  return snap.docs.map((d) => ({ id: d.id, ...d.data() } as FirestoreAgent));
+  return snap.docs.map(d => ({ id: d.id, ...d.data() } as Agent));
 }
 
-export async function updateAgent(agentId: string, data: Partial<FirestoreAgent>): Promise<void> {
+export async function getUnassignedAgents(orgId: string): Promise<Agent[]> {
+  const agents = await getAgentsByOrg(orgId);
+  return agents.filter(agent => agent.projectIds.length === 0);
+}
+
+export async function updateAgent(agentId: string, data: Partial<Agent>): Promise<void> {
   await updateDoc(doc(db, "agents", agentId), data);
 }
 
@@ -176,75 +221,128 @@ export async function deleteAgent(agentId: string): Promise<void> {
   await deleteDoc(doc(db, "agents", agentId));
 }
 
-// ─── Missions ───────────────────────────────────────────
+// ─── Tasks ──────────────────────────────────────────────
 
-export async function createMission(data: Omit<FirestoreMission, "id">): Promise<string> {
-  const ref = await addDoc(collection(db, "missions"), data);
+export async function createTask(data: Omit<Task, "id">): Promise<string> {
+  const ref = await addDoc(collection(db, "tasks"), {
+    ...data,
+    createdAt: serverTimestamp(),
+  });
   return ref.id;
 }
 
-export async function getMission(missionId: string): Promise<FirestoreMission | null> {
-  const snap = await getDoc(doc(db, "missions", missionId));
+export async function getTask(taskId: string): Promise<Task | null> {
+  const snap = await getDoc(doc(db, "tasks", taskId));
   if (!snap.exists()) return null;
-  return { id: snap.id, ...snap.data() } as FirestoreMission;
+  return { id: snap.id, ...snap.data() } as Task;
 }
 
-export async function getMissionsBySwarm(swarmId: string): Promise<FirestoreMission[]> {
-  const q = query(collection(db, "missions"), where("swarmId", "==", swarmId));
+export async function getTasksByOrg(orgId: string): Promise<Task[]> {
+  const q = query(collection(db, "tasks"), where("orgId", "==", orgId));
   const snap = await getDocs(q);
-  return snap.docs.map((d) => ({ id: d.id, ...d.data() } as FirestoreMission));
+  return snap.docs.map(d => ({ id: d.id, ...d.data() } as Task));
 }
 
-export async function getMissionsByTeam(teamId: string): Promise<FirestoreMission[]> {
-  const q = query(collection(db, "missions"), where("teamId", "==", teamId));
+export async function getTasksByProject(projectId: string): Promise<Task[]> {
+  const q = query(collection(db, "tasks"), where("projectId", "==", projectId));
   const snap = await getDocs(q);
-  return snap.docs.map((d) => ({ id: d.id, ...d.data() } as FirestoreMission));
+  return snap.docs.map(d => ({ id: d.id, ...d.data() } as Task));
 }
 
-export async function updateMission(missionId: string, data: Partial<FirestoreMission>): Promise<void> {
-  await updateDoc(doc(db, "missions", missionId), data);
+export async function updateTask(taskId: string, data: Partial<Task>): Promise<void> {
+  await updateDoc(doc(db, "tasks", taskId), data);
+}
+
+export async function deleteTask(taskId: string): Promise<void> {
+  await deleteDoc(doc(db, "tasks", taskId));
+}
+
+// ─── Channels ───────────────────────────────────────────
+
+export async function createChannel(data: Omit<Channel, "id">): Promise<string> {
+  const ref = await addDoc(collection(db, "channels"), {
+    ...data,
+    createdAt: serverTimestamp(),
+  });
+  return ref.id;
+}
+
+export async function getChannel(channelId: string): Promise<Channel | null> {
+  const snap = await getDoc(doc(db, "channels", channelId));
+  if (!snap.exists()) return null;
+  return { id: snap.id, ...snap.data() } as Channel;
+}
+
+export async function getChannelsByOrg(orgId: string): Promise<Channel[]> {
+  const q = query(collection(db, "channels"), where("orgId", "==", orgId));
+  const snap = await getDocs(q);
+  return snap.docs.map(d => ({ id: d.id, ...d.data() } as Channel));
+}
+
+export async function ensureGeneralChannel(orgId: string): Promise<string> {
+  const channels = await getChannelsByOrg(orgId);
+  const generalChannel = channels.find(c => c.name.toLowerCase() === 'general');
+  
+  if (generalChannel) {
+    return generalChannel.id;
+  }
+  
+  // Create General channel
+  return await createChannel({
+    orgId,
+    name: 'General',
+  });
 }
 
 // ─── Messages ───────────────────────────────────────────
 
-export async function sendMessage(data: Omit<FirestoreMessage, "id">): Promise<string> {
-  const ref = await addDoc(collection(db, "messages"), data);
+export async function sendMessage(data: Omit<Message, "id">): Promise<string> {
+  const ref = await addDoc(collection(db, "messages"), {
+    ...data,
+    createdAt: serverTimestamp(),
+  });
   return ref.id;
 }
 
 export function onMessagesByChannel(
   channelId: string,
-  callback: (messages: FirestoreMessage[]) => void
+  callback: (messages: Message[]) => void
 ): Unsubscribe {
   const q = query(
     collection(db, "messages"),
     where("channelId", "==", channelId),
-    orderBy("timestamp", "asc")
+    orderBy("createdAt", "asc")
   );
   return onSnapshot(q, (snap) => {
-    callback(snap.docs.map((d) => ({ id: d.id, ...d.data() } as FirestoreMessage)));
+    callback(snap.docs.map(d => ({ id: d.id, ...d.data() } as Message)));
   });
 }
 
-export async function getMessagesByChannel(channelId: string): Promise<FirestoreMessage[]> {
+export async function getMessagesByChannel(channelId: string): Promise<Message[]> {
   const q = query(
     collection(db, "messages"),
     where("channelId", "==", channelId),
-    orderBy("timestamp", "asc")
+    orderBy("createdAt", "asc")
   );
   const snap = await getDocs(q);
-  return snap.docs.map((d) => ({ id: d.id, ...d.data() } as FirestoreMessage));
+  return snap.docs.map(d => ({ id: d.id, ...d.data() } as Message));
 }
 
-// ─── Channels ───────────────────────────────────────────
+// ─── Statistics & Analytics ─────────────────────────────
 
-export async function createChannel(data: Omit<FirestoreChannel, "id">): Promise<string> {
-  const ref = await addDoc(collection(db, "channels"), data);
-  return ref.id;
-}
+export async function getOrgStats(orgId: string) {
+  const [projects, agents, tasks] = await Promise.all([
+    getProjectsByOrg(orgId),
+    getAgentsByOrg(orgId),
+    getTasksByOrg(orgId)
+  ]);
 
-export async function getChannelsByTeam(teamId: string): Promise<FirestoreChannel[]> {
-  const q = query(collection(db, "channels"), where("teamId", "==", teamId));
-  const snap = await getDocs(q);
-  return snap.docs.map((d) => ({ id: d.id, ...d.data() } as FirestoreChannel));
+  return {
+    projectCount: projects.length,
+    agentCount: agents.length,
+    taskCount: tasks.length,
+    completedTasks: tasks.filter(t => t.status === 'done').length,
+    activeTasks: tasks.filter(t => t.status === 'in_progress').length,
+    todoTasks: tasks.filter(t => t.status === 'todo').length,
+  };
 }

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { Web3Provider } from "@/lib/dynamic";
-import { TeamProvider } from "@/contexts/TeamContext";
+import { OrgProvider } from "@/contexts/OrgContext";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 
@@ -20,9 +20,9 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body className={inter.className} suppressHydrationWarning>
         <Web3Provider>
-          <TeamProvider>
+          <OrgProvider>
             {children}
-          </TeamProvider>
+          </OrgProvider>
         </Web3Provider>
       </body>
     </html>

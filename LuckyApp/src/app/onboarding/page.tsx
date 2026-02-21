@@ -4,11 +4,11 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { useTeam } from '@/contexts/TeamContext';
+import { useOrg } from '@/contexts/OrgContext';
 
 export default function OnboardingPage() {
   const router = useRouter();
-  const { createTeam } = useTeam();
+  const { createOrg } = useOrg();
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [creating, setCreating] = useState(false);
@@ -20,7 +20,7 @@ export default function OnboardingPage() {
     setError(null);
 
     try {
-      createTeam(name.trim(), description.trim() || undefined);
+      await createOrg(name.trim(), description.trim() || undefined);
       router.push('/dashboard');
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Failed to create organization';
