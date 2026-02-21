@@ -595,9 +595,9 @@ export default function ProjectDetailPage() {
                     </div>
                     {job.description && <p className="text-xs text-muted-foreground line-clamp-2">{job.description}</p>}
                     {job.reward && <div className="text-xs font-medium text-amber-600">💰 {job.reward}</div>}
-                    {job.skillsRequired && job.skillsRequired.length > 0 && (
+                    {job.requiredSkills && job.requiredSkills.length > 0 && (
                       <div className="flex flex-wrap gap-1">
-                        {job.skillsRequired.map((s) => <Badge key={s} variant="outline" className="text-[10px]">{s}</Badge>)}
+                        {job.requiredSkills.map((s) => <Badge key={s} variant="outline" className="text-[10px]">{s}</Badge>)}
                       </div>
                     )}
                     {job.status === "open" && assignedAgents.length > 0 && (
@@ -615,8 +615,8 @@ export default function ProjectDetailPage() {
                         </Select>
                       </div>
                     )}
-                    {job.claimedBy && (
-                      <div className="text-xs text-muted-foreground">🤖 {assignedAgents.find(a => a.id === job.claimedBy)?.name || job.claimedBy}</div>
+                    {job.takenByAgentId && (
+                      <div className="text-xs text-muted-foreground">🤖 {assignedAgents.find(a => a.id === job.takenByAgentId)?.name || job.takenByAgentId}</div>
                     )}
                   </CardContent>
                 </Card>
@@ -657,7 +657,8 @@ export default function ProjectDetailPage() {
                         description: newJobDesc.trim(),
                         status: 'open',
                         reward: newJobReward.trim() || undefined,
-                        createdBy: account?.address || 'unknown',
+                        requiredSkills: [],
+                        postedByAddress: account?.address || 'unknown',
                         priority: newJobPriority,
                         createdAt: new Date(),
                         updatedAt: new Date(),

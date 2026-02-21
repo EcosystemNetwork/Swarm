@@ -14,9 +14,10 @@
  *   node swarm.mjs chat listen <channelId>
  *   node swarm.mjs chat poll              — check all project channels for new messages
  *   node swarm.mjs daemon                — real-time listener, responds instantly via OpenClaw API
+ *   node swarm.mjs daemon --all          — run daemons for ALL registered agents
  */
 
-import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
 import { initializeApp } from "firebase/app";
@@ -41,7 +42,9 @@ import {
 // ---------------------------------------------------------------------------
 const SWARM_DIR = join(homedir(), ".swarm");
 const CREDS_PATH = join(SWARM_DIR, "credentials.json");
+const AGENTS_DIR = join(SWARM_DIR, "agents");
 const STATE_PATH = join(SWARM_DIR, "poll-state.json");
+const MAX_AGENTS_PER_MACHINE = 10;
 
 // ---------------------------------------------------------------------------
 // Firebase config — uses the same project as the Swarm webapp
@@ -137,6 +140,10 @@ async function cmdRegister() {
   };
 
   saveCreds(creds);
+
+  // Also save to agents directory for multi-agent daemon
+  mkdirSync(AGENTS_DIR, { recursive: true });
+  writeFileSync(join(AGENTS_DIR, `${finalAgentId}.json`), JSON.stringify(creds, null, 2) + "\n");
 
   // Update agent status to online in Firestore
   if (agentId) {
@@ -532,20 +539,90 @@ async function cmdChatListen() {
 // Daemon — real-time Firestore listener + OpenClaw API for instant responses
 // ---------------------------------------------------------------------------
 
-async function cmdDaemon() {
-  const creds = loadCreds();
+// ---------------------------------------------------------------------------
+// Helper: load all agent creds from ~/.swarm/agents/
+// ---------------------------------------------------------------------------
+function loadAllAgentCreds() {
+  if (!existsSync(AGENTS_DIR)) return [];
+  const files = readdirSync(AGENTS_DIR).filter(f => f.endsWith(".json"));
+  const agents = [];
+  for (const f of files) {
+    try {
+      agents.push(JSON.parse(readFileSync(join(AGENTS_DIR, f), "utf-8")));
+    } catch {}
+  }
+  return agents;
+}
+
+// ---------------------------------------------------------------------------
+// Single-agent daemon runner (used by both single and --all modes)
+// ---------------------------------------------------------------------------
+async function runAgentDaemon(creds, { agentIndex = 0, allLocalAgents = [], hubUrl, gatewayUrl, gatewayToken }) {
   const db = getDb();
-  const hubUrl = arg("--hub") || process.env.SWARM_HUB_URL || "https://hub.perkos.xyz";
-  const gatewayUrl = process.env.OPENCLAW_GATEWAY_URL || "http://localhost:18789";
-  const gatewayToken = process.env.OPENCLAW_GATEWAY_TOKEN || arg("--gateway-token") || "";
+  const logPrefix = `[${creds.agentName}]`;
+  const log = (msg) => console.log(`${logPrefix} ${msg}`);
 
-  console.log(`🐝 Swarm Daemon starting for ${creds.agentName} (${creds.agentType})`);
-  console.log(`   Hub: ${hubUrl}`);
-  console.log(`   Gateway: ${gatewayUrl}`);
+  log(`🐝 Starting daemon (${creds.agentType})`);
 
-  // --- Helper: trigger OpenClaw agent to respond ---
-  // Track other agents in channels to coordinate turn-taking
-  const channelAgents = {}; // channelId -> [agentId, ...]
+  // --- Anti-loop safety state ---
+  const lastResponseTime = {};    // channelId -> timestamp
+  const responseBurst = {};       // channelId -> [timestamp, ...]
+  const recentChannelSenders = {};// channelId -> [senderId, ...] (last 5)
+  const COOLDOWN_MS = 10000;      // 10s cooldown per channel
+  const MAX_BURST = 3;            // max 3 replies per 60s per channel
+  const BURST_WINDOW_MS = 60000;  // 60s window
+  const AGENT_ONLY_THRESHOLD = 5; // if last 5 messages are all agents, stop
+
+  function shouldRespond(channelId, senderId, senderType) {
+    // Self-skip
+    if (senderId === creds.agentId) return false;
+
+    const now = Date.now();
+
+    // Cooldown check
+    if (lastResponseTime[channelId] && (now - lastResponseTime[channelId]) < COOLDOWN_MS) {
+      log(`   ⏸️ Cooldown active for #${channelId}, skipping`);
+      return false;
+    }
+
+    // Burst check
+    if (responseBurst[channelId]) {
+      responseBurst[channelId] = responseBurst[channelId].filter(t => now - t < BURST_WINDOW_MS);
+      if (responseBurst[channelId].length >= MAX_BURST) {
+        log(`   🛑 Max burst (${MAX_BURST}) reached for #${channelId}, skipping`);
+        return false;
+      }
+    }
+
+    // Agent-only decay: if last N messages are all from agents, wait for human
+    if (senderType === "agent") {
+      const recent = recentChannelSenders[channelId] || [];
+      if (recent.length >= AGENT_ONLY_THRESHOLD && recent.every(s => s.type === "agent")) {
+        log(`   🔇 Last ${AGENT_ONLY_THRESHOLD} messages are agent-only, waiting for human`);
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  function recordResponse(channelId) {
+    const now = Date.now();
+    lastResponseTime[channelId] = now;
+    if (!responseBurst[channelId]) responseBurst[channelId] = [];
+    responseBurst[channelId].push(now);
+  }
+
+  function trackSender(channelId, senderId, senderType) {
+    if (!recentChannelSenders[channelId]) recentChannelSenders[channelId] = [];
+    recentChannelSenders[channelId].push({ id: senderId, type: senderType });
+    if (recentChannelSenders[channelId].length > AGENT_ONLY_THRESHOLD) {
+      recentChannelSenders[channelId].shift();
+    }
+  }
+
+  // Track other agents in channels
+  const channelAgents = {};
 
   // --- Helper: detect and execute task operations directly ---
   async function handleTaskOperations(text, projId, channelId, channelName) {
@@ -553,157 +630,102 @@ async function cmdDaemon() {
     const results = { created: [], assigned: [], completed: [], statusChanged: [] };
 
     try {
-      // --- ASSIGN tasks ---
       if (lower.includes("assign") && lower.includes("task")) {
-        // Assign all project tasks to agents
         const tasksSnap = await getDocs(query(collection(db, "tasks"), where("projectId", "==", projId)));
         const allTasks = tasksSnap.docs.map(d => ({ id: d.id, ...d.data() }));
         const unassigned = allTasks.filter(t => !t.assigneeAgentId && t.status !== "done");
-
-        // Get agents in this org
         const agentsSnap = await getDocs(collection(db, "agents"));
         const orgAgents = agentsSnap.docs.filter(d => d.data().organizationId === creds.orgId).map(d => ({ id: d.id, ...d.data() }));
-
         if (unassigned.length > 0 && orgAgents.length > 0) {
           for (let i = 0; i < unassigned.length; i++) {
             const agent = orgAgents[i % orgAgents.length];
-            await updateDoc(doc(db, "tasks", unassigned[i].id), {
-              assigneeAgentId: agent.id,
-              assignedTo: agent.id,
-              updatedAt: serverTimestamp(),
-            });
+            await updateDoc(doc(db, "tasks", unassigned[i].id), { assigneeAgentId: agent.id, assignedTo: agent.id, updatedAt: serverTimestamp() });
             results.assigned.push({ task: unassigned[i].title, agent: agent.name });
           }
-          console.log(`   👤 Assigned ${results.assigned.length} tasks`);
+          log(`   👤 Assigned ${results.assigned.length} tasks`);
         }
       }
 
-      // --- COMPLETE / DONE tasks ---
       if ((lower.includes("done") || lower.includes("complete") || lower.includes("finish")) && lower.includes("task")) {
         const tasksSnap = await getDocs(query(collection(db, "tasks"), where("projectId", "==", projId)));
         const allTasks = tasksSnap.docs.map(d => ({ id: d.id, ...d.data() }));
         const activeTasks = allTasks.filter(t => t.status !== "done");
-
-        // If "all" mentioned, complete all. Otherwise complete assigned to this agent.
-        const toComplete = lower.includes("all")
-          ? activeTasks
-          : activeTasks.filter(t => t.assigneeAgentId === creds.agentId || t.assignedTo === creds.agentId);
-
+        const toComplete = lower.includes("all") ? activeTasks : activeTasks.filter(t => t.assigneeAgentId === creds.agentId || t.assignedTo === creds.agentId);
         for (const task of toComplete) {
-          await updateDoc(doc(db, "tasks", task.id), {
-            status: "done",
-            completedAt: serverTimestamp(),
-            updatedAt: serverTimestamp(),
-          });
+          await updateDoc(doc(db, "tasks", task.id), { status: "done", completedAt: serverTimestamp(), updatedAt: serverTimestamp() });
           results.completed.push(task.title);
         }
-        if (toComplete.length > 0) console.log(`   ✅ Completed ${toComplete.length} tasks`);
+        if (toComplete.length > 0) log(`   ✅ Completed ${toComplete.length} tasks`);
       }
 
-      // --- CHANGE STATUS (in progress, review) ---
       if (lower.includes("start") || lower.includes("in progress") || lower.includes("begin") || lower.includes("work on")) {
         const tasksSnap = await getDocs(query(collection(db, "tasks"), where("projectId", "==", projId)));
         const allTasks = tasksSnap.docs.map(d => ({ id: d.id, ...d.data() }));
         const todoTasks = allTasks.filter(t => t.status === "todo" && (t.assigneeAgentId === creds.agentId || t.assignedTo === creds.agentId));
-
         for (const task of todoTasks) {
-          await updateDoc(doc(db, "tasks", task.id), {
-            status: "in_progress",
-            updatedAt: serverTimestamp(),
-          });
+          await updateDoc(doc(db, "tasks", task.id), { status: "in_progress", updatedAt: serverTimestamp() });
           results.statusChanged.push(task.title);
         }
-        if (todoTasks.length > 0) console.log(`   🔄 Started ${todoTasks.length} tasks`);
+        if (todoTasks.length > 0) log(`   🔄 Started ${todoTasks.length} tasks`);
       }
 
-      // --- CREATE tasks ---
-      // --- CREATE JOBS (detect "create job", "post job", "new job") ---
       const isJobRequest = lower.includes("create job") || lower.includes("post job") || lower.includes("new job") ||
         (lower.includes("job") && (lower.includes("create") || lower.includes("post") || lower.includes("add")));
-
       if (isJobRequest && projId) {
         const topic = text.replace(/@\w+/g, "").replace(/(?:create|post|new|add)\s*(?:a\s*)?jobs?\s*(?:to|for|about)?/gi, "").trim();
         if (topic) {
-          const jobRef = await addDoc(collection(db, "jobs"), {
-            title: topic,
-            description: `Auto-created from chat: "${text}"`,
-            projectId: projId,
-            orgId: creds.orgId,
-            status: "open",
-            priority: "medium",
-            createdBy: creds.agentId,
-            createdAt: serverTimestamp(),
-            updatedAt: serverTimestamp(),
-          });
+          const jobRef = await addDoc(collection(db, "jobs"), { title: topic, description: `Auto-created from chat: "${text}"`, projectId: projId, orgId: creds.orgId, status: "open", priority: "medium", createdBy: creds.agentId, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
           results.created.push({ id: jobRef.id, title: `[Job] ${topic}` });
-          console.log(`   💼 Created job: ${topic}`);
+          log(`   💼 Created job: ${topic}`);
         }
       }
 
       const isCreateRequest = !isJobRequest && (lower.includes("create task") || lower.includes("create the") || lower.includes("make task") ||
         (lower.includes("task") && (lower.includes("create") || lower.includes("add") || lower.includes("make"))));
-
       if (isCreateRequest && projId && !results.assigned.length && !results.completed.length) {
         const topic = text.replace(/@\w+/g, "").replace(/create\s*(the\s*)?(necessary\s*)?tasks?\s*(to|for|about)?/gi, "").trim();
         if (topic) {
-          const taskTitles = [
-            `Research and plan: ${topic}`,
-            `Prepare resources for: ${topic}`,
-            `Execute: ${topic}`,
-            `Quality check: ${topic}`,
-            `Document and review: ${topic}`,
-          ];
-
+          const taskTitles = [`Research and plan: ${topic}`, `Prepare resources for: ${topic}`, `Execute: ${topic}`, `Quality check: ${topic}`, `Document and review: ${topic}`];
           for (const title of taskTitles) {
-            const taskRef = await addDoc(collection(db, "tasks"), {
-              title,
-              description: `Auto-created from chat: "${text}"`,
-              projectId: projId,
-              orgId: creds.orgId,
-              organizationId: creds.orgId,
-              status: "todo",
-              priority: "medium",
-              assigneeAgentId: creds.agentId,
-              assignedTo: creds.agentId,
-              createdBy: creds.agentId,
-              createdAt: serverTimestamp(),
-              updatedAt: serverTimestamp(),
-            });
+            const taskRef = await addDoc(collection(db, "tasks"), { title, description: `Auto-created from chat: "${text}"`, projectId: projId, orgId: creds.orgId, organizationId: creds.orgId, status: "todo", priority: "medium", assigneeAgentId: creds.agentId, assignedTo: creds.agentId, createdBy: creds.agentId, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
             results.created.push({ id: taskRef.id, title });
           }
-          console.log(`   📝 Created ${results.created.length} tasks`);
+          log(`   📝 Created ${results.created.length} tasks`);
         }
       }
 
       const hasActions = results.created.length || results.assigned.length || results.completed.length || results.statusChanged.length;
       return hasActions ? results : null;
     } catch (err) {
-      console.log(`   ⚠️ Task operation error: ${err.message}`);
+      log(`   ⚠️ Task operation error: ${err.message}`);
       return null;
     }
   }
 
-  async function triggerAgentResponse(channelId, channelName, projName, from, text, projId) {
-    // --- Turn-taking: check if message is directed at us or our specialty ---
+  async function triggerAgentResponse(channelId, channelName, projName, from, senderType, text, projId) {
+    // --- Turn-taking for multi-agent on same machine ---
     const myName = creds.agentName.toLowerCase();
-    const myType = (creds.agentType || "").toLowerCase();
     const msgLower = text.toLowerCase();
     const mentionsMe = msgLower.includes(myName) || msgLower.includes(`@${myName}`);
 
-    // If there are other agents in this channel and message doesn't mention us,
-    // add a small random delay (1-4s) so not everyone responds at once.
-    // If we're directly mentioned, respond immediately.
-    const otherAgents = (channelAgents[channelId] || []).filter(id => id !== creds.agentId);
-    if (otherAgents.length > 0 && !mentionsMe) {
-      const delay = 1000 + Math.random() * 3000;
-      console.log(`   ⏳ ${otherAgents.length} other agent(s) in channel. Waiting ${Math.round(delay/1000)}s...`);
+    // Stagger: agent[0] immediate, agent[1] 3-5s, agent[2] 6-10s, etc.
+    if (agentIndex > 0 && !mentionsMe) {
+      const minDelay = agentIndex * 3000;
+      const maxDelay = agentIndex * 5000;
+      const delay = minDelay + Math.random() * (maxDelay - minDelay);
+      log(`   ⏳ Turn-taking: waiting ${Math.round(delay/1000)}s (agent #${agentIndex})`);
       await new Promise(r => setTimeout(r, delay));
+
+      // Re-check cooldown after waiting (another agent may have responded)
+      if (!shouldRespond(channelId, "recheck", senderType)) return;
     }
 
-    // --- Handle task operations directly (instant, no agent needed) ---
+    // Record that we're responding
+    recordResponse(channelId);
+
+    // Handle task operations
     const taskResults = await handleTaskOperations(text, projId, channelId, channelName);
 
-    // --- Build context for conversational response ---
     let taskContext = "";
     if (taskResults) {
       const parts = [];
@@ -714,168 +736,128 @@ async function cmdDaemon() {
       taskContext = `\n\nActions already executed: ${parts.join(". ")}. Confirm this to the user with specifics.`;
     }
 
+    // Build list of other agents for context
+    const otherAgentsList = allLocalAgents
+      .filter(a => a.agentId !== creds.agentId)
+      .map(a => `${a.agentName} (${a.agentType})`)
+      .join(", ");
+
     const taskMsg = `[Swarm Channel Message]
-Channel: #${channelName} | Project: ${projName} | From: ${from}
+Channel: #${channelName} | Project: ${projName}
+This message is from: ${from} (${senderType}).
 Message: "${text}"${taskContext}
 
-You are ${creds.agentName}, a ${creds.agentType} agent in this swarm. ALWAYS respond to every message — you are part of a team.
+You are ${creds.agentName}, a ${creds.agentType} agent in this swarm.
+${otherAgentsList ? `Other agents in this channel: ${otherAgentsList}.` : ""}
+${senderType === "agent" ? "This message is from another agent. If they already answered well, add your perspective briefly or just acknowledge." : ""}
+If another agent already answered the question well, you can add your perspective briefly or just acknowledge.
+Keep responses SHORT (1-2 sentences). Don't repeat what others said.
 
 IMPORTANT: You MUST run this command to send your reply (without it, nobody sees your response):
 node ~/.openclaw/skills/swarm-connect/scripts/swarm.mjs chat send ${channelId} "<your reply>"
 
 Rules:
 - ALWAYS run the chat send command above with your reply text.
-- Keep responses SHORT (1-3 sentences). Be natural and collaborative.
+- Keep responses SHORT (1-2 sentences). Be natural and collaborative.
 - Bring your ${creds.agentType} perspective to every conversation.
 - If tasks were just created, confirm what was created and offer to start working on them.
 - Be friendly, use emoji occasionally, feel like a real teammate.`;
 
-    const headers = { "Content-Type": "application/json" };
-    if (gatewayToken) headers["Authorization"] = `Bearer ${gatewayToken}`;
-
     try {
-      // Use openclaw agent CLI to trigger an isolated agent turn
       const { execSync } = await import("node:child_process");
       const escapedMsg = taskMsg.replace(/'/g, "'\\''");
-      execSync(`openclaw agent --agent main --message '${escapedMsg}' --json`, {
-        timeout: 120000,
-        stdio: 'pipe',
-      });
-      console.log(`   ✅ Triggered agent response`);
+      execSync(`openclaw agent --agent main --message '${escapedMsg}' --json`, { timeout: 45000, stdio: 'pipe' });
+      log(`   ✅ Triggered agent response`);
       return;
     } catch (cronErr) {
-      console.log(`   ⚠️ Agent trigger failed: ${cronErr.message?.substring(0, 200)}`);
+      log(`   ⚠️ Agent trigger failed: ${cronErr.message?.substring(0, 200)}`);
     }
 
-    // Fallback: direct Firestore response
+    // Fallback
     try {
-      await addDoc(collection(db, "messages"), {
-        channelId,
-        senderId: creds.agentId,
-        senderName: creds.agentName,
-        senderType: "agent",
-        content: `👋 Hey ${from}! I received your message. Let me look into that.`,
-        orgId: creds.orgId,
-        createdAt: serverTimestamp(),
-      });
-      console.log(`   📤 Sent fallback response`);
-    } catch {}
+      const roleResponses = {
+        scout: [`🔍 Interesting question, ${from}! Let me scout around for info on that.`, `📡 On it! Scanning for relevant data...`, `🔎 Good point — let me dig into that.`],
+        research: [`📚 Let me research that for you, ${from}.`, `🧪 Analyzing... I'll look into the details.`, `📊 Great question — checking my sources.`],
+        builder: [`🔧 I can help build something for that!`, `⚡ Let me work on that, ${from}.`, `🛠️ On it — I'll get this sorted.`],
+        default: [`👋 Hey ${from}! On it — let me think about that.`, `💡 Good point! Let me look into it.`, `🤔 Interesting — working on a response for you.`],
+      };
+      const typeKey = (creds.agentType || "").toLowerCase();
+      const responses = roleResponses[typeKey] || roleResponses.default;
+      const reply = responses[Math.floor(Math.random() * responses.length)];
+      await addDoc(collection(db, "messages"), { channelId, senderId: creds.agentId, senderName: creds.agentName, senderType: "agent", content: reply, orgId: creds.orgId, createdAt: serverTimestamp() });
+      log(`   📤 Sent fallback response`);
+    } catch (fbErr) {
+      log(`   ❌ Fallback also failed: ${fbErr.message?.substring(0, 100)}`);
+    }
   }
 
-  // --- Step 1: Authenticate with Hub and get JWT ---
+  // --- Hub auth ---
   let jwt = null;
   let refreshToken = null;
   let ws = null;
 
   async function authenticate() {
     try {
-      const resp = await fetch(`${hubUrl}/auth/token`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ agentId: creds.agentId, apiKey: creds.apiKey }),
-      });
-      if (!resp.ok) {
-        const body = await resp.text();
-        console.log(`   ⚠️ Hub auth failed (${resp.status}): ${body}`);
-        return false;
-      }
+      const resp = await fetch(`${hubUrl}/auth/token`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ agentId: creds.agentId, apiKey: creds.apiKey }) });
+      if (!resp.ok) { log(`   ⚠️ Hub auth failed (${resp.status})`); return false; }
       const data = await resp.json();
       jwt = data.token || data.accessToken;
       refreshToken = data.refreshToken || null;
-      console.log(`   🔑 Authenticated with Hub (JWT obtained)`);
+      log(`   🔑 Authenticated with Hub`);
       return true;
-    } catch (err) {
-      console.log(`   ⚠️ Hub unreachable: ${err.message}`);
-      return false;
-    }
+    } catch (err) { log(`   ⚠️ Hub unreachable: ${err.message}`); return false; }
   }
 
   async function refreshJwt() {
     if (!refreshToken) return authenticate();
     try {
-      const resp = await fetch(`${hubUrl}/auth/refresh`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ refreshToken }),
-      });
+      const resp = await fetch(`${hubUrl}/auth/refresh`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ refreshToken }) });
       if (!resp.ok) return authenticate();
       const data = await resp.json();
       jwt = data.token || data.accessToken;
       if (data.refreshToken) refreshToken = data.refreshToken;
-      console.log(`   🔄 JWT refreshed`);
+      log(`   🔄 JWT refreshed`);
       return true;
-    } catch {
-      return authenticate();
-    }
+    } catch { return authenticate(); }
   }
 
-  // --- Step 2: Connect via WebSocket ---
-  async function connectWebSocket() {
-    const { default: WebSocket } = await import("ws");
-    const wsUrl = hubUrl.replace(/^http/, "ws") + `?token=${jwt}`;
-
-    ws = new WebSocket(wsUrl);
-
-    ws.on("open", () => {
-      console.log(`   🔗 WebSocket connected to Hub (secure)`);
-    });
-
-    ws.on("message", (raw) => {
-      try {
-        const msg = JSON.parse(raw.toString());
-
-        if (msg.type === "message") {
-          // Skip own messages
-          if (msg.senderId === creds.agentId) return;
-          if (msg.senderType === "agent") return;
-
-          const from = msg.senderName || msg.senderId || "unknown";
-          const text = msg.content || "";
-          const channelName = msg.channelName || msg.channelId;
-          const projName = msg.projectName || "Project";
-          console.log(`\n📨 [${projName}] #${channelName} — ${from}: ${text}`);
-          triggerAgentResponse(msg.channelId, channelName, projName, from, text, msg.projectId);
-        } else if (msg.type === "agent:online" || msg.type === "agent:offline") {
-          console.log(`   ${msg.type === "agent:online" ? "🟢" : "🔴"} ${msg.agentName || msg.agentId} ${msg.type.split(":")[1]}`);
-        }
-      } catch {}
-    });
-
-    ws.on("close", (code) => {
-      console.log(`   🔌 WebSocket closed (${code}). Reconnecting in 5s...`);
-      setTimeout(async () => {
-        const ok = await refreshJwt();
-        if (ok) connectWebSocket();
-        else {
-          console.log(`   ⚠️ Hub reconnect failed. Falling back to Firestore listeners.`);
-          startFirestorePolling();
-        }
-      }, 5000);
-    });
-
-    ws.on("error", (err) => {
-      console.log(`   ⚠️ WebSocket error: ${err.message}`);
-    });
-  }
-
-  // --- Step 3: Firestore fallback listeners ---
-  const activeListeners = [];
+  // --- Firestore polling ---
   const processedMessages = new Set();
   let firestoreActive = false;
+  const channelInfo = {};
 
-  // Channel info cache
-  const channelInfo = {}; // channelId -> { name, projName, projId }
+  function handleNewMessage(channelId, m, mDocId) {
+    if (processedMessages.has(mDocId)) return;
+    processedMessages.add(mDocId);
+
+    const senderId = m.senderId || "";
+    const senderType = m.senderType || "user";
+
+    // Track sender for agent-only decay
+    trackSender(channelId, senderId, senderType);
+
+    // Self-skip (NOT senderType filter — agents CAN respond to other agents)
+    if (senderId === creds.agentId) return;
+
+    // Anti-loop checks
+    if (!shouldRespond(channelId, senderId, senderType)) return;
+
+    const from = m.senderName || senderId || "unknown";
+    const text = m.content || m.text || "";
+    const info = channelInfo[channelId] || { name: channelId, projName: "Project", projId: "" };
+    log(`\n📨 [${info.projName}] #${info.name} — ${from} (${senderType}): ${text}`);
+    triggerAgentResponse(channelId, info.name, info.projName, from, senderType, text, info.projId);
+  }
 
   async function startFirestorePolling() {
     if (firestoreActive) return;
     firestoreActive = true;
-    console.log(`   📡 Starting Firestore polling (every 5s)`);
+    log(`   📡 Starting Firestore polling (every 5s)`);
 
     const agentSnap = await getDoc(doc(db, "agents", creds.agentId));
     if (!agentSnap.exists()) return;
     const projectIds = agentSnap.data().projectIds || [];
 
-    // Discover channels and mark existing messages
     for (const projectId of projectIds) {
       const projSnap = await getDoc(doc(db, "projects", projectId));
       const projName = projSnap.exists() ? projSnap.data().name : projectId;
@@ -886,124 +868,131 @@ Rules:
         const channelId = chDoc.id;
         const channelName = chDoc.data().name || "Channel";
         channelInfo[channelId] = { name: channelName, projName, projId: projectId };
-
         const messagesQ = query(collection(db, "messages"), where("channelId", "==", channelId));
         const existing = await getDocs(messagesQ);
         existing.forEach((d) => processedMessages.add(d.id));
-        console.log(`   👂 Watching: [${projName}] #${channelName} (${existing.size} existing msgs)`);
+        log(`   👂 Watching: [${projName}] #${channelName} (${existing.size} existing msgs)`);
       }
     }
 
-    // Poll every 5 seconds for new messages
     setInterval(async () => {
       for (const [channelId, info] of Object.entries(channelInfo)) {
         try {
           const messagesQ = query(collection(db, "messages"), where("channelId", "==", channelId));
           const snap = await getDocs(messagesQ);
           for (const d of snap.docs) {
-            if (processedMessages.has(d.id)) continue;
-            processedMessages.add(d.id);
-            const m = d.data();
-            if (m.senderId === creds.agentId || m.senderType === "agent") continue;
-            const from = m.senderName || m.senderId || "unknown";
-            const text = m.content || m.text || "";
-            console.log(`\n📨 [${info.projName}] #${info.name} — ${from}: ${text}`);
-            triggerAgentResponse(channelId, info.name, info.projName, from, text, info.projId);
+            handleNewMessage(channelId, d.data(), d.id);
           }
         } catch {}
       }
     }, 5000);
   }
 
-  // --- Step 4: Start ---
-  // Update status
-  try {
-    await updateDoc(doc(db, "agents", creds.agentId), { status: "online", lastSeen: serverTimestamp() });
-  } catch {}
+  // --- Start ---
+  try { await updateDoc(doc(db, "agents", creds.agentId), { status: "online", lastSeen: serverTimestamp() }); } catch {}
 
-  // ALWAYS start Firestore listeners (webapp writes directly to Firestore)
   await startFirestorePolling();
 
-  // ALSO connect to Hub for agent-to-agent communication
   const hubOk = await authenticate();
   if (hubOk) {
-    // Dynamic import ws for WebSocket client
     try {
       const { default: WebSocket } = await import("ws");
       const wsUrl = hubUrl.replace(/^http/, "ws") + `?token=${jwt}`;
       ws = new WebSocket(wsUrl);
-
-      ws.on("open", () => {
-        console.log(`   🔗 WebSocket connected to Hub (secure)`);
-      });
-
+      ws.on("open", () => log(`   🔗 WebSocket connected to Hub`));
       ws.on("message", (raw) => {
         try {
           const msg = JSON.parse(raw.toString());
           if (msg.type === "message") {
-            if (msg.senderId === creds.agentId || msg.senderType === "agent") return;
-            const from = msg.senderName || msg.senderId || "unknown";
-            const text = msg.content || "";
-            const channelName = msg.channelName || msg.channelId;
-            const projName = msg.projectName || "Project";
-            console.log(`\n📨 [WSS] [${projName}] #${channelName} — ${from}: ${text}`);
-            triggerAgentResponse(msg.channelId, channelName, projName, from, text, msg.projectId);
+            // Use same anti-loop logic — handleNewMessage does self-skip + cooldown
+            const mDocId = `ws_${msg.messageId || msg.channelId + "_" + Date.now()}`;
+            if (!channelInfo[msg.channelId]) {
+              channelInfo[msg.channelId] = { name: msg.channelName || msg.channelId, projName: msg.projectName || "Project", projId: msg.projectId || "" };
+            }
+            handleNewMessage(msg.channelId, msg, mDocId);
           } else if (msg.type === "agent:online") {
-            console.log(`   🟢 ${msg.agentName || msg.agentId} online`);
-            // Track agent in their channels
+            log(`   🟢 ${msg.agentName || msg.agentId} online`);
             if (msg.channelId) {
               if (!channelAgents[msg.channelId]) channelAgents[msg.channelId] = [];
               if (!channelAgents[msg.channelId].includes(msg.agentId)) channelAgents[msg.channelId].push(msg.agentId);
             }
           } else if (msg.type === "agent:offline") {
-            console.log(`   🔴 ${msg.agentName || msg.agentId} offline`);
+            log(`   🔴 ${msg.agentName || msg.agentId} offline`);
           }
         } catch {}
       });
-
       ws.on("close", (code) => {
-        console.log(`   🔌 WebSocket closed (${code}). Reconnecting in 5s...`);
+        log(`   🔌 WebSocket closed (${code}). Reconnecting in 5s...`);
         setTimeout(async () => {
           const ok = await refreshJwt();
           if (ok) {
             const { default: WS } = await import("ws");
             const url = hubUrl.replace(/^http/, "ws") + `?token=${jwt}`;
             ws = new WS(url);
-            // Re-attach handlers (simplified reconnect)
-            ws.on("open", () => console.log(`   🔗 Reconnected to Hub`));
-            ws.on("message", ws.listeners("message")[0]);
-            ws.on("close", ws.listeners("close")[0]);
-          } else {
-            console.log(`   ⚠️ Hub reconnect failed. Firestore listeners still active.`);
-          }
+            ws.on("open", () => log(`   🔗 Reconnected to Hub`));
+          } else { log(`   ⚠️ Hub reconnect failed. Firestore still active.`); }
         }, 5000);
       });
-
-      ws.on("error", (err) => console.log(`   ⚠️ WS error: ${err.message}`));
-    } catch (err) {
-      console.log(`   ⚠️ WebSocket client failed: ${err.message}. Firestore listeners active.`);
-    }
-  } else {
-    console.log(`   📡 Hub unavailable. Firestore listeners active.`);
-  }
+      ws.on("error", (err) => log(`   ⚠️ WS error: ${err.message}`));
+    } catch (err) { log(`   ⚠️ WebSocket failed: ${err.message}. Firestore active.`); }
+  } else { log(`   📡 Hub unavailable. Firestore active.`); }
 
   // Heartbeat every 60s
-  setInterval(async () => {
-    try {
-      await updateDoc(doc(db, "agents", creds.agentId), { lastSeen: serverTimestamp(), status: "online" });
-    } catch {}
-  }, 60000);
-
-  // Refresh JWT every 12 min
+  setInterval(async () => { try { await updateDoc(doc(db, "agents", creds.agentId), { lastSeen: serverTimestamp(), status: "online" }); } catch {} }, 60000);
   setInterval(() => refreshJwt(), 720000);
 
-  console.log(`\n🟢 Daemon running. Ctrl+C to stop.`);
+  log(`🟢 Daemon running.`);
+
+  // Return cleanup function
+  return () => {
+    if (ws) ws.close();
+    updateDoc(doc(db, "agents", creds.agentId), { status: "offline" }).catch(() => {});
+  };
+}
+
+async function cmdDaemon() {
+  const isAll = process.argv.includes("--all");
+  const hubUrl = arg("--hub") || process.env.SWARM_HUB_URL || "https://hub.perkos.xyz";
+  const gatewayUrl = process.env.OPENCLAW_GATEWAY_URL || "http://localhost:18789";
+  const gatewayToken = process.env.OPENCLAW_GATEWAY_TOKEN || arg("--gateway-token") || "";
+
+  console.log(`   Hub: ${hubUrl}`);
+  console.log(`   Gateway: ${gatewayUrl}`);
+
+  const cleanups = [];
+
+  if (isAll) {
+    // --- Multi-agent mode ---
+    const allAgents = loadAllAgentCreds();
+    if (allAgents.length === 0) {
+      console.error("❌ No agents found in ~/.swarm/agents/. Register agents first.");
+      process.exit(1);
+    }
+    if (allAgents.length > MAX_AGENTS_PER_MACHINE) {
+      console.error(`❌ Too many agents (${allAgents.length}). Max ${MAX_AGENTS_PER_MACHINE} per machine.`);
+      process.exit(1);
+    }
+
+    console.log(`🐝 Multi-agent daemon starting for ${allAgents.length} agent(s):`);
+    allAgents.forEach((a, i) => console.log(`   ${i + 1}. ${a.agentName} (${a.agentType})`));
+    console.log();
+
+    for (let i = 0; i < allAgents.length; i++) {
+      const cleanup = await runAgentDaemon(allAgents[i], { agentIndex: i, allLocalAgents: allAgents, hubUrl, gatewayUrl, gatewayToken });
+      cleanups.push(cleanup);
+    }
+  } else {
+    // --- Single agent mode (backward compat) ---
+    const creds = loadCreds();
+    const cleanup = await runAgentDaemon(creds, { agentIndex: 0, allLocalAgents: [creds], hubUrl, gatewayUrl, gatewayToken });
+    cleanups.push(cleanup);
+  }
+
+  console.log(`\n🟢 Daemon running${isAll ? ` (${cleanups.length} agents)` : ""}. Ctrl+C to stop.`);
 
   process.on("SIGINT", () => {
     console.log("\n🔴 Daemon stopping...");
-    if (ws) ws.close();
-    activeListeners.forEach((unsub) => unsub());
-    updateDoc(doc(db, "agents", creds.agentId), { status: "offline" }).catch(() => {});
+    cleanups.forEach(fn => fn());
     setTimeout(() => process.exit(0), 1000);
   });
 }
@@ -1133,7 +1122,8 @@ Commands:
   job list                — list open jobs for your org
   job claim <jobId>       — claim a job (creates task)
   job create "<title>"    — post a new job (--project --reward --priority --description)
-  daemon                  — real-time listener (instant responses)`);
+  daemon                  — real-time listener (instant responses)
+  daemon --all             — run daemons for ALL registered agents`);
   }
 } catch (err) {
   console.error("Error:", err.message || err);

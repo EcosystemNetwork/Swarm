@@ -42,8 +42,8 @@ type ViewTab = "org" | "onchain";
 
 const orgColumns = [
   { status: "open" as const, label: "Open", icon: "📢", accent: "border-border" },
-  { status: "claimed" as const, label: "Claimed", icon: "🔄", accent: "border-amber-400" },
-  { status: "closed" as const, label: "Closed", icon: "✅", accent: "border-emerald-400" },
+  { status: "in_progress" as const, label: "In Progress", icon: "🔄", accent: "border-amber-400" },
+  { status: "completed" as const, label: "Completed", icon: "✅", accent: "border-emerald-400" },
 ];
 
 const priorityColors = {
@@ -140,13 +140,12 @@ export default function JobBoardPage() {
         title: jobTitle.trim(),
         description: jobDescription.trim(),
         reward: jobReward.trim() || undefined,
-        skillsRequired: jobSkills,
+        requiredSkills: jobSkills,
         status: "open",
-        createdBy: account?.address || "",
-        projectId: jobProject === "__none__" ? "" : jobProject,
+        postedByAddress: account?.address || "",
+        projectId: jobProject || "",
         priority: jobPriority,
         createdAt: new Date(),
-        updatedAt: new Date(),
       });
       setJobTitle(""); setJobDescription(""); setJobReward("");
       setJobSkills([]); setJobProject("__none__"); setJobPriority("medium");
@@ -163,7 +162,7 @@ export default function JobBoardPage() {
   const handleTakeJob = async (job: Job, agentId: string) => {
     try {
       setUpdating(true);
-      await updateJob(job.id, { status: "claimed", claimedBy: agentId });
+      await updateJob(job.id, { status: "in_progress", takenByAgentId: agentId });
       setDetailOpen(false);
       setSelectedJob(null);
       await loadData();
@@ -363,16 +362,16 @@ export default function JobBoardPage() {
                                 💰 {job.reward}
                               </div>
                             )}
-                            {(job.skillsRequired?.length ?? 0) > 0 && (
+                            {job.requiredSkills.length > 0 && (
                               <div className="flex flex-wrap gap-1">
-                                {job.skillsRequired?.slice(0, 3).map((skill) => (
+                                {job.requiredSkills.slice(0, 3).map((skill) => (
                                   <Badge key={skill} variant="outline" className="text-[10px] bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-800">
                                     {skill}
                                   </Badge>
                                 ))}
-                                {(job.skillsRequired?.length ?? 0) > 3 && (
+                                {job.requiredSkills.length > 3 && (
                                   <Badge variant="outline" className="text-[10px]">
-                                    +{(job.skillsRequired?.length ?? 0) - 3}
+                                    +{job.requiredSkills.length - 3}
                                   </Badge>
                                 )}
                               </div>
@@ -380,8 +379,8 @@ export default function JobBoardPage() {
                             <div className="flex items-center justify-between text-[11px] text-muted-foreground pt-1">
                               <div className="flex items-center gap-1.5 min-w-0 truncate">
                                 {job.projectId && <span className="truncate">📁 {getProjectName(job.projectId)}</span>}
-                                {job.claimedBy && <span className="truncate">🤖 {getAgentName(job.claimedBy)}</span>}
-                                {!job.claimedBy && job.status === "open" && (
+                                {job.takenByAgentId && <span className="truncate">🤖 {getAgentName(job.takenByAgentId)}</span>}
+                                {!job.takenByAgentId && job.status === "open" && (
                                   <span className="text-amber-600 dark:text-amber-400">Awaiting agent</span>
                                 )}
                               </div>
@@ -549,11 +548,11 @@ export default function JobBoardPage() {
                   <span className="text-sm font-medium text-amber-700 dark:text-amber-400">💰 Reward: {selectedJob.reward}</span>
                 </div>
               )}
-              {(selectedJob.skillsRequired?.length ?? 0) > 0 && (
+              {selectedJob.requiredSkills.length > 0 && (
                 <div>
                   <span className="text-xs text-muted-foreground block mb-1.5">Required Skills</span>
                   <div className="flex flex-wrap gap-1">
-                    {selectedJob.skillsRequired?.map((skill) => (
+                    {selectedJob.requiredSkills.map((skill) => (
                       <Badge key={skill} variant="outline" className="bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-800 text-xs">{skill}</Badge>
                     ))}
                   </div>
@@ -572,7 +571,7 @@ export default function JobBoardPage() {
                 </div>
                 <div>
                   <span className="text-xs text-muted-foreground">Assigned to</span>
-                  <p className="font-medium truncate">{getAgentName(selectedJob.claimedBy)}</p>
+                  <p className="font-medium truncate">{getAgentName(selectedJob.takenByAgentId)}</p>
                 </div>
                 <div>
                   <span className="text-xs text-muted-foreground">Posted</span>
@@ -598,7 +597,7 @@ export default function JobBoardPage() {
               <div className="flex items-center gap-2 pt-3 border-t">
                 <span className="text-xs text-muted-foreground">Status:</span>
                 <div className="flex gap-1.5">
-                  {(["open", "claimed", "closed"] as const).map((status) => (
+                  {(["open", "in_progress", "completed"] as const).map((status) => (
                     <Button
                       key={status} size="sm"
                       variant={selectedJob.status === status ? "default" : "outline"}
@@ -606,7 +605,7 @@ export default function JobBoardPage() {
                       disabled={updating || selectedJob.status === status}
                       className={cn("text-xs", selectedJob.status === status && "bg-amber-600 hover:bg-amber-700")}
                     >
-                      {status === "claimed" ? "Claimed" : status === "open" ? "Open" : "Closed"}
+                      {status === "in_progress" ? "In Progress" : status === "open" ? "Open" : "Completed"}
                     </Button>
                   ))}
                 </div>

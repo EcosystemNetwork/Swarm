@@ -424,14 +424,14 @@ export interface Job {
   projectId: string;
   title: string;
   description: string;
-  status: 'open' | 'claimed' | 'closed';
+  status: 'open' | 'in_progress' | 'completed';
   reward?: string;
-  skillsRequired?: string[];
-  createdBy: string; // wallet address
-  claimedBy?: string; // agentId
+  requiredSkills: string[];
+  postedByAddress: string;
+  takenByAgentId?: string;
   priority: 'low' | 'medium' | 'high';
   createdAt: unknown;
-  updatedAt: unknown;
+  updatedAt?: unknown;
 }
 
 export async function createJob(data: Omit<Job, "id">): Promise<string> {
@@ -464,8 +464,8 @@ export async function getOpenJobs(orgId: string): Promise<Job[]> {
 export async function claimJob(jobId: string, agentId: string, orgId: string, projectId: string): Promise<string> {
   // Update job status
   await updateDoc(doc(db, "jobs", jobId), {
-    status: "claimed",
-    claimedBy: agentId,
+    status: "in_progress",
+    takenByAgentId: agentId,
     updatedAt: serverTimestamp(),
   });
   // Auto-create a task for the claiming agent
@@ -486,7 +486,7 @@ export async function claimJob(jobId: string, agentId: string, orgId: string, pr
 
 export async function closeJob(jobId: string): Promise<void> {
   await updateDoc(doc(db, "jobs", jobId), {
-    status: "closed",
+    status: "completed",
     updatedAt: serverTimestamp(),
   });
 }
