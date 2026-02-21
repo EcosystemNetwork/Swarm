@@ -1,0 +1,268 @@
+#!/usr/bin/env node
+
+/**
+ * Swarm Connect CLI — manage your agent's connection to the Swarm platform.
+ *
+ * Usage:
+ *   node swarm.mjs register --org <orgId> --name <name> --type <type> --api-key <key>
+ *   node swarm.mjs status
+ *   node swarm.mjs tasks list
+ *   node swarm.mjs tasks update <taskId> --status <status>
+ *   node swarm.mjs inbox list
+ *   node swarm.mjs inbox count
+ *   node swarm.mjs chat send <channelId> <message>
+ */
+
+import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
+import { join } from "node:path";
+import { homedir } from "node:os";
+import { initializeApp } from "firebase/app";
+import {
+  getFirestore,
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+  updateDoc,
+  addDoc,
+  query,
+  where,
+  orderBy,
+  serverTimestamp,
+} from "firebase/firestore";
+
+// ---------------------------------------------------------------------------
+// Paths
+// ---------------------------------------------------------------------------
+const SWARM_DIR = join(homedir(), ".swarm");
+const CREDS_PATH = join(SWARM_DIR, "credentials.json");
+
+// ---------------------------------------------------------------------------
+// Firebase config — uses the same project as the Swarm webapp
+// ---------------------------------------------------------------------------
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyAwsFqFmZpw2QN0ZR1UmpgsC4ApTqHmoOM",
+  authDomain: "lucky-st.firebaseapp.com",
+  projectId: "lucky-st",
+  storageBucket: "lucky-st.firebasestorage.app",
+  messagingSenderId: "1075065834255",
+  appId: "1:1075065834255:web:f66fd6e4fa05f812c18c7a",
+};
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+function loadCreds() {
+  if (!existsSync(CREDS_PATH)) {
+    console.error("❌ Not registered. Run `swarm.mjs register` first.");
+    process.exit(1);
+  }
+  return JSON.parse(readFileSync(CREDS_PATH, "utf-8"));
+}
+
+function saveCreds(creds) {
+  mkdirSync(SWARM_DIR, { recursive: true });
+  writeFileSync(CREDS_PATH, JSON.stringify(creds, null, 2) + "\n");
+}
+
+function getDb() {
+  const app = initializeApp(FIREBASE_CONFIG);
+  return getFirestore(app);
+}
+
+function arg(flag) {
+  const idx = process.argv.indexOf(flag);
+  return idx !== -1 && idx + 1 < process.argv.length
+    ? process.argv[idx + 1]
+    : undefined;
+}
+
+// ---------------------------------------------------------------------------
+// Commands
+// ---------------------------------------------------------------------------
+
+async function cmdRegister() {
+  const orgId = arg("--org");
+  const name = arg("--name");
+  const type = arg("--type");
+  const apiKey = arg("--api-key");
+
+  if (!orgId || !name || !type || !apiKey) {
+    console.error(
+      "Usage: swarm.mjs register --org <orgId> --name <name> --type <type> --api-key <key>"
+    );
+    process.exit(1);
+  }
+
+  // For now we generate a local agentId — will be replaced by server-side registration later
+  const agentId = `agent_${Date.now().toString(36)}`;
+
+  const creds = {
+    orgId,
+    agentId,
+    agentName: name,
+    agentType: type,
+    apiKey,
+    platformUrl: "https://swarm.perkos.xyz",
+  };
+
+  saveCreds(creds);
+  console.log(`✅ Registered as "${name}" (${type})`);
+  console.log(`   Org:      ${orgId}`);
+  console.log(`   Agent ID: ${agentId}`);
+  console.log(`   Creds:    ${CREDS_PATH}`);
+}
+
+async function cmdStatus() {
+  const creds = loadCreds();
+  console.log("🐝 Swarm Connect Status");
+  console.log(`   Agent:    ${creds.agentName} (${creds.agentType || "unknown"})`);
+  console.log(`   Org:      ${creds.orgId}`);
+  console.log(`   Agent ID: ${creds.agentId}`);
+  console.log(`   Platform: ${creds.platformUrl}`);
+
+  // Try to read agent doc from Firestore
+  try {
+    const db = getDb();
+    const snap = await getDoc(doc(db, "agents", creds.agentId));
+    if (snap.exists()) {
+      const data = snap.data();
+      console.log(`   Status:   ${data.status || "unknown"}`);
+      console.log(`   Projects: ${(data.projectIds || []).length}`);
+    } else {
+      console.log("   (agent doc not found in Firestore — register via dashboard first)");
+    }
+  } catch {
+    console.log("   (could not reach Firestore)");
+  }
+}
+
+async function cmdTasksList() {
+  const creds = loadCreds();
+  const db = getDb();
+
+  const q = query(
+    collection(db, "tasks"),
+    where("assignedTo", "==", creds.agentId),
+    orderBy("createdAt", "desc")
+  );
+
+  const snap = await getDocs(q);
+  if (snap.empty) {
+    console.log("📋 No tasks assigned to you.");
+    return;
+  }
+
+  console.log(`📋 Tasks (${snap.size}):\n`);
+  snap.forEach((d) => {
+    const t = d.data();
+    console.log(`  [${t.status || "todo"}] ${d.id} — ${t.title || "(untitled)"}`);
+  });
+}
+
+async function cmdTasksUpdate() {
+  const taskId = process.argv[4];
+  const status = arg("--status");
+
+  if (!taskId || !status) {
+    console.error("Usage: swarm.mjs tasks update <taskId> --status <status>");
+    process.exit(1);
+  }
+
+  const db = getDb();
+  await updateDoc(doc(db, "tasks", taskId), { status, updatedAt: serverTimestamp() });
+  console.log(`✅ Task ${taskId} → ${status}`);
+}
+
+async function cmdInboxList() {
+  const creds = loadCreds();
+  const db = getDb();
+
+  const q = query(
+    collection(db, "messages"),
+    where("recipientId", "==", creds.agentId),
+    orderBy("createdAt", "desc")
+  );
+
+  const snap = await getDocs(q);
+  if (snap.empty) {
+    console.log("📬 Inbox empty.");
+    return;
+  }
+
+  console.log(`📬 Inbox (${snap.size}):\n`);
+  snap.forEach((d) => {
+    const m = d.data();
+    const from = m.senderName || m.senderId || "unknown";
+    const text = m.text || "(no text)";
+    console.log(`  [${from}] ${text}`);
+  });
+}
+
+async function cmdInboxCount() {
+  const creds = loadCreds();
+  const db = getDb();
+
+  const q = query(
+    collection(db, "messages"),
+    where("recipientId", "==", creds.agentId)
+  );
+
+  const snap = await getDocs(q);
+  console.log(`📬 ${snap.size} message(s)`);
+}
+
+async function cmdChatSend() {
+  const channelId = process.argv[4];
+  const message = process.argv.slice(5).join(" ");
+
+  if (!channelId || !message) {
+    console.error("Usage: swarm.mjs chat send <channelId> <message>");
+    process.exit(1);
+  }
+
+  const creds = loadCreds();
+  const db = getDb();
+
+  await addDoc(collection(db, "channels", channelId, "messages"), {
+    senderId: creds.agentId,
+    senderName: creds.agentName,
+    text: message,
+    createdAt: serverTimestamp(),
+  });
+
+  console.log(`💬 Sent to #${channelId}`);
+}
+
+// ---------------------------------------------------------------------------
+// Router
+// ---------------------------------------------------------------------------
+
+const cmd = process.argv[2];
+const sub = process.argv[3];
+
+try {
+  if (cmd === "register") await cmdRegister();
+  else if (cmd === "status") await cmdStatus();
+  else if (cmd === "tasks" && sub === "list") await cmdTasksList();
+  else if (cmd === "tasks" && sub === "update") await cmdTasksUpdate();
+  else if (cmd === "inbox" && sub === "list") await cmdInboxList();
+  else if (cmd === "inbox" && sub === "count") await cmdInboxCount();
+  else if (cmd === "chat" && sub === "send") await cmdChatSend();
+  else {
+    console.log(`Swarm Connect CLI
+
+Commands:
+  register  --org <id> --name <n> --type <t> --api-key <k>
+  status
+  tasks list
+  tasks update <taskId> --status <status>
+  inbox list
+  inbox count
+  chat send <channelId> <message>`);
+  }
+} catch (err) {
+  console.error("Error:", err.message || err);
+  process.exit(1);
+}

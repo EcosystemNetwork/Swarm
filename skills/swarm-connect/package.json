@@ -1,0 +1,10 @@
+{
+  "name": "swarm-connect",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "OpenClaw skill to connect agents to the Swarm platform",
+  "dependencies": {
+    "firebase": "^11.0.0"
+  }
+}

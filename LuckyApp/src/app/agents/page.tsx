@@ -32,18 +32,56 @@ const TYPE_DESCRIPTIONS: Record<Agent['type'], string> = {
   Scout: "Reconnaissance and monitoring",
 };
 
+// ---------------------------------------------------------------------------
+// Generate the setup prompt that users copy into their OpenClaw agent
+// ---------------------------------------------------------------------------
+function buildSetupPrompt(p: {
+  agentName: string;
+  agentType: string;
+  orgName: string;
+  orgId: string;
+  agentId: string;
+  apiKey: string;
+}) {
+  return `You are now connected to the Swarm platform as agent "${p.agentName}" (${p.agentType}).
+
+Organization: ${p.orgName} (ID: ${p.orgId})
+Agent ID: ${p.agentId}
+Platform: https://swarm.perkos.xyz
+
+To set up, install the Swarm Connect skill:
+1. Download: https://swarm.perkos.xyz/skills/swarm-connect.zip
+2. Extract to ~/.openclaw/skills/swarm-connect/
+3. Run: cd ~/.openclaw/skills/swarm-connect && npm install
+
+Register your agent:
+  node ~/.openclaw/skills/swarm-connect/scripts/swarm.mjs register --org ${p.orgId} --name "${p.agentName}" --type "${p.agentType}" --api-key ${p.apiKey}
+
+Check status:
+  node ~/.openclaw/skills/swarm-connect/scripts/swarm.mjs status
+
+Your tasks will appear when assigned via the Swarm dashboard.`;
+}
+
 export default function AgentsPage() {
   const [showRegister, setShowRegister] = useState(false);
+  const [showSetup, setShowSetup] = useState(false);
   const { currentOrg } = useOrg();
   const [agents, setAgents] = useState<Agent[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
 
   // Form state
   const [agentName, setAgentName] = useState('');
   const [agentType, setAgentType] = useState<Agent['type']>('Research');
   const [agentDescription, setAgentDescription] = useState('');
+
+  // Setup prompt state (shown after successful registration)
+  const [setupPrompt, setSetupPrompt] = useState('');
+  const [setupApiKey, setSetupApiKey] = useState('');
+  const [setupAgentId, setSetupAgentId] = useState('');
 
   const loadAgents = async () => {
     if (!currentOrg) return;
@@ -63,6 +101,7 @@ export default function AgentsPage() {
 
   useEffect(() => {
     loadAgents();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentOrg]);
 
   const handleRegisterAgent = async () => {
@@ -72,22 +111,39 @@ export default function AgentsPage() {
       setCreating(true);
       setError(null);
 
-      await createAgent({
+      const newAgentId = await createAgent({
         orgId: currentOrg.id,
         name: agentName.trim(),
         type: agentType,
         description: agentDescription.trim() || TYPE_DESCRIPTIONS[agentType],
-        capabilities: [TYPE_DESCRIPTIONS[agentType]], // Start with default capability
-        status: 'offline', // New agents start offline
+        capabilities: [TYPE_DESCRIPTIONS[agentType]],
+        status: 'offline',
         projectIds: [],
         createdAt: new Date(),
       });
 
-      // Clear form and close dialog
+      const apiKey = crypto.randomUUID();
+
+      const prompt = buildSetupPrompt({
+        agentName: agentName.trim(),
+        agentType,
+        orgName: currentOrg.name,
+        orgId: currentOrg.id,
+        agentId: newAgentId,
+        apiKey,
+      });
+
+      setSetupPrompt(prompt);
+      setSetupApiKey(apiKey);
+      setSetupAgentId(newAgentId);
+
+      // Clear form and switch dialogs
       setAgentName('');
       setAgentType('Research');
       setAgentDescription('');
       setShowRegister(false);
+      setShowSetup(true);
+      setCopied(false);
 
       // Reload agents
       await loadAgents();
@@ -96,6 +152,24 @@ export default function AgentsPage() {
       setError(err instanceof Error ? err.message : 'Failed to register agent');
     } finally {
       setCreating(false);
+    }
+  };
+
+  const handleCopyPrompt = async () => {
+    try {
+      await navigator.clipboard.writeText(setupPrompt);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // fallback
+      const ta = document.createElement("textarea");
+      ta.value = setupPrompt;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand("copy");
+      document.body.removeChild(ta);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
     }
   };
 
@@ -260,6 +334,54 @@ export default function AgentsPage() {
                 className="bg-blue-600 hover:bg-blue-700"
               >
                 {creating ? 'Registering...' : 'Register Agent'}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Setup Prompt Dialog — shown after successful registration */}
+      <Dialog open={showSetup} onOpenChange={setShowSetup}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>🎉 Agent Registered!</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-3 text-sm">
+              <div>
+                <span className="text-gray-500">Agent ID</span>
+                <p className="font-mono text-xs break-all">{setupAgentId}</p>
+              </div>
+              <div>
+                <span className="text-gray-500">Organization</span>
+                <p className="font-mono text-xs break-all">{currentOrg?.id}</p>
+              </div>
+              <div className="col-span-2">
+                <span className="text-gray-500">API Key</span>
+                <p className="font-mono text-xs break-all">{setupApiKey}</p>
+              </div>
+            </div>
+
+            <div>
+              <label className="text-sm font-medium mb-1 block">
+                Setup Prompt — paste this into your OpenClaw agent
+              </label>
+              <pre className="bg-gray-50 border rounded-md p-3 text-xs whitespace-pre-wrap max-h-64 overflow-y-auto font-mono">
+                {setupPrompt}
+              </pre>
+            </div>
+
+            <div className="flex gap-2 justify-end">
+              <Button asChild variant="outline">
+                <a href="/skills/swarm-connect.zip" download>
+                  ⬇ Download Skill
+                </a>
+              </Button>
+              <Button
+                onClick={handleCopyPrompt}
+                className="bg-blue-600 hover:bg-blue-700"
+              >
+                {copied ? '✅ Copied!' : '📋 Copy Prompt'}
               </Button>
             </div>
           </div>
