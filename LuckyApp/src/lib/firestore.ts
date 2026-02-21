@@ -75,9 +75,12 @@ export interface Channel {
 export interface Message {
   id: string;
   channelId: string;
-  senderAddress: string;
+  senderId: string;
+  senderAddress?: string;
   senderName: string;
+  senderType: 'human' | 'agent';
   content: string;
+  orgId?: string;
   createdAt: unknown;
 }
 
@@ -301,11 +304,40 @@ export async function ensureGeneralChannel(orgId: string): Promise<string> {
   });
 }
 
+export async function getOrCreateProjectChannel(
+  projectId: string,
+  orgId: string,
+  projectName: string
+): Promise<Channel> {
+  const q = query(
+    collection(db, "channels"),
+    where("orgId", "==", orgId),
+    where("projectId", "==", projectId)
+  );
+  const snap = await getDocs(q);
+
+  if (!snap.empty) {
+    const d = snap.docs[0];
+    return { id: d.id, ...d.data() } as Channel;
+  }
+
+  const id = await createChannel({
+    orgId,
+    projectId,
+    name: `${projectName} Channel`,
+    createdAt: new Date(),
+  });
+
+  return { id, orgId, projectId, name: `${projectName} Channel`, createdAt: new Date() };
+}
+
 // ─── Messages ───────────────────────────────────────────
 
 export async function sendMessage(data: Omit<Message, "id">): Promise<string> {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { createdAt: _ca, ...rest } = data;
   const ref = await addDoc(collection(db, "messages"), {
-    ...data,
+    ...rest,
     createdAt: serverTimestamp(),
   });
   return ref.id;

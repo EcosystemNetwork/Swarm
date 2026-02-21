@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams } from "next/navigation";
+import { useActiveAccount } from "thirdweb/react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 
@@ -24,9 +25,14 @@ import {
   unassignAgentFromProject,
   createTask,
   updateTask,
+  getOrCreateProjectChannel,
+  sendMessage,
+  onMessagesByChannel,
   type Project,
   type Agent,
   type Task,
+  type Message,
+  type Channel,
 } from "@/lib/firestore";
 
 const TASK_STATUS_COLORS: Record<string, string> = {
@@ -45,6 +51,7 @@ export default function ProjectDetailPage() {
   const params = useParams();
   const projectId = params.swarmId as string;
   const { currentOrg } = useOrg();
+  const account = useActiveAccount();
 
   const [project, setProject] = useState<Project | null>(null);
   const [assignedAgents, setAssignedAgents] = useState<Agent[]>([]);
@@ -67,6 +74,13 @@ export default function ProjectDetailPage() {
   const [taskAssignee, setTaskAssignee] = useState<string>('');
   const [creating, setCreating] = useState(false);
   const [updating, setUpdating] = useState(false);
+
+  // Chat state
+  const [channel, setChannel] = useState<Channel | null>(null);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [chatInput, setChatInput] = useState('');
+  const [sendingChat, setSendingChat] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const loadProjectData = async () => {
     if (!currentOrg) return;
@@ -106,6 +120,53 @@ export default function ProjectDetailPage() {
   useEffect(() => {
     loadProjectData();
   }, [projectId, currentOrg]);
+
+  // Auto-create project channel & subscribe to messages
+  useEffect(() => {
+    if (!currentOrg || !project) return;
+    let unsub: (() => void) | undefined;
+
+    (async () => {
+      try {
+        const ch = await getOrCreateProjectChannel(projectId, currentOrg.id, project.name);
+        setChannel(ch);
+        unsub = onMessagesByChannel(ch.id, (msgs) => {
+          setMessages(msgs);
+        });
+      } catch (err) {
+        console.error('Failed to setup project channel:', err);
+      }
+    })();
+
+    return () => { unsub?.(); };
+  }, [projectId, currentOrg, project]);
+
+  // Auto-scroll on new messages
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  const handleSendChat = async () => {
+    if (!chatInput.trim() || !channel || !currentOrg) return;
+    const addr = account?.address || 'anonymous';
+    try {
+      setSendingChat(true);
+      await sendMessage({
+        channelId: channel.id,
+        senderId: addr,
+        senderName: addr.slice(0, 6) + '...' + addr.slice(-4),
+        senderType: 'human',
+        content: chatInput.trim(),
+        orgId: currentOrg.id,
+        createdAt: new Date(),
+      });
+      setChatInput('');
+    } catch (err) {
+      console.error('Failed to send message:', err);
+    } finally {
+      setSendingChat(false);
+    }
+  };
 
   const handleAssignAgent = async () => {
     if (!selectedAgentId) return;
@@ -419,15 +480,71 @@ export default function ProjectDetailPage() {
           <Card>
             <CardHeader className="pb-3 border-b">
               <CardTitle className="text-base">📡 Project Channel</CardTitle>
-              <CardDescription>Real-time communication with project agents</CardDescription>
+              <CardDescription>
+                Real-time communication with project agents
+                {channel && <span className="ml-2 text-xs opacity-50">ID: {channel.id}</span>}
+              </CardDescription>
             </CardHeader>
-            <CardContent className="p-0">
-              <div className="h-[400px] overflow-y-auto p-4 flex items-center justify-center">
-                <div className="text-center text-muted-foreground">
-                  <div className="text-4xl mb-3">💬</div>
-                  <p className="text-sm">Channel integration coming soon</p>
-                  <p className="text-xs text-muted-foreground mt-1">Connect with agents in real-time</p>
-                </div>
+            <CardContent className="p-0 flex flex-col" style={{ height: '500px' }}>
+              {/* Messages */}
+              <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                {messages.length === 0 && (
+                  <div className="flex items-center justify-center h-full text-muted-foreground">
+                    <div className="text-center">
+                      <div className="text-4xl mb-3">💬</div>
+                      <p className="text-sm">No messages yet — say hello!</p>
+                    </div>
+                  </div>
+                )}
+                {messages.map((msg) => {
+                  const isAgent = msg.senderType === 'agent';
+                  const ts = msg.createdAt && typeof msg.createdAt === 'object' && 'seconds' in msg.createdAt
+                    ? new Date((msg.createdAt as { seconds: number }).seconds * 1000)
+                    : msg.createdAt instanceof Date ? msg.createdAt : null;
+                  return (
+                    <div key={msg.id} className={`flex gap-3 ${isAgent ? '' : ''}`}>
+                      <div className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-sm" 
+                           style={{ background: isAgent ? 'rgba(139,92,246,0.15)' : 'rgba(245,158,11,0.15)' }}>
+                        {isAgent ? '🤖' : '👤'}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-0.5">
+                          <span className="font-medium text-sm">{msg.senderName}</span>
+                          {isAgent && (
+                            <Badge variant="secondary" className="text-[10px] px-1.5 py-0 bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400">
+                              Agent
+                            </Badge>
+                          )}
+                          {ts && (
+                            <span className="text-[10px] text-muted-foreground">
+                              {ts.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-sm text-foreground/90 break-words">{msg.content}</p>
+                      </div>
+                    </div>
+                  );
+                })}
+                <div ref={messagesEndRef} />
+              </div>
+              {/* Input */}
+              <div className="border-t p-3 flex gap-2">
+                <Input
+                  placeholder="Type a message..."
+                  value={chatInput}
+                  onChange={(e) => setChatInput(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendChat(); } }}
+                  disabled={sendingChat || !channel}
+                  className="flex-1"
+                />
+                <Button
+                  onClick={handleSendChat}
+                  disabled={sendingChat || !chatInput.trim() || !channel}
+                  className="bg-amber-600 hover:bg-amber-700"
+                >
+                  Send
+                </Button>
               </div>
             </CardContent>
           </Card>
