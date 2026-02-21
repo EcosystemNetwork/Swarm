@@ -8,7 +8,10 @@ import { ConnectButton, useActiveAccount } from 'thirdweb/react';
 import { createThirdwebClient } from 'thirdweb';
 import { base, defineChain } from 'thirdweb/chains';
 import { useOrg } from '@/contexts/OrgContext';
-import { getProjectsByOrg, type Project } from '@/lib/firestore';
+import { getProjectsByOrg, createProject, type Project } from '@/lib/firestore';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 
 const client = createThirdwebClient({
   clientId: process.env.NEXT_PUBLIC_THIRDWEB_CLIENT_ID || 'cbd8abcfa13db759ca2f5fa7d8a5a5e5',
@@ -35,6 +38,9 @@ export function Header() {
   const isConnected = !!account;
   const { currentOrg, organizations, selectOrg } = useOrg();
   const [projects, setProjects] = useState<Project[]>([]);
+  const [showCreateProject, setShowCreateProject] = useState(false);
+  const [newProjectName, setNewProjectName] = useState('');
+  const [creatingProject, setCreatingProject] = useState(false);
 
   const projectMatch = pathname.match(/\/swarms\/([^/]+)/);
   const currentProjectId = projectMatch?.[1] || '';
@@ -49,7 +55,31 @@ export function Header() {
 
   useEffect(() => { fetchProjects(); }, [fetchProjects]);
 
+  const handleCreateProject = async () => {
+    if (!newProjectName.trim() || !currentOrg) return;
+    setCreatingProject(true);
+    try {
+      const id = await createProject({
+        name: newProjectName.trim(),
+        description: '',
+        orgId: currentOrg.id,
+        status: 'active',
+        agentIds: [],
+        createdAt: null,
+      });
+      setNewProjectName('');
+      setShowCreateProject(false);
+      await fetchProjects();
+      router.push(`/swarms/${id}`);
+    } catch (err) {
+      console.error('Failed to create project:', err);
+    } finally {
+      setCreatingProject(false);
+    }
+  };
+
   return (
+    <>
     <header className="sticky top-0 z-50 w-full border-b border-white/10 bg-black/95 backdrop-blur supports-[backdrop-filter]:bg-black/60">
       <div className="flex h-16 items-center justify-between px-6">
         <div className="flex items-center gap-8">
@@ -87,27 +117,58 @@ export function Header() {
                   <option key={org.id} value={org.id}>{org.name}</option>
                 ))}
               </select>
-              {projects.length > 0 && (
-                <>
-                  <span className="text-muted-foreground text-sm">/</span>
-                  <select
-                    className="rounded-md border border-border bg-card px-2 py-1 text-sm text-muted-foreground max-w-[160px]"
-                    value={currentProjectId}
-                    onChange={(e) => { if (e.target.value) router.push(`/swarms/${e.target.value}`); }}
-                    title="Switch Project"
-                  >
-                    <option value="">Select project...</option>
-                    {projects.map(proj => (
-                      <option key={proj.id} value={proj.id}>📁 {proj.name}</option>
-                    ))}
-                  </select>
-                </>
-              )}
+              <span className="text-muted-foreground text-sm">/</span>
+              <select
+                className="rounded-md border border-border bg-card px-2 py-1 text-sm text-muted-foreground max-w-[160px]"
+                value={currentProjectId}
+                onChange={(e) => {
+                  if (e.target.value === '__create__') {
+                    setShowCreateProject(true);
+                    e.target.value = currentProjectId;
+                  } else if (e.target.value) {
+                    router.push(`/swarms/${e.target.value}`);
+                  }
+                }}
+                title="Switch Project"
+              >
+                <option value="">Select project...</option>
+                {projects.map(proj => (
+                  <option key={proj.id} value={proj.id}>📁 {proj.name}</option>
+                ))}
+                <option value="__create__">+ Project</option>
+              </select>
             </>
           )}
           <ConnectButton client={client} chains={[base, hedera]} />
         </div>
       </div>
     </header>
+    <Dialog open={showCreateProject} onOpenChange={setShowCreateProject}>
+      <DialogContent className="bg-card border-border">
+        <DialogHeader>
+          <DialogTitle>Create New Project</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4 pt-2">
+          <Input
+            placeholder="Project name"
+            value={newProjectName}
+            onChange={(e) => setNewProjectName(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') handleCreateProject(); }}
+            autoFocus
+          />
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setShowCreateProject(false)}>Cancel</Button>
+            <Button
+              onClick={handleCreateProject}
+              disabled={!newProjectName.trim() || creatingProject}
+              className="bg-amber-500 hover:bg-amber-600 text-black"
+            >
+              {creatingProject ? 'Creating...' : 'Create Project'}
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+    </>
   );
 }
