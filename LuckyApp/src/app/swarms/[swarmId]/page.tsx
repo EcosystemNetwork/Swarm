@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useActiveAccount } from "thirdweb/react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
@@ -33,6 +33,8 @@ import {
   type Task,
   type Message,
   type Channel,
+  updateProject,
+  deleteProject,
 } from "@/lib/firestore";
 
 const TASK_STATUS_COLORS: Record<string, string> = {
@@ -71,6 +73,11 @@ export default function ProjectDetailPage() {
   const [taskTitle, setTaskTitle] = useState('');
   const [taskDescription, setTaskDescription] = useState('');
   const [taskPriority, setTaskPriority] = useState<'low' | 'medium' | 'high'>('medium');
+  const [showEditProject, setShowEditProject] = useState(false);
+  const [showDeleteProject, setShowDeleteProject] = useState(false);
+  const [editName, setEditName] = useState('');
+  const [editDescription, setEditDescription] = useState('');
+  const router = useRouter();
   const [taskAssignee, setTaskAssignee] = useState<string>('');
   const [creating, setCreating] = useState(false);
   const [updating, setUpdating] = useState(false);
@@ -309,6 +316,10 @@ export default function ProjectDetailPage() {
             </div>
             <p className="text-muted-foreground mt-1">{project.description || 'No description'}</p>
           </div>
+        </div>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={() => { setEditName(project.name); setEditDescription(project.description || ''); setShowEditProject(true); }}>✏️ Edit</Button>
+          <Button variant="outline" size="sm" className="text-red-400 border-red-400 hover:bg-red-500/10" onClick={() => setShowDeleteProject(true)}>🗑️ Delete</Button>
         </div>
       </div>
 
@@ -690,6 +701,40 @@ export default function ProjectDetailPage() {
           </DialogContent>
         </Dialog>
       )}
+
+      {/* Edit Project Dialog */}
+      <Dialog open={showEditProject} onOpenChange={setShowEditProject}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Edit Project</DialogTitle></DialogHeader>
+          <div className="space-y-4 pt-2">
+            <div><label className="text-sm font-medium">Name</label><Input value={editName} onChange={e => setEditName(e.target.value)} /></div>
+            <div><label className="text-sm font-medium">Description</label><Input value={editDescription} onChange={e => setEditDescription(e.target.value)} /></div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setShowEditProject(false)}>Cancel</Button>
+              <Button className="bg-amber-500 hover:bg-amber-600 text-black" onClick={async () => {
+                await updateProject(projectId, { name: editName.trim(), description: editDescription.trim() || '' });
+                setProject(p => p ? { ...p, name: editName.trim(), description: editDescription.trim() || '' } : p);
+                setShowEditProject(false);
+              }}>Save</Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Project Dialog */}
+      <Dialog open={showDeleteProject} onOpenChange={setShowDeleteProject}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Delete Project</DialogTitle></DialogHeader>
+          <p className="text-muted-foreground py-2">Are you sure you want to delete &quot;{project?.name}&quot;? This cannot be undone.</p>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setShowDeleteProject(false)}>Cancel</Button>
+            <Button className="bg-red-600 hover:bg-red-700 text-white" onClick={async () => {
+              await deleteProject(projectId);
+              router.push('/swarms');
+            }}>Delete Project</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
