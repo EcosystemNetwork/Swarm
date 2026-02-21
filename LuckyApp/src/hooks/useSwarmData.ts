@@ -22,7 +22,7 @@ import {
   type TreasuryPnL,
 } from "@/lib/swarm-contracts";
 
-const POLL_INTERVAL = 12_000;
+const POLL_INTERVAL = 30_000; // 30s — individual fetches can take 10-20s
 
 interface SwarmData {
   tasks: TaskListing[];
@@ -46,6 +46,7 @@ export function useSwarmData(): SwarmData {
   const [error, setError] = useState<string | null>(null);
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
   const providerRef = useRef<ethers.JsonRpcProvider | null>(null);
+  const isFetchingRef = useRef(false);
 
   const getProvider = useCallback(() => {
     if (!providerRef.current) {
@@ -55,6 +56,10 @@ export function useSwarmData(): SwarmData {
   }, []);
 
   const fetchData = useCallback(async () => {
+    // Prevent concurrent fetches — batch fallback can take 10-20s
+    if (isFetchingRef.current) return;
+    isFetchingRef.current = true;
+
     try {
       const provider = getProvider();
       const board = new ethers.Contract(CONTRACTS.TASK_BOARD, TASK_BOARD_ABI, provider);
@@ -74,7 +79,7 @@ export function useSwarmData(): SwarmData {
       let rawTasks: unknown[] = rawTasksBulk ?? [];
       if (!rawTasksBulk && Number(taskCount) > 0) {
         const count = Number(taskCount);
-        const BATCH = 10;
+        const BATCH = 20;
         const results: unknown[] = [];
         for (let i = 0; i < count; i += BATCH) {
           const batch = Array.from(
@@ -144,6 +149,7 @@ export function useSwarmData(): SwarmData {
       setError(err instanceof Error ? err.message : "Failed to fetch Swarm data");
     } finally {
       setIsLoading(false);
+      isFetchingRef.current = false;
     }
   }, [getProvider]);
 

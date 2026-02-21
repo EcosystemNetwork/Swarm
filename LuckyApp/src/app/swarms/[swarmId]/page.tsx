@@ -96,6 +96,7 @@ export default function ProjectDetailPage() {
   const [taskAssignee, setTaskAssignee] = useState<string>('__none__');
   const [creating, setCreating] = useState(false);
   const [updating, setUpdating] = useState(false);
+  const [batchAssigning, setBatchAssigning] = useState(false);
 
   // Chat state
   const [channel, setChannel] = useState<Channel | null>(null);
@@ -347,6 +348,40 @@ export default function ProjectDetailPage() {
       setError(err instanceof Error ? err.message : 'Failed to update task');
     } finally {
       setUpdating(false);
+    }
+  };
+
+  // Batch assign agents to jobs from Agent Map
+  const handleBatchAssign = async (assignments: { jobId: string; agentId: string; jobTitle: string; agentName: string }[]) => {
+    if (!currentOrg) return;
+    try {
+      setBatchAssigning(true);
+      setError(null);
+      for (const { jobId, agentId, jobTitle, agentName } of assignments) {
+        await claimJob(jobId, agentId, currentOrg.id, projectId);
+        // Send notification to project channel
+        if (channel) {
+          try {
+            await sendMessage({
+              channelId: channel.id,
+              senderId: "system",
+              senderName: "Swarm",
+              senderType: "system" as any,
+              content: `📋 **Swarm Assignment**\nJob: "${jobTitle}"\nAssigned to: @${agentName}\n\nExecuted via Agent Map workflow.`,
+              orgId: currentOrg.id,
+              createdAt: new Date(),
+            });
+          } catch {
+            // notification failure is non-critical
+          }
+        }
+      }
+      await loadProjectData();
+    } catch (err) {
+      console.error("Batch assign failed:", err);
+      setError(err instanceof Error ? err.message : "Failed to assign agents to jobs");
+    } finally {
+      setBatchAssigning(false);
     }
   };
 
@@ -777,6 +812,16 @@ export default function ProjectDetailPage() {
                 status: t.status,
                 assigneeAgentId: t.assigneeAgentId,
               }))}
+              jobs={jobs.map((j) => ({
+                id: j.id,
+                title: j.title,
+                reward: j.reward,
+                priority: j.priority,
+                requiredSkills: j.requiredSkills ?? [],
+                status: j.status,
+              }))}
+              onAssign={handleBatchAssign}
+              executing={batchAssigning}
             />
           </div>
         </TabsContent>

@@ -39,9 +39,12 @@ export default function AnalyticsPage() {
     const disputed = swarm.tasks.filter((t) => t.status === TaskStatus.Disputed).length;
     const resolved = completed + expired + disputed;
     const winRate = resolved > 0 ? (completed / resolved) * 100 : 0;
+    // Show treasury revenue if available, otherwise total task budget
+    const treasuryRevenue = swarm.treasury?.totalRevenue ?? 0;
+    const totalTaskBudget = swarm.tasks.reduce((sum, t) => sum + t.budget, 0);
 
     return {
-      totalPnl: swarm.treasury?.totalRevenue ?? 0,
+      totalPnl: treasuryRevenue > 0 ? treasuryRevenue : totalTaskBudget,
       winRate: Math.round(winRate * 10) / 10,
       totalPredictions: swarm.totalTasks,
       activeAgents: swarm.agents.filter((a) => a.active).length,
@@ -59,9 +62,8 @@ export default function AnalyticsPage() {
       ).length;
       const pending = agentTasks.filter((t) => t.status === TaskStatus.Claimed).length;
       const total = wins + losses + pending;
-      const pnl = agentTasks
-        .filter((t) => t.status === TaskStatus.Completed)
-        .reduce((sum, t) => sum + t.budget, 0);
+      // Total HBAR value of all tasks handled by this agent
+      const pnl = agentTasks.reduce((sum, t) => sum + t.budget, 0);
       const winRate = wins + losses > 0 ? (wins / (wins + losses)) * 100 : 0;
       const firstSkill = (agent.skills || "").split(",")[0]?.trim() || "Agent";
 
@@ -135,7 +137,7 @@ export default function AnalyticsPage() {
     },
     {
       key: "pnl",
-      label: "P&L",
+      label: view === "live" ? "HBAR Value" : "P&L",
       sortable: true,
       getValue: (a: AgentPerformance) => a.pnl,
       render: (a: AgentPerformance) => <PnlDisplay value={a.pnl} currency={currency} />,
@@ -289,7 +291,7 @@ export default function AnalyticsPage() {
           {/* Overview Stats */}
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             <StatCard
-              title="Total P&L"
+              title={view === "live" ? "Treasury HBAR" : "Total P&L"}
               value={pnlValue}
               icon="💰"
               change={stats.pnlChange}

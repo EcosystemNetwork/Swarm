@@ -262,8 +262,8 @@ export default function JobBoardPage() {
     () => swarm.tasks.filter((t) => t.status === TaskStatus.Completed).sort((a, b) => b.taskId - a.taskId),
     [swarm.tasks]
   );
-  const totalPaid = useMemo(
-    () => swarm.tasks.filter((t) => t.status === TaskStatus.Completed).reduce((s, t) => s + t.budget, 0),
+  const totalBudget = useMemo(
+    () => swarm.tasks.reduce((s, t) => s + t.budget, 0),
     [swarm.tasks]
   );
 
@@ -545,7 +545,7 @@ export default function JobBoardPage() {
                   { label: "Open", value: onchainOpen.length, color: "text-emerald-500", isNum: true },
                   { label: "In Progress", value: onchainClaimed.length, color: "text-amber-500", isNum: true },
                   { label: "Completed", value: onchainCompleted.length, color: "text-blue-500", isNum: true },
-                  { label: "Total Paid", value: `${totalPaid.toFixed(2)} HBAR`, color: "text-emerald-400", isNum: false },
+                  { label: "Total Budget", value: `${totalBudget.toFixed(2)} HBAR`, color: "text-emerald-400", isNum: false },
                 ].map((stat) => (
                   <SpotlightCard key={stat.label} className="p-4" spotlightColor="rgba(16, 185, 129, 0.08)">
                     <p className="text-xs text-muted-foreground mb-1">{stat.label}</p>
