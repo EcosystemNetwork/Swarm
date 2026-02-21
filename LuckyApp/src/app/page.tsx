@@ -63,20 +63,27 @@ const features = [
 export default function LandingPage() {
   const account = useActiveAccount();
   const router = useRouter();
-  const kittyRef = useRef<HTMLDivElement>(null);
-  const robotRef = useRef<HTMLDivElement>(null);
+  const kittyCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const robotCanvasRef = useRef<HTMLCanvasElement | null>(null);
 
   useEffect(() => {
     if (account) router.push('/dashboard');
   }, [account, router]);
 
+  // Capture canvas elements from Spline Application on load
+  const handleKittyLoad = (spline: any) => {
+    kittyCanvasRef.current = spline.canvas ?? spline._canvas ?? null;
+  };
+  const handleRobotLoad = (spline: any) => {
+    robotCanvasRef.current = spline.canvas ?? spline._canvas ?? null;
+  };
+
   // Global Mouse Tracking Forwarder — Spline uses pointermove, not mousemove
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
-      [kittyRef, robotRef].forEach(ref => {
-        const canvas = ref.current?.querySelector('canvas');
-        if (canvas) {
-          canvas.dispatchEvent(new PointerEvent('pointermove', {
+      [kittyCanvasRef, robotCanvasRef].forEach(ref => {
+        if (ref.current) {
+          ref.current.dispatchEvent(new PointerEvent('pointermove', {
             clientX: e.clientX,
             clientY: e.clientY,
             screenX: e.screenX,
@@ -120,7 +127,7 @@ export default function LandingPage() {
             <div className="absolute inset-0 z-0 opacity-40 md:opacity-50">
               <Suspense fallback={null}>
                 <Spline
-                  ref={kittyRef}
+                  onLoad={handleKittyLoad}
                   scene="https://prod.spline.design/G9Uv2yhuZyhmrxRG/scene.splinecode"
                   className="w-full h-full scale-[0.6] md:scale-[0.7] translate-x-[-30%] md:translate-x-[-40%]"
                 />
@@ -135,7 +142,7 @@ export default function LandingPage() {
                 </div>
               }>
                 <Spline
-                  ref={robotRef}
+                  onLoad={handleRobotLoad}
                   scene="https://prod.spline.design/Apa6K76Zg3Ki-VRj/scene.splinecode"
                   className="w-full h-full scale-[0.9] md:scale-[1.1] origin-center"
                 />
