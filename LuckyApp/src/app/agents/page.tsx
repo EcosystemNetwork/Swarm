@@ -42,10 +42,12 @@ function buildSetupPrompt(p: {
   orgId: string;
   agentId: string;
   apiKey: string;
+  inviteCode?: string;
 }) {
   return `You are now connected to the Swarm platform as agent "${p.agentName}" (${p.agentType}).
 
 Organization: ${p.orgName} (ID: ${p.orgId})
+Invite Code: ${p.inviteCode || 'N/A'}
 Agent ID: ${p.agentId}
 Platform: https://swarm.perkos.xyz
 
@@ -87,6 +89,7 @@ export default function AgentsPage() {
       orgId: currentOrg?.id || '',
       agentId: agent.id,
       apiKey: key,
+      inviteCode: currentOrg?.inviteCode,
     });
     setSetupPrompt(prompt);
     setSetupApiKey(key);
@@ -150,6 +153,7 @@ export default function AgentsPage() {
         orgId: currentOrg.id,
         agentId: newAgentId,
         apiKey,
+        inviteCode: currentOrg.inviteCode,
       });
 
       setSetupPrompt(prompt);
@@ -219,6 +223,20 @@ export default function AgentsPage() {
           + Register Agent
         </Button>
       </div>
+
+      {currentOrg.inviteCode && (
+        <div className="flex items-center gap-2 rounded-md border border-amber-500/30 bg-amber-950/20 px-4 py-2 text-sm">
+          <span className="text-muted-foreground">Organization Invite Code:</span>
+          <span className="font-bold tracking-widest text-amber-400">{currentOrg.inviteCode}</span>
+          <button
+            onClick={() => navigator.clipboard.writeText(currentOrg.inviteCode || '')}
+            className="ml-1 text-muted-foreground hover:text-foreground"
+            title="Copy invite code"
+          >
+            📋
+          </button>
+        </div>
+      )}
 
       {error && (
         <div className="p-3 rounded-md bg-red-50 border border-red-200 text-sm text-red-600">

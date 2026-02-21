@@ -8,7 +8,7 @@ import { ConnectButton, useActiveAccount } from 'thirdweb/react';
 import { createThirdwebClient } from 'thirdweb';
 import { base, defineChain } from 'thirdweb/chains';
 import { useOrg } from '@/contexts/OrgContext';
-import { getProjectsByOrg, createProject, type Project } from '@/lib/firestore';
+import { getProjectsByOrg, createProject, createOrganization, type Project } from '@/lib/firestore';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -36,11 +36,15 @@ export function Header() {
   const router = useRouter();
   const account = useActiveAccount();
   const isConnected = !!account;
-  const { currentOrg, organizations, selectOrg } = useOrg();
+  const { currentOrg, organizations, selectOrg, refreshOrgs } = useOrg();
   const [projects, setProjects] = useState<Project[]>([]);
   const [showCreateProject, setShowCreateProject] = useState(false);
   const [newProjectName, setNewProjectName] = useState('');
   const [creatingProject, setCreatingProject] = useState(false);
+  const [showCreateOrg, setShowCreateOrg] = useState(false);
+  const [newOrgName, setNewOrgName] = useState('');
+  const [newOrgDescription, setNewOrgDescription] = useState('');
+  const [creatingOrg, setCreatingOrg] = useState(false);
 
   const projectMatch = pathname.match(/\/swarms\/([^/]+)/);
   const currentProjectId = projectMatch?.[1] || '';
@@ -54,6 +58,29 @@ export function Header() {
   }, [currentOrg]);
 
   useEffect(() => { fetchProjects(); }, [fetchProjects]);
+
+  const handleCreateOrg = async () => {
+    if (!newOrgName.trim() || !account?.address) return;
+    setCreatingOrg(true);
+    try {
+      const id = await createOrganization({
+        name: newOrgName.trim(),
+        description: newOrgDescription.trim() || '',
+        ownerAddress: account.address,
+        members: [account.address],
+        createdAt: null,
+      });
+      setNewOrgName('');
+      setNewOrgDescription('');
+      setShowCreateOrg(false);
+      await refreshOrgs();
+      selectOrg(id);
+    } catch (err) {
+      console.error('Failed to create org:', err);
+    } finally {
+      setCreatingOrg(false);
+    }
+  };
 
   const handleCreateProject = async () => {
     if (!newProjectName.trim() || !currentOrg) return;
@@ -110,12 +137,20 @@ export function Header() {
               <select
                 className="rounded-md border border-border bg-card px-2 py-1 text-sm text-muted-foreground max-w-[160px]"
                 value={currentOrg.id}
-                onChange={(e) => selectOrg(e.target.value)}
+                onChange={(e) => {
+                  if (e.target.value === '__create_org__') {
+                    setShowCreateOrg(true);
+                    e.target.value = currentOrg.id;
+                  } else {
+                    selectOrg(e.target.value);
+                  }
+                }}
                 title="Switch Organization"
               >
                 {organizations.map(org => (
                   <option key={org.id} value={org.id}>{org.name}</option>
                 ))}
+                <option value="__create_org__">+ New Org</option>
               </select>
               <span className="text-muted-foreground text-sm">/</span>
               <select
@@ -164,6 +199,38 @@ export function Header() {
               className="bg-amber-500 hover:bg-amber-600 text-black"
             >
               {creatingProject ? 'Creating...' : 'Create Project'}
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+    <Dialog open={showCreateOrg} onOpenChange={setShowCreateOrg}>
+      <DialogContent className="bg-card border-border">
+        <DialogHeader>
+          <DialogTitle>Create New Organization</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4 pt-2">
+          <Input
+            placeholder="Organization name"
+            value={newOrgName}
+            onChange={(e) => setNewOrgName(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') handleCreateOrg(); }}
+            autoFocus
+          />
+          <Input
+            placeholder="Description (optional)"
+            value={newOrgDescription}
+            onChange={(e) => setNewOrgDescription(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') handleCreateOrg(); }}
+          />
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setShowCreateOrg(false)}>Cancel</Button>
+            <Button
+              onClick={handleCreateOrg}
+              disabled={!newOrgName.trim() || creatingOrg}
+              className="bg-amber-500 hover:bg-amber-600 text-black"
+            >
+              {creatingOrg ? 'Creating...' : 'Create Organization'}
             </Button>
           </div>
         </div>

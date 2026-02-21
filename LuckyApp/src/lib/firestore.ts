@@ -23,6 +23,7 @@ export interface Organization {
   id: string;
   name: string;
   description?: string;
+  inviteCode?: string;
   ownerAddress: string;
   members: string[];
   createdAt: unknown;
@@ -83,9 +84,11 @@ export interface Message {
 // ─── Organizations ──────────────────────────────────────
 
 export async function createOrganization(data: Omit<Organization, "id">): Promise<string> {
+  const inviteCode = Math.random().toString(36).substring(2, 8).toUpperCase();
   const ref = await addDoc(collection(db, "organizations"), {
     ...data,
     description: data.description || "",
+    inviteCode,
     createdAt: serverTimestamp(),
   });
   return ref.id;

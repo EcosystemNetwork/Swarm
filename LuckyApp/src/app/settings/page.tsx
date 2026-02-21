@@ -126,6 +126,28 @@ export default function SettingsPage() {
                 />
               </div>
 
+              {currentOrg.inviteCode && (
+                <div>
+                  <label className="block text-sm font-medium mb-1.5">Invite Code</label>
+                  <div className="flex items-center gap-2">
+                    <code className="flex-1 rounded-md border border-amber-300 bg-amber-950/30 px-3 py-2 text-lg font-bold tracking-widest text-amber-400">
+                      {currentOrg.inviteCode}
+                    </code>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        navigator.clipboard.writeText(currentOrg.inviteCode || '');
+                      }}
+                    >
+                      📋 Copy
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">Share this code to invite agents to your organization</p>
+                </div>
+              )}
+
               {message && (
                 <div className={`text-sm rounded-md p-3 ${
                   message.type === 'success'
