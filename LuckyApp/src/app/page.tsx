@@ -6,7 +6,7 @@ import { ConnectButton, useActiveAccount } from "thirdweb/react";
 import { createThirdwebClient } from "thirdweb";
 import { base, defineChain } from "thirdweb/chains";
 import { useRouter } from "next/navigation";
-import { useEffect, Suspense, lazy } from "react";
+import { useEffect, Suspense, lazy, useRef } from "react";
 import Image from "next/image";
 import {
   Shield,
@@ -63,10 +63,39 @@ const features = [
 export default function LandingPage() {
   const account = useActiveAccount();
   const router = useRouter();
+  const kittyRef = useRef<any>(null);
+  const robotRef = useRef<any>(null);
 
   useEffect(() => {
     if (account) router.push('/dashboard');
   }, [account, router]);
+
+  // Global Mouse Tracking Forwarder
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      [kittyRef, robotRef].forEach(ref => {
+        if (ref.current && ref.current.canvas) {
+          const canvas = ref.current.canvas;
+          const rect = canvas.getBoundingClientRect();
+          const x = e.clientX - rect.left;
+          const y = e.clientY - rect.top;
+
+          // Dispatch move event to the canvas so Spline's internal listener catches it
+          canvas.dispatchEvent(new MouseEvent('mousemove', {
+            clientX: e.clientX,
+            clientY: e.clientY,
+            screenX: e.screenX,
+            screenY: e.screenY,
+            bubbles: false,
+            cancelable: true
+          }));
+        }
+      });
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    return () => window.removeEventListener('mousemove', handleMouseMove);
+  }, []);
 
   return (
     <div className="flex flex-col min-h-screen">
@@ -89,33 +118,35 @@ export default function LandingPage() {
         {/* Hero Section */}
         <section className="relative pt-24 pb-32 overflow-hidden min-h-[95vh] flex items-center justify-center">
           {/* Dual Spline Background Container */}
-          <div className="absolute inset-0 z-0">
+          <div className="absolute inset-0 z-0 pointer-events-none">
             {/* Left Asset: Kitty Robot */}
-            <div className="absolute inset-0 z-0 opacity-60 pointer-events-auto">
+            <div className="absolute inset-0 z-0 opacity-40 md:opacity-50">
               <Suspense fallback={null}>
                 <Spline
+                  onLoad={(spline) => (kittyRef.current = spline)}
                   scene="https://prod.spline.design/G9Uv2yhuZyhmrxRG/scene.splinecode"
-                  className="w-full h-full scale-[0.8] translate-x-[-25%] md:translate-x-[-35%]"
+                  className="w-full h-full scale-[0.6] md:scale-[0.7] translate-x-[-30%] md:translate-x-[-40%]"
                 />
               </Suspense>
             </div>
 
-            {/* Center Asset: New Robot */}
-            <div className="absolute inset-0 z-[1] opacity-90 pointer-events-auto">
+            {/* Center Asset: New Robot - Perfectly centered */}
+            <div className="absolute inset-0 z-[1] opacity-70 md:opacity-80">
               <Suspense fallback={
                 <div className="w-full h-full flex items-center justify-center bg-black/20">
                   <div className="w-12 h-12 border-4 border-amber-500/20 border-t-amber-500 rounded-full animate-spin" />
                 </div>
               }>
                 <Spline
+                  onLoad={(spline) => (robotRef.current = spline)}
                   scene="https://prod.spline.design/Apa6K76Zg3Ki-VRj/scene.splinecode"
-                  className="w-full h-full"
+                  className="w-full h-full scale-[0.9] md:scale-[1.1] origin-center"
                 />
               </Suspense>
             </div>
 
-            {/* Gradient Overlay - ensuring mouse events still pass through to Spline elements */}
-            <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-transparent to-black pointer-events-none" />
+            {/* Gradient Overlay */}
+            <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-transparent to-black pointer-events-none z-[10]" />
           </div>
 
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-amber-500/5 rounded-full blur-[120px] pointer-events-none" />
