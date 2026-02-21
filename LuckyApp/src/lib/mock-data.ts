@@ -474,6 +474,90 @@ export const mockDMMessages: Record<string, CommandMessage[]> = {
   ],
 };
 
+// ─── Analytics Data ─────────────────────────────────────
+
+export interface AgentPerformance {
+  agentId: string;
+  name: string;
+  type: AgentType;
+  winRate: number;
+  totalPredictions: number;
+  wins: number;
+  losses: number;
+  pending: number;
+  pnl: number;
+  pnlChange: number;
+  streak: number;
+}
+
+export interface SwarmPerformance {
+  swarmId: string;
+  name: string;
+  status: "active" | "paused";
+  totalPnl: number;
+  pnlChange: number;
+  missionsCompleted: number;
+  missionsActive: number;
+  winRate: number;
+  agentCount: number;
+}
+
+export interface MarketBreakdown {
+  category: MarketType;
+  label: string;
+  icon: string;
+  totalPredictions: number;
+  wins: number;
+  losses: number;
+  pending: number;
+  winRate: number;
+  totalPnl: number;
+}
+
+export interface OverviewStats {
+  totalPnl: number;
+  pnlChange: number;
+  winRate: number;
+  winRateChange: number;
+  totalPredictions: number;
+  predictionsChange: number;
+  activeAgents: number;
+  agentsChange: number;
+}
+
+export const mockOverviewStats: OverviewStats = {
+  totalPnl: 1835,
+  pnlChange: 12.4,
+  winRate: 67.6,
+  winRateChange: 2.1,
+  totalPredictions: 2234,
+  predictionsChange: 8.3,
+  activeAgents: 4,
+  agentsChange: 0,
+};
+
+export const mockAgentPerformance: AgentPerformance[] = [
+  { agentId: "agent-005", name: "QuantEdge", type: "Quant", winRate: 73.1, totalPredictions: 891, wins: 651, losses: 198, pending: 42, pnl: 4250, pnlChange: 15.2, streak: 5 },
+  { agentId: "agent-002", name: "SportOracle", type: "Sports", winRate: 71.2, totalPredictions: 518, wins: 369, losses: 131, pending: 18, pnl: 2180, pnlChange: 8.7, streak: 3 },
+  { agentId: "agent-001", name: "CryptoHawk", type: "Crypto", winRate: 68.5, totalPredictions: 342, wins: 234, losses: 95, pending: 13, pnl: 1520, pnlChange: -3.4, streak: -2 },
+  { agentId: "agent-006", name: "MarketScout", type: "Scout", winRate: 66.7, totalPredictions: 124, wins: 83, losses: 36, pending: 5, pnl: 680, pnlChange: 4.1, streak: 1 },
+  { agentId: "agent-003", name: "PixelSniper", type: "Esports", winRate: 64.8, totalPredictions: 203, wins: 132, losses: 64, pending: 7, pnl: 410, pnlChange: -1.8, streak: -1 },
+  { agentId: "agent-004", name: "EventPulse", type: "Events", winRate: 59.3, totalPredictions: 156, wins: 92, losses: 55, pending: 9, pnl: -205, pnlChange: -7.2, streak: -3 },
+];
+
+export const mockSwarmPerformance: SwarmPerformance[] = [
+  { swarmId: "swarm-001", name: "Polymarket Alpha", status: "active", totalPnl: 3820, pnlChange: 11.5, missionsCompleted: 8, missionsActive: 4, winRate: 72.4, agentCount: 3 },
+  { swarmId: "swarm-002", name: "Sports & Esports Edge", status: "active", totalPnl: 1640, pnlChange: 6.3, missionsCompleted: 5, missionsActive: 3, winRate: 68.9, agentCount: 2 },
+  { swarmId: "swarm-003", name: "Quant Research Lab", status: "paused", totalPnl: -420, pnlChange: -15.8, missionsCompleted: 3, missionsActive: 2, winRate: 55.2, agentCount: 3 },
+];
+
+export const mockMarketBreakdown: MarketBreakdown[] = [
+  { category: "crypto", label: "Crypto", icon: "₿", totalPredictions: 842, wins: 571, losses: 224, pending: 47, winRate: 71.8, totalPnl: 2890 },
+  { category: "sports", label: "Sports", icon: "⚽", totalPredictions: 624, wins: 437, losses: 168, pending: 19, winRate: 72.2, totalPnl: 1950 },
+  { category: "esports", label: "Esports", icon: "🎮", totalPredictions: 385, wins: 243, losses: 128, pending: 14, winRate: 65.5, totalPnl: 620 },
+  { category: "events", label: "Events", icon: "🌍", totalPredictions: 383, wins: 218, losses: 148, pending: 17, winRate: 59.6, totalPnl: -325 },
+];
+
 // ─── Helper functions ───────────────────────────────────
 export function getSwarmAgents(swarmId: string): Agent[] {
   const swarm = mockSwarms.find(s => s.id === swarmId);
