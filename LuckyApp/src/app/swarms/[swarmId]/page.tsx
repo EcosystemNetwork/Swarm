@@ -2,7 +2,10 @@
 
 import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
+import dynamic from "next/dynamic";
 import Link from "next/link";
+
+const AgentMap = dynamic(() => import("@/components/agent-map/agent-map"), { ssr: false });
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -258,6 +261,7 @@ export default function ProjectDetailPage() {
         <TabsList>
           <TabsTrigger value="agents">🤖 Agents ({assignedAgents.length})</TabsTrigger>
           <TabsTrigger value="tasks">📋 Tasks ({tasks.length})</TabsTrigger>
+          <TabsTrigger value="map">🗺️ Agent Map</TabsTrigger>
           <TabsTrigger value="channel">📡 Project Channel</TabsTrigger>
         </TabsList>
 
@@ -380,6 +384,24 @@ export default function ProjectDetailPage() {
               </div>
             )}
           </div>
+        </TabsContent>
+
+        {/* Agent Map Tab */}
+        <TabsContent value="map">
+          <AgentMap
+            projectName={project.name}
+            agents={assignedAgents.map((a) => ({
+              id: a.id,
+              name: a.name,
+              type: a.type,
+              status: a.status,
+            }))}
+            tasks={tasks.map((t) => ({
+              id: t.id,
+              status: t.status,
+              assigneeAgentId: t.assigneeAgentId,
+            }))}
+          />
         </TabsContent>
 
         {/* Channel Tab */}
