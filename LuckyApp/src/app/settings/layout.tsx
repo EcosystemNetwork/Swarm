@@ -2,7 +2,7 @@ import { HeaderWrapper as Header } from "@/components/header-wrapper";
 import { Sidebar } from "@/components/sidebar";
 import { ProtectedRoute } from "@/components/protected-route";
 
-export default function AgentsLayout({ children }: { children: React.ReactNode }) {
+export default function SettingsLayout({ children }: { children: React.ReactNode }) {
   return (
     <ProtectedRoute>
       <div className="min-h-screen">

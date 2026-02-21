@@ -1,133 +1,296 @@
 "use client";
 
 import { useState, useCallback, useEffect } from "react";
-import { ChannelList } from "@/components/chat/channel-list";
-import { MessageList } from "@/components/chat/message-list";
-import { MessageInput } from "@/components/chat/message-input";
-import { useTeam } from "@/contexts/TeamContext";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { useActiveAccount } from 'thirdweb/react';
+import { useOrg } from "@/contexts/OrgContext";
 import {
-  getChannelsByTeam,
+  getChannelsByOrg,
   onMessagesByChannel,
-  sendMessage as sendFirestoreMessage,
-  type FirestoreChannel,
-  type FirestoreMessage,
+  sendMessage,
+  ensureGeneralChannel,
+  createChannel,
+  getProjectsByOrg,
+  type Channel,
+  type Message,
 } from "@/lib/firestore";
-import {
-  CommandMessage,
-  mockChannelMessages,
-  mockDMMessages,
-  mockChannels,
-  mockDirectMessages,
-} from "@/lib/mock-data";
+
+interface ChannelWithUnread extends Channel {
+  unreadCount?: number;
+  lastMessage?: Message;
+}
 
 export default function ChatPage() {
-  const { currentTeam } = useTeam();
-  const [activeId, setActiveId] = useState("ch-general");
-  const [activeType, setActiveType] = useState<"channel" | "dm">("channel");
-  const [firestoreChannels, setFirestoreChannels] = useState<FirestoreChannel[]>([]);
-  const [firestoreMessages, setFirestoreMessages] = useState<FirestoreMessage[]>([]);
-  const [mockMsgs, setMockMsgs] = useState<Record<string, CommandMessage[]>>({
-    ...mockChannelMessages,
-    ...mockDMMessages,
-  });
-  const [useFirestore, setUseFirestore] = useState(false);
+  const account = useActiveAccount();
+  const address = account?.address;
+  const { currentOrg } = useOrg();
+  
+  const [channels, setChannels] = useState<ChannelWithUnread[]>([]);
+  const [activeChannel, setActiveChannel] = useState<Channel | null>(null);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [messageInput, setMessageInput] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  // Load channels from Firestore
-  useEffect(() => {
-    if (!currentTeam) return;
-    getChannelsByTeam(currentTeam.id).then((channels) => {
-      setFirestoreChannels(channels);
-      if (channels.length > 0) {
-        setUseFirestore(true);
+  // Load channels
+  const loadChannels = async () => {
+    if (!currentOrg) return;
+
+    try {
+      setLoading(true);
+      setError(null);
+
+      // Ensure a General channel exists
+      await ensureGeneralChannel(currentOrg.id);
+      
+      const channelsData = await getChannelsByOrg(currentOrg.id);
+      setChannels(channelsData);
+
+      // Auto-select General channel if no active channel
+      if (!activeChannel && channelsData.length > 0) {
+        const generalChannel = channelsData.find(c => c.name.toLowerCase() === 'general') || channelsData[0];
+        setActiveChannel(generalChannel);
       }
-    });
-  }, [currentTeam]);
+    } catch (err) {
+      console.error('Failed to load channels:', err);
+      setError(err instanceof Error ? err.message : 'Failed to load channels');
+    } finally {
+      setLoading(false);
+    }
+  };
 
-  // Subscribe to real-time messages for active channel
+  // Subscribe to messages for active channel
   useEffect(() => {
-    if (!useFirestore) return;
-    const unsub = onMessagesByChannel(activeId, (msgs) => {
-      setFirestoreMessages(msgs);
-    });
-    return () => unsub();
-  }, [activeId, useFirestore]);
+    if (!activeChannel) return;
 
-  const handleSelectChannel = (id: string, type: "channel" | "dm") => {
-    setActiveId(id);
-    setActiveType(type);
+    const unsubscribe = onMessagesByChannel(activeChannel.id, (msgs) => {
+      setMessages(msgs);
+    });
+
+    return unsubscribe;
+  }, [activeChannel]);
+
+  // Load channels on org change
+  useEffect(() => {
+    loadChannels();
+  }, [currentOrg]);
+
+  const handleSelectChannel = (channel: Channel) => {
+    setActiveChannel(channel);
   };
 
   const handleSend = useCallback(
     async (content: string) => {
-      if (useFirestore && currentTeam) {
-        await sendFirestoreMessage({
-          channelId: activeId,
-          senderId: "operator-1",
-          senderName: "Julio",
-          senderType: "operator",
-          content,
-          timestamp: Date.now(),
-          teamId: currentTeam.id,
+      if (!activeChannel || !address || !messageInput.trim()) return;
+
+      try {
+        setSending(true);
+        await sendMessage({
+          channelId: activeChannel.id,
+          senderAddress: address,
+          senderName: address.slice(0, 6) + '...' + address.slice(-4), // Format address
+          content: content.trim(),
+          createdAt: new Date(),
         });
-      } else {
-        const newMsg: CommandMessage = {
-          id: `msg-${Date.now()}`,
-          senderId: "operator-1",
-          senderName: "Julio",
-          senderType: "operator",
-          content,
-          timestamp: Date.now(),
-        };
-        setMockMsgs((prev) => ({
-          ...prev,
-          [activeId]: [...(prev[activeId] || []), newMsg],
-        }));
+        setMessageInput('');
+      } catch (err) {
+        console.error('Failed to send message:', err);
+        setError(err instanceof Error ? err.message : 'Failed to send message');
+      } finally {
+        setSending(false);
       }
     },
-    [activeId, useFirestore, currentTeam]
+    [activeChannel, address, messageInput]
   );
 
-  const currentMessages: CommandMessage[] = useFirestore
-    ? firestoreMessages.map((m) => ({
-        id: m.id!,
-        senderId: m.senderId,
-        senderName: m.senderName,
-        senderType: m.senderType,
-        content: m.content,
-        timestamp: m.timestamp,
-      }))
-    : mockMsgs[activeId] || [];
+  const formatTime = (timestamp: unknown) => {
+    if (!timestamp) return '';
+    
+    let date: Date;
+    if (timestamp && typeof timestamp === 'object' && 'seconds' in timestamp) {
+      date = new Date((timestamp as any).seconds * 1000);
+    } else {
+      date = new Date(timestamp as any);
+    }
+    
+    const now = new Date();
+    const isToday = date.toDateString() === now.toDateString();
+    
+    if (isToday) {
+      return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    } else {
+      return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
+    }
+  };
 
-  const activeName =
-    activeType === "channel"
-      ? (useFirestore
-          ? firestoreChannels.find((c) => c.id === activeId)?.name
-          : mockChannels.find((c) => c.id === activeId)?.name) || "General"
-      : mockDirectMessages.find((d) => d.id === activeId)?.participantName || "Chat";
+  if (!currentOrg) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">💬 Chat</h1>
+          <p className="text-gray-500 mt-1">No organization selected</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!address) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">💬 Chat</h1>
+          <p className="text-gray-500 mt-1">Connect your wallet to start chatting</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="flex h-[calc(100vh-8rem)] bg-white rounded-lg border border-gray-200 overflow-hidden">
-      <ChannelList
-        activeChannelId={activeId}
-        onSelectChannel={handleSelectChannel}
-      />
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-3xl font-bold tracking-tight">💬 Chat</h1>
+        <p className="text-gray-500 mt-1">Real-time communication channels</p>
+      </div>
 
-      <div className="flex-1 flex flex-col min-w-0">
-        <div className="border-b border-gray-200 px-6 py-3 bg-white">
-          <div className="flex items-center gap-2">
-            <h2 className="font-semibold text-gray-900">
-              {activeType === "channel" ? "#" : ""} {activeName}
-            </h2>
-            {activeType === "dm" && (
-              <span className="text-[11px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">
-                Direct Message
-              </span>
+      {error && (
+        <div className="p-3 rounded-md bg-red-50 border border-red-200 text-sm text-red-600">
+          {error}
+        </div>
+      )}
+
+      <div className="flex h-[calc(100vh-12rem)] bg-white rounded-lg border border-gray-200 overflow-hidden">
+        {/* Channel Sidebar */}
+        <div className="w-64 border-r border-gray-200 flex flex-col bg-gray-50">
+          <div className="p-4 border-b border-gray-200">
+            <h2 className="font-semibold text-gray-900">Channels</h2>
+          </div>
+          <div className="flex-1 overflow-y-auto">
+            {loading ? (
+              <div className="p-4 text-sm text-gray-500">Loading channels...</div>
+            ) : channels.length === 0 ? (
+              <div className="p-4 text-sm text-gray-500">No channels yet</div>
+            ) : (
+              <div className="py-2">
+                {channels.map((channel) => (
+                  <button
+                    key={channel.id}
+                    onClick={() => handleSelectChannel(channel)}
+                    className={`w-full text-left px-4 py-2 text-sm hover:bg-white transition-colors ${
+                      activeChannel?.id === channel.id ? 'bg-white border-r-2 border-blue-600 text-blue-600' : 'text-gray-600'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <span>#</span>
+                      <span className="truncate">{channel.name}</span>
+                      {channel.unreadCount && channel.unreadCount > 0 && (
+                        <Badge variant="destructive" className="text-xs">
+                          {channel.unreadCount}
+                        </Badge>
+                      )}
+                    </div>
+                  </button>
+                ))}
+              </div>
             )}
           </div>
         </div>
 
-        <MessageList messages={currentMessages} />
-        <MessageInput onSend={handleSend} channelName={activeName} />
+        {/* Chat Area */}
+        <div className="flex-1 flex flex-col min-w-0">
+          {activeChannel ? (
+            <>
+              {/* Chat Header */}
+              <div className="border-b border-gray-200 px-6 py-3 bg-white">
+                <div className="flex items-center gap-2">
+                  <h2 className="font-semibold text-gray-900">
+                    # {activeChannel.name}
+                  </h2>
+                  <Badge variant="secondary" className="text-xs">
+                    {messages.length} messages
+                  </Badge>
+                </div>
+              </div>
+
+              {/* Messages */}
+              <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                {messages.length === 0 ? (
+                  <div className="flex items-center justify-center h-full text-gray-400">
+                    <div className="text-center">
+                      <div className="text-4xl mb-3">💬</div>
+                      <p className="text-sm">No messages yet</p>
+                      <p className="text-xs text-gray-500 mt-1">Start the conversation!</p>
+                    </div>
+                  </div>
+                ) : (
+                  messages.map((message, index) => {
+                    const prevMessage = index > 0 ? messages[index - 1] : null;
+                    const showSender = !prevMessage || prevMessage.senderAddress !== message.senderAddress;
+                    
+                    return (
+                      <div key={message.id} className={`flex items-start gap-3 ${showSender ? '' : 'mt-1'}`}>
+                        <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-sm font-medium text-blue-700 shrink-0">
+                          {message.senderName.charAt(0).toUpperCase()}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          {showSender && (
+                            <div className="flex items-baseline gap-2 mb-1">
+                              <span className="text-sm font-semibold text-gray-900">
+                                {message.senderName}
+                              </span>
+                              <span className="text-xs text-gray-500">
+                                {formatTime(message.createdAt)}
+                              </span>
+                            </div>
+                          )}
+                          <p className="text-sm text-gray-700 break-words">
+                            {message.content}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+
+              {/* Message Input */}
+              <div className="border-t border-gray-200 p-4">
+                <div className="flex gap-3">
+                  <Input
+                    value={messageInput}
+                    onChange={(e) => setMessageInput(e.target.value)}
+                    placeholder={`Message #${activeChannel.name}`}
+                    className="flex-1"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey && messageInput.trim()) {
+                        e.preventDefault();
+                        handleSend(messageInput);
+                      }
+                    }}
+                    disabled={sending}
+                  />
+                  <Button
+                    onClick={() => handleSend(messageInput)}
+                    disabled={sending || !messageInput.trim()}
+                    className="bg-blue-600 hover:bg-blue-700"
+                  >
+                    {sending ? 'Sending...' : 'Send'}
+                  </Button>
+                </div>
+              </div>
+            </>
+          ) : (
+            <div className="flex-1 flex items-center justify-center text-gray-400">
+              <div className="text-center">
+                <div className="text-4xl mb-3">💬</div>
+                <p>Select a channel to start chatting</p>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

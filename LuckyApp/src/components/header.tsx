@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation';
 import { ConnectButton, useActiveAccount } from 'thirdweb/react';
 import { createThirdwebClient } from 'thirdweb';
 import { base, defineChain } from 'thirdweb/chains';
-import { useTeam } from '@/contexts/TeamContext';
+import { useOrg } from '@/contexts/OrgContext';
 
 const client = createThirdwebClient({
   clientId: process.env.NEXT_PUBLIC_THIRDWEB_CLIENT_ID || 'cbd8abcfa13db759ca2f5fa7d8a5a5e5',
@@ -29,7 +29,7 @@ export function Header() {
   const pathname = usePathname();
   const account = useActiveAccount();
   const isConnected = !!account;
-  const { currentTeam, teams, selectTeam } = useTeam();
+  const { currentOrg, organizations, selectOrg } = useOrg();
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/60">
@@ -57,15 +57,15 @@ export function Header() {
           )}
         </div>
         <div className="flex items-center gap-3">
-          {isConnected && currentTeam && teams.length > 0 && (
+          {isConnected && currentOrg && organizations.length > 0 && (
             <select
               className="rounded-md border border-gray-300 bg-white px-2 py-1 text-sm text-gray-700 max-w-[160px]"
-              value={currentTeam.id}
-              onChange={(e) => selectTeam(e.target.value)}
+              value={currentOrg.id}
+              onChange={(e) => selectOrg(e.target.value)}
               title="Switch Organization"
             >
-              {teams.map(team => (
-                <option key={team.id} value={team.id}>{team.name}</option>
+              {organizations.map(org => (
+                <option key={org.id} value={org.id}>{org.name}</option>
               ))}
             </select>
           )}
