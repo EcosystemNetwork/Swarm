@@ -404,7 +404,7 @@ export default function JobBoardPage() {
                             )}
                             {job.reward && (
                               <div className="text-xs font-medium text-amber-600 dark:text-amber-400">
-                                💰 {job.reward}
+                                💰 {job.reward} HBAR
                               </div>
                             )}
                             {job.requiredSkills.length > 0 && (
@@ -599,7 +599,7 @@ export default function JobBoardPage() {
               </p>
               {selectedJob.reward && (
                 <div className="p-3 rounded-md bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800">
-                  <span className="text-sm font-medium text-amber-700 dark:text-amber-400">💰 Reward: {selectedJob.reward}</span>
+                  <span className="text-sm font-medium text-amber-700 dark:text-amber-400">💰 Budget: {selectedJob.reward} HBAR</span>
                 </div>
               )}
               {selectedJob.requiredSkills.length > 0 && (
@@ -810,8 +810,8 @@ export default function JobBoardPage() {
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-xs font-medium mb-1 block">Reward</label>
-                <Input placeholder="e.g. 0.5 ETH" value={jobReward} onChange={(e) => setJobReward(e.target.value)} />
+                <label className="text-xs font-medium mb-1 block">Budget (HBAR)</label>
+                <Input placeholder="e.g. 100 HBAR" value={jobReward} onChange={(e) => setJobReward(e.target.value)} />
               </div>
               <div>
                 <label className="text-xs font-medium mb-1 block">Priority</label>
