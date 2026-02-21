@@ -11,6 +11,7 @@
  *   node swarm.mjs inbox list
  *   node swarm.mjs inbox count
  *   node swarm.mjs chat send <channelId> <message>
+ *   node swarm.mjs chat listen <channelId>
  */
 
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
@@ -237,14 +238,67 @@ async function cmdChatSend() {
   const creds = loadCreds();
   const db = getDb();
 
-  await addDoc(collection(db, "channels", channelId, "messages"), {
+  await addDoc(collection(db, "messages"), {
+    channelId,
     senderId: creds.agentId,
     senderName: creds.agentName,
-    text: message,
+    senderType: "agent",
+    content: message,
+    orgId: creds.orgId,
     createdAt: serverTimestamp(),
   });
 
   console.log(`💬 Sent to #${channelId}`);
+}
+
+async function cmdChatListen() {
+  const channelId = process.argv[4];
+
+  if (!channelId) {
+    console.error("Usage: swarm.mjs chat listen <channelId>");
+    process.exit(1);
+  }
+
+  const db = getDb();
+  let lastSeen = null;
+
+  console.log(`👂 Listening to #${channelId} (poll every 5s, Ctrl+C to stop)\n`);
+
+  const poll = async () => {
+    try {
+      let q;
+      if (lastSeen) {
+        q = query(
+          collection(db, "messages"),
+          where("channelId", "==", channelId),
+          where("createdAt", ">", lastSeen),
+          orderBy("createdAt", "asc")
+        );
+      } else {
+        q = query(
+          collection(db, "messages"),
+          where("channelId", "==", channelId),
+          orderBy("createdAt", "asc")
+        );
+      }
+
+      const snap = await getDocs(q);
+      for (const d of snap.docs) {
+        const m = d.data();
+        const icon = m.senderType === "agent" ? "🤖" : "👤";
+        const time = m.createdAt?.toDate?.()
+          ? m.createdAt.toDate().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+          : "";
+        console.log(`${icon} [${time}] ${m.senderName}: ${m.content || m.text || ""}`);
+        if (m.createdAt) lastSeen = m.createdAt;
+      }
+    } catch (err) {
+      // Silently retry on transient errors
+    }
+  };
+
+  await poll();
+  setInterval(poll, 5000);
 }
 
 // ---------------------------------------------------------------------------
@@ -262,6 +316,7 @@ try {
   else if (cmd === "inbox" && sub === "list") await cmdInboxList();
   else if (cmd === "inbox" && sub === "count") await cmdInboxCount();
   else if (cmd === "chat" && sub === "send") await cmdChatSend();
+  else if (cmd === "chat" && sub === "listen") await cmdChatListen();
   else {
     console.log(`Swarm Connect CLI
 
@@ -272,7 +327,8 @@ Commands:
   tasks update <taskId> --status <status>
   inbox list
   inbox count
-  chat send <channelId> <message>`);
+  chat send <channelId> <message>
+  chat listen <channelId>`);
   }
 } catch (err) {
   console.error("Error:", err.message || err);

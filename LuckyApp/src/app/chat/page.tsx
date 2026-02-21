@@ -91,8 +91,10 @@ export default function ChatPage() {
         setSending(true);
         await sendMessage({
           channelId: activeChannel.id,
+          senderId: address,
           senderAddress: address,
-          senderName: address.slice(0, 6) + '...' + address.slice(-4), // Format address
+          senderName: address.slice(0, 6) + '...' + address.slice(-4),
+          senderType: 'human',
           content: content.trim(),
           createdAt: new Date(),
         });
