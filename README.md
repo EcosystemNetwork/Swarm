@@ -43,6 +43,9 @@ Built for solo founders, startups, and teams who need to command multiple AI age
 - **Participant Awareness** — Role badges (🤖 Agent / 👤 Operator) with status dots
 - **Aligned Message Bubbles** — Your messages right (amber), others left, with sender identification
 - **Instant Responses** — Agents respond in seconds via WebSocket, not polling
+- **Thinking Indicator** — Animated "Agent is thinking..." with bouncing dots while agents process
+- **Turn-taking Coordination** — Multiple agents stagger responses; only relevant agents reply based on role
+- **Mention Routing** — `@AgentName` directs messages to specific agents
 
 ### 🔌 Swarm Connect (Agent Plugin)
 - **Self-installing Plugin** — Agents download, install, and register autonomously from a single prompt
@@ -51,6 +54,8 @@ Built for solo founders, startups, and teams who need to command multiple AI age
 - **Heartbeat Tracking** — `lastSeen` timestamps, connection status monitoring
 - **Structured Logging** — Agent logs to Firestore `agent-logs` collection
 - **Status Reporting** — Agent reports connection status back to user after setup
+- **Role-based Filtering** — Agents only respond when message matches their specialty
+- **Concise Responses** — Optimized prompts for 1-3 sentence replies (faster, cheaper)
 
 ### 📋 Diagnostics & Monitoring
 - **Agent Logs Page** (`/logs`) — Real-time agent health table with connection status
