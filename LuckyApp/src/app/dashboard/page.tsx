@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from "next/link";
 import dynamic from "next/dynamic";
+import { motion } from "motion/react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -13,6 +14,7 @@ import BlurText from "@/components/reactbits/BlurText";
 import GradientText from "@/components/reactbits/GradientText";
 import SpotlightCard from "@/components/reactbits/SpotlightCard";
 import ShinyText from "@/components/reactbits/ShinyText";
+import DecryptedText from "@/components/reactbits/DecryptedText";
 import {
   getOrgStats,
   getTasksByOrg,
@@ -51,9 +53,9 @@ interface OrgStats {
 }
 
 const statusColors: Record<string, string> = {
-  todo: "bg-muted text-foreground",
-  in_progress: "bg-amber-100 text-amber-800",
-  done: "bg-emerald-100 text-emerald-800",
+  todo: "badge-neon-default",
+  in_progress: "badge-neon-amber",
+  done: "badge-neon-green",
 };
 
 const statusLabels: Record<string, string> = {
@@ -63,9 +65,9 @@ const statusLabels: Record<string, string> = {
 };
 
 const jobStatusColors: Record<string, string> = {
-  open: "bg-emerald-100 text-emerald-800",
-  claimed: "bg-amber-100 text-amber-800",
-  closed: "bg-muted text-foreground",
+  open: "badge-neon-green",
+  claimed: "badge-neon-amber",
+  closed: "badge-neon-default",
 };
 
 const jobStatusLabels: Record<string, string> = {
@@ -223,50 +225,44 @@ export default function DashboardPage() {
 
         <TabsContent value="overview">
           <div className="space-y-6">
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
-              <StatCard
-                title="Projects"
-                value={String(stats?.projectCount || 0)}
-                icon="📁"
-                change={0}
-                changeLabel="active projects"
-              />
-              <StatCard
-                title="Agents"
-                value={String(stats?.agentCount || 0)}
-                icon="🤖"
-                change={0}
-                changeLabel="registered agents"
-              />
-              <StatCard
-                title="Active Tasks"
-                value={String(stats?.activeTasks || 0)}
-                icon="🎯"
-                change={0}
-                changeLabel="in progress"
-              />
-              <StatCard
-                title="Completed Tasks"
-                value={String(stats?.completedTasks || 0)}
-                icon="✅"
-                change={0}
-                changeLabel="total completed"
-              />
-              <StatCard
-                title="Open Jobs"
-                value={String(stats?.openJobs || 0)}
-                icon="💼"
-                change={0}
-                changeLabel={`${stats?.jobCount || 0} total jobs`}
-              />
-            </div>
+            {/* Stat Cards with staggered entrance */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, ease: "easeOut" }}
+              className="grid gap-4 md:grid-cols-2 lg:grid-cols-5"
+            >
+              {[
+                { title: "Projects", value: String(stats?.projectCount || 0), icon: "📁", changeLabel: "active projects" },
+                { title: "Agents", value: String(stats?.agentCount || 0), icon: "🤖", changeLabel: "registered agents" },
+                { title: "Active Tasks", value: String(stats?.activeTasks || 0), icon: "🎯", changeLabel: "in progress" },
+                { title: "Completed Tasks", value: String(stats?.completedTasks || 0), icon: "✅", changeLabel: "total completed" },
+                { title: "Open Jobs", value: String(stats?.openJobs || 0), icon: "💼", changeLabel: `${stats?.jobCount || 0} total jobs` },
+              ].map((card, index) => (
+                <motion.div
+                  key={card.title}
+                  initial={{ opacity: 0, y: 20, scale: 0.95 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  transition={{ duration: 0.5, delay: index * 0.1, ease: "easeOut" }}
+                >
+                  <StatCard {...card} change={0} />
+                </motion.div>
+              ))}
+            </motion.div>
 
             <div className="grid gap-6 lg:grid-cols-3">
-              <div className="lg:col-span-2 space-y-6">
+              <motion.div
+                initial={{ opacity: 0, y: 30 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.6, delay: 0.2, ease: "easeOut" }}
+                className="lg:col-span-2 space-y-6"
+              >
                 {/* Recent Tasks */}
-                <SpotlightCard className="p-0" spotlightColor="rgba(255, 191, 0, 0.06)">
+                <SpotlightCard className="p-0 glass-card-enhanced" spotlightColor="rgba(255, 191, 0, 0.06)">
                   <CardHeader className="flex flex-row items-center justify-between px-6 pt-6">
-                    <CardTitle className="text-lg">📋 Recent Tasks</CardTitle>
+                    <CardTitle className="text-lg">
+                      📋 <DecryptedText text="Recent Tasks" speed={30} maxIterations={6} animateOn="view" sequential className="text-lg font-semibold" encryptedClassName="text-lg font-semibold text-amber-500/40" />
+                    </CardTitle>
                     <Link href="/missions" className="text-sm">
                       <ShinyText text="View all →" speed={3} color="#b5954a" shineColor="#FFD700" className="text-sm" />
                     </Link>
@@ -292,7 +288,7 @@ export default function DashboardPage() {
                               📁 {task.projectName} · 🤖 {task.agentName}
                             </p>
                           </div>
-                          <Badge className={`text-[10px] ${statusColors[task.status]}`}>
+                          <Badge variant="outline" className={`text-[10px] ${statusColors[task.status]}`}>
                             {statusLabels[task.status]}
                           </Badge>
                         </div>
@@ -302,9 +298,11 @@ export default function DashboardPage() {
                 </SpotlightCard>
 
                 {/* Recent Jobs */}
-                <SpotlightCard className="p-0" spotlightColor="rgba(255, 191, 0, 0.06)">
+                <SpotlightCard className="p-0 glass-card-enhanced" spotlightColor="rgba(255, 191, 0, 0.06)">
                   <CardHeader className="flex flex-row items-center justify-between px-6 pt-6">
-                    <CardTitle className="text-lg">💼 Recent Jobs</CardTitle>
+                    <CardTitle className="text-lg">
+                      💼 <DecryptedText text="Recent Jobs" speed={30} maxIterations={6} animateOn="view" sequential className="text-lg font-semibold" encryptedClassName="text-lg font-semibold text-amber-500/40" />
+                    </CardTitle>
                     <Link href="/jobs" className="text-sm">
                       <ShinyText text="View all →" speed={3} color="#b5954a" shineColor="#FFD700" className="text-sm" />
                     </Link>
@@ -331,7 +329,7 @@ export default function DashboardPage() {
                               {job.priority} priority
                             </p>
                           </div>
-                          <Badge className={`text-[10px] ${jobStatusColors[job.status]}`}>
+                          <Badge variant="outline" className={`text-[10px] ${jobStatusColors[job.status]}`}>
                             {jobStatusLabels[job.status]}
                           </Badge>
                         </div>
@@ -339,36 +337,43 @@ export default function DashboardPage() {
                     )}
                   </CardContent>
                 </SpotlightCard>
-              </div>
+              </motion.div>
 
-              {/* Quick Actions */}
-              <div className="space-y-6">
-                <SpotlightCard className="p-0" spotlightColor="rgba(255, 191, 0, 0.06)">
+              {/* Quick Actions & Org Info */}
+              <motion.div
+                initial={{ opacity: 0, y: 30 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.6, delay: 0.4, ease: "easeOut" }}
+                className="space-y-6"
+              >
+                <SpotlightCard className="p-0 glass-card-enhanced" spotlightColor="rgba(255, 191, 0, 0.06)">
                   <CardHeader>
-                    <CardTitle className="text-lg">⚡ Quick Actions</CardTitle>
+                    <CardTitle className="text-lg">
+                      ⚡ <DecryptedText text="Quick Actions" speed={30} maxIterations={6} animateOn="view" sequential className="text-lg font-semibold" encryptedClassName="text-lg font-semibold text-amber-500/40" />
+                    </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-3">
-                    <Button asChild className="w-full" variant="outline">
+                    <Button asChild className="w-full btn-glow" variant="outline">
                       <Link href="/swarms">
                         📁 Create Project
                       </Link>
                     </Button>
-                    <Button asChild className="w-full" variant="outline">
+                    <Button asChild className="w-full btn-glow" variant="outline">
                       <Link href="/agents">
                         🤖 Register Agent
                       </Link>
                     </Button>
-                    <Button asChild className="w-full" variant="outline">
+                    <Button asChild className="w-full btn-glow" variant="outline">
                       <Link href="/missions">
                         📋 Create Task
                       </Link>
                     </Button>
-                    <Button asChild className="w-full" variant="outline">
+                    <Button asChild className="w-full btn-glow" variant="outline">
                       <Link href="/jobs">
                         💼 Post Job
                       </Link>
                     </Button>
-                    <Button asChild className="w-full" variant="outline">
+                    <Button asChild className="w-full btn-glow" variant="outline">
                       <Link href="/chat">
                         💬 Open Chat
                       </Link>
@@ -377,9 +382,11 @@ export default function DashboardPage() {
                 </SpotlightCard>
 
                 {/* Org Info */}
-                <SpotlightCard className="p-0" spotlightColor="rgba(255, 191, 0, 0.06)">
+                <SpotlightCard className="p-0 glass-card-enhanced" spotlightColor="rgba(255, 191, 0, 0.06)">
                   <CardHeader>
-                    <CardTitle className="text-lg">🏢 Organization</CardTitle>
+                    <CardTitle className="text-lg">
+                      🏢 <DecryptedText text="Organization" speed={30} maxIterations={6} animateOn="view" sequential className="text-lg font-semibold" encryptedClassName="text-lg font-semibold text-amber-500/40" />
+                    </CardTitle>
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-2">
@@ -401,7 +408,7 @@ export default function DashboardPage() {
                     </div>
                   </CardContent>
                 </SpotlightCard>
-              </div>
+              </motion.div>
             </div>
           </div>
         </TabsContent>

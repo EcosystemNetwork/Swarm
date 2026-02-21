@@ -109,12 +109,12 @@ export function Header() {
 
   return (
     <>
-    <header className="sticky top-0 z-50 w-full border-b border-white/10 bg-black/95 backdrop-blur supports-[backdrop-filter]:bg-black/60">
+    <header className="sticky top-0 z-50 w-full border-b border-amber-500/10 bg-black/95 backdrop-blur supports-[backdrop-filter]:bg-black/60 neon-glow-gold">
       <div className="flex h-16 items-center justify-between px-6">
         <div className="flex items-center gap-8">
           <Link href="/" className="flex items-center gap-2">
             <Image src="/lobsterlogo.png" alt="Swarm Logo" width={40} height={40} />
-            <GradientText colors={['#FFD700', '#FFA500', '#FF8C00']} animationSpeed={4} className="text-xl font-bold">Swarm</GradientText>
+            <GradientText colors={['#FFD700', '#FFA500', '#FF8C00']} animationSpeed={4} className="text-xl font-bold text-glow-gold">Swarm</GradientText>
           </Link>
           {isConnected && (
             <nav className="hidden md:flex items-center gap-6">
@@ -122,12 +122,15 @@ export function Header() {
                 <Link
                   key={link.href}
                   href={link.href}
-                  className={`text-sm font-medium transition-colors ${pathname === link.href
-                      ? 'text-foreground'
-                      : 'text-muted-foreground hover:text-foreground'
+                  className={`relative text-sm font-medium transition-all duration-300 ${pathname === link.href
+                      ? 'text-amber-400 text-glow-amber'
+                      : 'text-muted-foreground hover:text-amber-300'
                     }`}
                 >
                   {link.label}
+                  {pathname === link.href && (
+                    <span className="absolute -bottom-[17px] left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-amber-400 to-transparent animate-pulse-subtle" />
+                  )}
                 </Link>
               ))}
             </nav>

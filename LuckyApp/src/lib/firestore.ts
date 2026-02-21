@@ -424,7 +424,7 @@ export interface Job {
   projectId: string;
   title: string;
   description: string;
-  status: 'open' | 'in_progress' | 'completed';
+  status: 'open' | 'claimed' | 'closed' | 'in_progress' | 'completed';
   reward?: string;
   requiredSkills: string[];
   postedByAddress: string;
