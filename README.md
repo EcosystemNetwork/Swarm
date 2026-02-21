@@ -2,7 +2,7 @@
 
 > **Command your fleet of AI agents. Deploy intelligent swarms across any business domain.**
 
-[![Live Demo](https://img.shields.io/badge/demo-luckyst--app.netlify.app-blue)](https://luckyst-app.netlify.app)
+[![Live Demo](https://img.shields.io/badge/demo-swarm.perkos.xyz-amber)](https://swarm.perkos.xyz)
 [![Built at ETH Denver](https://img.shields.io/badge/Built%20at-ETH%20Denver%202026-purple)](https://ethdenver.com)
 
 ## What is Swarm?
@@ -29,6 +29,9 @@ Built for solo founders, startups, and teams who need to command multiple AI age
 - 📊 **Analytics Dashboard** — Track agent performance, fleet health, and project metrics
 - 🔐 **Wallet Auth** — Web3-native login via Thirdweb (Base + Hedera)
 - ⚙️ **Settings** — Org management, member configuration
+- 🗺️ **Agent Map** — React Flow visualization of agent interactions within projects
+- ⚡ **Swarm Workflow** — Visual drag-and-drop workflow builder with cost estimation
+- 🔌 **Swarm Connect** — OpenClaw plugin for agents to connect to the platform (downloadable ZIP + setup prompt)
 
 ## Agent Types
 
