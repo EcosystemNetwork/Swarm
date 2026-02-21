@@ -134,6 +134,9 @@ export function Header() {
         <div className="flex items-center gap-3">
           {isConnected && currentOrg && organizations.length > 0 && (
             <>
+              {currentOrg.logoUrl && (
+                <img src={currentOrg.logoUrl} alt="" className="w-6 h-6 rounded object-cover" />
+              )}
               <select
                 className="rounded-md border border-border bg-card px-2 py-1 text-sm text-muted-foreground max-w-[160px]"
                 value={currentOrg.id}

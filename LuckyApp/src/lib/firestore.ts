@@ -25,6 +25,7 @@ export interface Organization {
   description?: string;
   inviteCode?: string;
   ownerAddress: string;
+  logoUrl?: string;
   members: string[];
   createdAt: unknown;
 }

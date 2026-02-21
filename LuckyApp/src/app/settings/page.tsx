@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -18,14 +18,42 @@ export default function SettingsPage() {
   const [description, setDescription] = useState('');
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Initialize form with current org data
   useEffect(() => {
     if (currentOrg) {
       setName(currentOrg.name);
       setDescription(currentOrg.description || '');
+      setLogoPreview(currentOrg.logoUrl || null);
     }
   }, [currentOrg]);
+
+  const handleLogoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !currentOrg) return;
+
+    if (file.size > 500 * 1024) {
+      setMessage({ type: 'error', text: 'Image must be under 500KB' });
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = async () => {
+      const base64 = reader.result as string;
+      setLogoPreview(base64);
+      try {
+        await updateOrganization(currentOrg.id, { logoUrl: base64 });
+        await refreshOrgs();
+        setMessage({ type: 'success', text: 'Logo updated!' });
+      } catch {
+        setMessage({ type: 'error', text: 'Failed to save logo' });
+      }
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  };
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -94,8 +122,26 @@ export default function SettingsPage() {
           <CardContent>
             <form onSubmit={handleSave} className="space-y-5">
               <div className="flex items-center gap-4">
-                <div className="w-16 h-16 rounded-xl border border-amber-200 bg-amber-50 flex items-center justify-center">
-                  <span className="text-2xl">⚡</span>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  className="hidden"
+                  onChange={handleLogoChange}
+                />
+                <div className="flex flex-col items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="w-16 h-16 rounded-xl border border-amber-200 bg-amber-50 dark:bg-amber-950/30 flex items-center justify-center overflow-hidden cursor-pointer hover:opacity-80 transition-opacity"
+                  >
+                    {logoPreview ? (
+                      <img src={logoPreview} alt="Logo" className="w-full h-full object-cover" />
+                    ) : (
+                      <span className="text-2xl font-bold text-amber-600">{currentOrg.name.charAt(0).toUpperCase()}</span>
+                    )}
+                  </button>
+                  <button type="button" onClick={() => fileInputRef.current?.click()} className="text-[10px] text-muted-foreground hover:text-foreground">📷 Change Logo</button>
                 </div>
                 <div className="text-sm text-muted-foreground">
                   <p className="font-medium text-foreground">{currentOrg.name}</p>

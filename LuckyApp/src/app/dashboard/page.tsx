@@ -291,7 +291,14 @@ export default function DashboardPage() {
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-2">
-                      <p className="font-medium">{currentOrg.name}</p>
+                      <div className="flex items-center gap-2">
+                        {currentOrg.logoUrl ? (
+                          <img src={currentOrg.logoUrl} alt="" className="w-8 h-8 rounded object-cover" />
+                        ) : (
+                          <span className="text-lg">🏢</span>
+                        )}
+                        <p className="font-medium">{currentOrg.name}</p>
+                      </div>
                       {currentOrg.description && (
                         <p className="text-sm text-muted-foreground">{currentOrg.description}</p>
                       )}
