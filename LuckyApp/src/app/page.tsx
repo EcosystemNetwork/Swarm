@@ -6,7 +6,7 @@ import { ConnectButton, useActiveAccount } from "thirdweb/react";
 import { createThirdwebClient } from "thirdweb";
 import { base, defineChain } from "thirdweb/chains";
 import { useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, Suspense, lazy } from "react";
 import Image from "next/image";
 import {
   Shield,
@@ -18,6 +18,8 @@ import {
   LayoutDashboard,
   ArrowRight
 } from "lucide-react";
+
+const Spline = lazy(() => import('@splinetool/react-spline'));
 
 const client = createThirdwebClient({
   clientId: process.env.NEXT_PUBLIC_THIRDWEB_CLIENT_ID || 'cbd8abcfa13db759ca2f5fa7d8a5a5e5',
@@ -85,7 +87,23 @@ export default function LandingPage() {
 
       <main className="flex-1">
         {/* Hero Section */}
-        <section className="relative pt-24 pb-32 overflow-hidden">
+        <section className="relative pt-24 pb-32 overflow-hidden min-h-[90vh] flex items-center justify-center">
+          {/* Spline Background Container */}
+          <div className="absolute inset-0 z-0">
+            <Suspense fallback={
+              <div className="w-full h-full flex items-center justify-center bg-black/20">
+                <div className="w-12 h-12 border-4 border-amber-500/20 border-t-amber-500 rounded-full animate-spin" />
+              </div>
+            }>
+              <Spline
+                scene="https://prod.spline.design/G9Uv2yhuZyhmrxRG/scene.splinecode"
+                className="w-full h-full pointer-events-none opacity-60"
+              />
+            </Suspense>
+            {/* Gradient Overlay to fade Spline into background */}
+            <div className="absolute inset-0 bg-gradient-to-b from-black/0 via-black/20 to-black pointer-events-none" />
+          </div>
+
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-amber-500/5 rounded-full blur-[120px] pointer-events-none" />
 
           <div className="max-w-5xl mx-auto px-6 text-center relative z-10">
