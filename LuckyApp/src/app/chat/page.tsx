@@ -1,9 +1,17 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { ChannelList } from "@/components/chat/channel-list";
 import { MessageList } from "@/components/chat/message-list";
 import { MessageInput } from "@/components/chat/message-input";
+import { useTeam } from "@/contexts/TeamContext";
+import {
+  getChannelsByTeam,
+  onMessagesByChannel,
+  sendMessage as sendFirestoreMessage,
+  type FirestoreChannel,
+  type FirestoreMessage,
+} from "@/lib/firestore";
 import {
   CommandMessage,
   mockChannelMessages,
@@ -13,12 +21,36 @@ import {
 } from "@/lib/mock-data";
 
 export default function ChatPage() {
+  const { currentTeam } = useTeam();
   const [activeId, setActiveId] = useState("ch-general");
   const [activeType, setActiveType] = useState<"channel" | "dm">("channel");
-  const [messages, setMessages] = useState<Record<string, CommandMessage[]>>({
+  const [firestoreChannels, setFirestoreChannels] = useState<FirestoreChannel[]>([]);
+  const [firestoreMessages, setFirestoreMessages] = useState<FirestoreMessage[]>([]);
+  const [mockMsgs, setMockMsgs] = useState<Record<string, CommandMessage[]>>({
     ...mockChannelMessages,
     ...mockDMMessages,
   });
+  const [useFirestore, setUseFirestore] = useState(false);
+
+  // Load channels from Firestore
+  useEffect(() => {
+    if (!currentTeam) return;
+    getChannelsByTeam(currentTeam.id).then((channels) => {
+      setFirestoreChannels(channels);
+      if (channels.length > 0) {
+        setUseFirestore(true);
+      }
+    });
+  }, [currentTeam]);
+
+  // Subscribe to real-time messages for active channel
+  useEffect(() => {
+    if (!useFirestore) return;
+    const unsub = onMessagesByChannel(activeId, (msgs) => {
+      setFirestoreMessages(msgs);
+    });
+    return () => unsub();
+  }, [activeId, useFirestore]);
 
   const handleSelectChannel = (id: string, type: "channel" | "dm") => {
     setActiveId(id);
@@ -26,43 +58,61 @@ export default function ChatPage() {
   };
 
   const handleSend = useCallback(
-    (content: string) => {
-      const newMsg: CommandMessage = {
-        id: `msg-${Date.now()}`,
-        senderId: "operator-1",
-        senderName: "Julio",
-        senderType: "operator",
-        content,
-        timestamp: Date.now(),
-      };
-      setMessages((prev) => ({
-        ...prev,
-        [activeId]: [...(prev[activeId] || []), newMsg],
-      }));
+    async (content: string) => {
+      if (useFirestore && currentTeam) {
+        await sendFirestoreMessage({
+          channelId: activeId,
+          senderId: "operator-1",
+          senderName: "Julio",
+          senderType: "operator",
+          content,
+          timestamp: Date.now(),
+          teamId: currentTeam.id,
+        });
+      } else {
+        const newMsg: CommandMessage = {
+          id: `msg-${Date.now()}`,
+          senderId: "operator-1",
+          senderName: "Julio",
+          senderType: "operator",
+          content,
+          timestamp: Date.now(),
+        };
+        setMockMsgs((prev) => ({
+          ...prev,
+          [activeId]: [...(prev[activeId] || []), newMsg],
+        }));
+      }
     },
-    [activeId]
+    [activeId, useFirestore, currentTeam]
   );
 
-  const currentMessages = messages[activeId] || [];
+  const currentMessages: CommandMessage[] = useFirestore
+    ? firestoreMessages.map((m) => ({
+        id: m.id!,
+        senderId: m.senderId,
+        senderName: m.senderName,
+        senderType: m.senderType,
+        content: m.content,
+        timestamp: m.timestamp,
+      }))
+    : mockMsgs[activeId] || [];
 
-  // Get display name for the active channel
   const activeName =
     activeType === "channel"
-      ? mockChannels.find((c) => c.id === activeId)?.name || "General"
-      : mockDirectMessages.find((d) => d.id === activeId)?.participantName ||
-        "Chat";
+      ? (useFirestore
+          ? firestoreChannels.find((c) => c.id === activeId)?.name
+          : mockChannels.find((c) => c.id === activeId)?.name) || "General"
+      : mockDirectMessages.find((d) => d.id === activeId)?.participantName || "Chat";
 
   return (
     <div className="flex h-[calc(100vh-8rem)] bg-white rounded-lg border border-gray-200 overflow-hidden">
-      {/* Sidebar */}
       <ChannelList
         activeChannelId={activeId}
         onSelectChannel={handleSelectChannel}
       />
 
-      {/* Main Chat Area */}
       <div className="flex-1 flex flex-col min-w-0">
-        {/* Channel Header */}
         <div className="border-b border-gray-200 px-6 py-3 bg-white">
           <div className="flex items-center gap-2">
             <h2 className="font-semibold text-gray-900">
@@ -76,10 +126,7 @@ export default function ChatPage() {
           </div>
         </div>
 
-        {/* Messages */}
         <MessageList messages={currentMessages} />
-
-        {/* Input */}
         <MessageInput onSend={handleSend} channelName={activeName} />
       </div>
     </div>
