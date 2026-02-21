@@ -37,7 +37,7 @@ export default function SettingsPage() {
     try {
       await updateOrganization(currentOrg.id, {
         name: name.trim(),
-        description: description.trim() || undefined,
+        description: description.trim() || '',
       });
 
       // Refresh org data to reflect changes
