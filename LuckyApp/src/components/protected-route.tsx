@@ -1,14 +1,14 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import { useActiveAccount, useAutoConnect } from 'thirdweb/react';
-import { createThirdwebClient } from 'thirdweb';
+import { useActiveAccount } from 'thirdweb/react';
 import { useOrg } from '@/contexts/OrgContext';
 
-const client = createThirdwebClient({
-  clientId: process.env.NEXT_PUBLIC_THIRDWEB_CLIENT_ID || 'cbd8abcfa13db759ca2f5fa7d8a5a5e5',
-});
+// Grace period (ms) after mount before allowing auth redirects.
+// Gives the global AutoConnect component time to restore the wallet session
+// on page refresh / HMR remount, preventing premature logout.
+const AUTH_GRACE_MS = 3000;
 
 export function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const account = useActiveAccount();
@@ -16,14 +16,31 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { organizations, loading } = useOrg();
   const router = useRouter();
   const pathname = usePathname();
-  const { isLoading: isAutoConnecting } = useAutoConnect({
-    client,
-    timeout: 15000,
-  });
+
+  // --- Grace period: don't redirect until AUTH_GRACE_MS after mount ---
+  const mountTime = useRef(Date.now());
+  const [graceOver, setGraceOver] = useState(false);
 
   useEffect(() => {
-    // Don't redirect while auto-reconnect is still in progress
-    if (isAutoConnecting) return;
+    const remaining = AUTH_GRACE_MS - (Date.now() - mountTime.current);
+    if (remaining <= 0) {
+      setGraceOver(true);
+      return;
+    }
+    const timer = setTimeout(() => setGraceOver(true), remaining);
+    return () => clearTimeout(timer);
+  }, []);
+
+  // If wallet connects during grace period, we can end it early
+  useEffect(() => {
+    if (isConnected && !graceOver) {
+      setGraceOver(true);
+    }
+  }, [isConnected, graceOver]);
+
+  useEffect(() => {
+    // Don't redirect during the grace period
+    if (!graceOver) return;
 
     // First check: wallet connection
     if (!isConnected) {
@@ -33,19 +50,16 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
     // Second check: organizations (only after loading is complete)
     if (!loading && isConnected) {
-      // If user has no orgs and is not already on onboarding page, redirect
       if (organizations.length === 0 && pathname !== '/onboarding') {
         router.push('/onboarding');
-      }
-      // If user has orgs and is on onboarding page, redirect to dashboard
-      else if (organizations.length > 0 && pathname === '/onboarding') {
+      } else if (organizations.length > 0 && pathname === '/onboarding') {
         router.push('/dashboard');
       }
     }
-  }, [isConnected, organizations.length, loading, router, pathname, isAutoConnecting]);
+  }, [isConnected, organizations.length, loading, router, pathname, graceOver]);
 
-  // Show nothing while auto-reconnecting, loading, or not connected
-  if (isAutoConnecting || !isConnected || loading) {
+  // Show nothing while grace period is active, not connected, or loading orgs
+  if (!graceOver || !isConnected || loading) {
     return null;
   }
 
@@ -56,3 +70,5 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
   return <>{children}</>;
 }
+
+
