@@ -508,6 +508,45 @@ export async function deleteJob(jobId: string): Promise<void> {
   await deleteDoc(doc(db, "jobs", jobId));
 }
 
+// ─── Agent Communications ───────────────────────────────
+
+export interface AgentComm {
+  id: string;
+  orgId: string;
+  fromAgentId: string;
+  fromAgentName: string;
+  toAgentId: string;
+  toAgentName: string;
+  type: 'message' | 'status' | 'handoff' | 'error';
+  content: string;
+  metadata?: Record<string, unknown>;
+  createdAt: unknown;
+}
+
+export async function sendAgentComm(data: Omit<AgentComm, "id">): Promise<string> {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { createdAt: _ca, ...rest } = data;
+  const ref = await addDoc(collection(db, "agentComms"), {
+    ...rest,
+    createdAt: serverTimestamp(),
+  });
+  return ref.id;
+}
+
+export function onAgentCommsByOrg(
+  orgId: string,
+  callback: (comms: AgentComm[]) => void
+): Unsubscribe {
+  const q = query(
+    collection(db, "agentComms"),
+    where("orgId", "==", orgId),
+    orderBy("createdAt", "desc")
+  );
+  return onSnapshot(q, (snap) => {
+    callback(snap.docs.map(d => ({ id: d.id, ...d.data() } as AgentComm)));
+  });
+}
+
 // ─── Statistics & Analytics ─────────────────────────────
 
 export async function getOrgStats(orgId: string) {

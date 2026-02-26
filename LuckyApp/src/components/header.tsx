@@ -32,6 +32,7 @@ const navLinks = [
   { href: '/agents', label: 'Agents' },
   { href: '/jobs', label: 'Jobs' },
   { href: '/chat', label: 'Channels' },
+  { href: '/agent-comms', label: 'Agent Comms' },
   { href: '/settings', label: '⚙️' },
 ];
 
@@ -114,150 +115,150 @@ export function Header() {
 
   return (
     <>
-    <header className="sticky top-0 z-50 w-full border-b border-gray-200 dark:border-amber-500/10 bg-white/95 dark:bg-black/95 backdrop-blur supports-[backdrop-filter]:bg-white/60 dark:supports-[backdrop-filter]:bg-black/60 dark:neon-glow-gold">
-      <div className="flex h-16 items-center justify-between px-6">
-        <div className="flex items-center gap-8">
-          <Link href="/" className="flex items-center gap-2">
-            <Image src="/lobsterlogo.png" alt="Swarm Logo" width={40} height={40} />
-            <GradientText colors={['#FFD700', '#FFA500', '#FF8C00']} animationSpeed={4} className="text-xl font-bold text-glow-gold">Swarm</GradientText>
-          </Link>
-          {isConnected && (
-            <nav className="hidden md:flex items-center gap-6">
-              {navLinks.map((link) => (
-                <Link
-                  key={link.href}
-                  href={link.href}
-                  className={`relative text-sm font-medium transition-all duration-300 ${pathname === link.href
+      <header className="sticky top-0 z-50 w-full border-b border-gray-200 dark:border-amber-500/10 bg-white/95 dark:bg-black/95 backdrop-blur supports-[backdrop-filter]:bg-white/60 dark:supports-[backdrop-filter]:bg-black/60 dark:neon-glow-gold">
+        <div className="flex h-16 items-center justify-between px-6">
+          <div className="flex items-center gap-8">
+            <Link href="/" className="flex items-center gap-2">
+              <Image src="/lobsterlogo.png" alt="Swarm Logo" width={40} height={40} />
+              <GradientText colors={['#FFD700', '#FFA500', '#FF8C00']} animationSpeed={4} className="text-xl font-bold text-glow-gold">Swarm</GradientText>
+            </Link>
+            {isConnected && (
+              <nav className="hidden md:flex items-center gap-6">
+                {navLinks.map((link) => (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    className={`relative text-sm font-medium transition-all duration-300 ${pathname === link.href
                       ? 'text-amber-400 text-glow-amber'
                       : 'text-muted-foreground hover:text-amber-300'
-                    }`}
+                      }`}
+                  >
+                    {link.label}
+                    {pathname === link.href && (
+                      <span className="absolute -bottom-[17px] left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-amber-400 to-transparent animate-pulse-subtle" />
+                    )}
+                  </Link>
+                ))}
+              </nav>
+            )}
+          </div>
+          <div className="flex items-center gap-3">
+            {isConnected && currentOrg && organizations.length > 0 && (
+              <>
+                {currentOrg.logoUrl && (
+                  <img src={currentOrg.logoUrl} alt="" className="w-6 h-6 rounded object-cover" />
+                )}
+                <select
+                  className="rounded-md border border-border bg-card px-2 py-1 text-sm text-muted-foreground max-w-[160px]"
+                  value={currentOrg.id}
+                  onChange={(e) => {
+                    if (e.target.value === '__create_org__') {
+                      setShowCreateOrg(true);
+                      e.target.value = currentOrg.id;
+                    } else {
+                      selectOrg(e.target.value);
+                    }
+                  }}
+                  title="Switch Organization"
                 >
-                  {link.label}
-                  {pathname === link.href && (
-                    <span className="absolute -bottom-[17px] left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-amber-400 to-transparent animate-pulse-subtle" />
-                  )}
-                </Link>
-              ))}
-            </nav>
-          )}
-        </div>
-        <div className="flex items-center gap-3">
-          {isConnected && currentOrg && organizations.length > 0 && (
-            <>
-              {currentOrg.logoUrl && (
-                <img src={currentOrg.logoUrl} alt="" className="w-6 h-6 rounded object-cover" />
-              )}
-              <select
-                className="rounded-md border border-border bg-card px-2 py-1 text-sm text-muted-foreground max-w-[160px]"
-                value={currentOrg.id}
-                onChange={(e) => {
-                  if (e.target.value === '__create_org__') {
-                    setShowCreateOrg(true);
-                    e.target.value = currentOrg.id;
-                  } else {
-                    selectOrg(e.target.value);
-                  }
-                }}
-                title="Switch Organization"
+                  {organizations.map(org => (
+                    <option key={org.id} value={org.id}>{org.name}</option>
+                  ))}
+                  <option value="__create_org__">+ New Org</option>
+                </select>
+                <span className="text-muted-foreground text-sm">/</span>
+                <select
+                  className="rounded-md border border-border bg-card px-2 py-1 text-sm text-muted-foreground max-w-[160px]"
+                  value={currentProjectId}
+                  onChange={(e) => {
+                    if (e.target.value === '__create__') {
+                      setShowCreateProject(true);
+                      e.target.value = currentProjectId;
+                    } else if (e.target.value) {
+                      router.push(`/swarms/${e.target.value}`);
+                    }
+                  }}
+                  title="Switch Project"
+                >
+                  <option value="">Select project...</option>
+                  {projects.map(proj => (
+                    <option key={proj.id} value={proj.id}>📁 {proj.name}</option>
+                  ))}
+                  <option value="__create__">+ Project</option>
+                </select>
+              </>
+            )}
+            {mounted && (
+              <button
+                onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+                className="p-2 rounded-md border border-amber-500/20 hover:border-amber-500/40 transition-colors text-amber-400 hover:text-amber-300"
+                title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
               >
-                {organizations.map(org => (
-                  <option key={org.id} value={org.id}>{org.name}</option>
-                ))}
-                <option value="__create_org__">+ New Org</option>
-              </select>
-              <span className="text-muted-foreground text-sm">/</span>
-              <select
-                className="rounded-md border border-border bg-card px-2 py-1 text-sm text-muted-foreground max-w-[160px]"
-                value={currentProjectId}
-                onChange={(e) => {
-                  if (e.target.value === '__create__') {
-                    setShowCreateProject(true);
-                    e.target.value = currentProjectId;
-                  } else if (e.target.value) {
-                    router.push(`/swarms/${e.target.value}`);
-                  }
-                }}
-                title="Switch Project"
-              >
-                <option value="">Select project...</option>
-                {projects.map(proj => (
-                  <option key={proj.id} value={proj.id}>📁 {proj.name}</option>
-                ))}
-                <option value="__create__">+ Project</option>
-              </select>
-            </>
-          )}
-          {mounted && (
-            <button
-              onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-              className="p-2 rounded-md border border-amber-500/20 hover:border-amber-500/40 transition-colors text-amber-400 hover:text-amber-300"
-              title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
-            >
-              {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-            </button>
-          )}
-          <ConnectButton client={client} chains={[base, hedera]} />
-        </div>
-      </div>
-    </header>
-    <Dialog open={showCreateProject} onOpenChange={setShowCreateProject}>
-      <DialogContent className="bg-card border-border">
-        <DialogHeader>
-          <DialogTitle>Create New Project</DialogTitle>
-        </DialogHeader>
-        <div className="space-y-4 pt-2">
-          <Input
-            placeholder="Project name"
-            value={newProjectName}
-            onChange={(e) => setNewProjectName(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter') handleCreateProject(); }}
-            autoFocus
-          />
-          <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={() => setShowCreateProject(false)}>Cancel</Button>
-            <Button
-              onClick={handleCreateProject}
-              disabled={!newProjectName.trim() || creatingProject}
-              className="bg-amber-500 hover:bg-amber-600 text-black"
-            >
-              {creatingProject ? 'Creating...' : 'Create Project'}
-            </Button>
+                {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+              </button>
+            )}
+            <ConnectButton client={client} chains={[base, hedera]} />
           </div>
         </div>
-      </DialogContent>
-    </Dialog>
-    <Dialog open={showCreateOrg} onOpenChange={setShowCreateOrg}>
-      <DialogContent className="bg-card border-border">
-        <DialogHeader>
-          <DialogTitle>Create New Organization</DialogTitle>
-        </DialogHeader>
-        <div className="space-y-4 pt-2">
-          <Input
-            placeholder="Organization name"
-            value={newOrgName}
-            onChange={(e) => setNewOrgName(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter') handleCreateOrg(); }}
-            autoFocus
-          />
-          <Input
-            placeholder="Description (optional)"
-            value={newOrgDescription}
-            onChange={(e) => setNewOrgDescription(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter') handleCreateOrg(); }}
-          />
-          <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={() => setShowCreateOrg(false)}>Cancel</Button>
-            <Button
-              onClick={handleCreateOrg}
-              disabled={!newOrgName.trim() || creatingOrg}
-              className="bg-amber-500 hover:bg-amber-600 text-black"
-            >
-              {creatingOrg ? 'Creating...' : 'Create Organization'}
-            </Button>
+      </header>
+      <Dialog open={showCreateProject} onOpenChange={setShowCreateProject}>
+        <DialogContent className="bg-card border-border">
+          <DialogHeader>
+            <DialogTitle>Create New Project</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <Input
+              placeholder="Project name"
+              value={newProjectName}
+              onChange={(e) => setNewProjectName(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') handleCreateProject(); }}
+              autoFocus
+            />
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setShowCreateProject(false)}>Cancel</Button>
+              <Button
+                onClick={handleCreateProject}
+                disabled={!newProjectName.trim() || creatingProject}
+                className="bg-amber-500 hover:bg-amber-600 text-black"
+              >
+                {creatingProject ? 'Creating...' : 'Create Project'}
+              </Button>
+            </div>
           </div>
-        </div>
-      </DialogContent>
-    </Dialog>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={showCreateOrg} onOpenChange={setShowCreateOrg}>
+        <DialogContent className="bg-card border-border">
+          <DialogHeader>
+            <DialogTitle>Create New Organization</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <Input
+              placeholder="Organization name"
+              value={newOrgName}
+              onChange={(e) => setNewOrgName(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') handleCreateOrg(); }}
+              autoFocus
+            />
+            <Input
+              placeholder="Description (optional)"
+              value={newOrgDescription}
+              onChange={(e) => setNewOrgDescription(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') handleCreateOrg(); }}
+            />
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setShowCreateOrg(false)}>Cancel</Button>
+              <Button
+                onClick={handleCreateOrg}
+                disabled={!newOrgName.trim() || creatingOrg}
+                className="bg-amber-500 hover:bg-amber-600 text-black"
+              >
+                {creatingOrg ? 'Creating...' : 'Create Organization'}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
