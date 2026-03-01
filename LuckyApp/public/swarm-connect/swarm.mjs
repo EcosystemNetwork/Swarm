@@ -159,7 +159,26 @@ async function cmdCheck() {
   const state = loadState();
   const { privateKey } = ensureKeypair();
 
-  const since = arg("--since") || state.lastPoll || "0";
+  const isFirstRun = !existsSync(STATE_PATH);
+  const hasHistory = process.argv.includes("--history");
+
+  // First run or --history: fetch everything (since=0)
+  // Normal run: fetch since last poll
+  let since;
+  if (hasHistory) {
+    since = "0";
+  } else if (arg("--since")) {
+    since = arg("--since");
+  } else if (isFirstRun) {
+    since = "0"; // First check — show channel history
+  } else {
+    since = state.lastPoll || "0";
+  }
+
+  if (isFirstRun) {
+    console.log("🆕 First check — fetching channel history...\n");
+  }
+
   const signedMessage = `GET:/v1/messages:${since}`;
   const sig = sign(signedMessage, privateKey);
 
@@ -175,11 +194,21 @@ async function cmdCheck() {
 
   const data = await resp.json();
   const messages = data.messages || [];
+  const channels = data.channels || [];
+
+  // Always show channels
+  if (channels.length) {
+    console.log(`📡 Channels: ${channels.map(c => `#${c.name} (${c.id})`).join(", ")}`);
+  }
 
   if (messages.length === 0) {
     console.log("📭 No new messages.");
+    if (!hasHistory && !isFirstRun) {
+      console.log("💡 Tip: Use `swarm check --history` to see older messages");
+    }
   } else {
-    console.log(`📬 ${messages.length} new message(s):\n`);
+    const label = isFirstRun ? "existing" : "new";
+    console.log(`📬 ${messages.length} ${label} message(s):\n`);
     for (const msg of messages) {
       const icon = msg.fromType === "agent" ? "🤖" : "👤";
       console.log(`  ${icon} [#${msg.channelName}] ${msg.from}: ${msg.text}`);
@@ -190,10 +219,6 @@ async function cmdCheck() {
   // Update last poll timestamp
   const maxTs = messages.reduce((max, m) => Math.max(max, m.timestamp || 0), parseInt(since, 10));
   saveState({ lastPoll: maxTs || Date.now() });
-
-  if (data.channels?.length) {
-    console.log(`\n📡 Channels: ${data.channels.map(c => `#${c.name} (${c.id})`).join(", ")}`);
-  }
 }
 
 async function cmdSend() {
