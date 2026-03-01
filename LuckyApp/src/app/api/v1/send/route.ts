@@ -11,6 +11,8 @@ import { verifyAgentRequest, unauthorized } from "../verify";
 import { db } from "@/lib/firebase";
 import {
     collection,
+    doc,
+    getDoc,
     addDoc,
     serverTimestamp,
 } from "firebase/firestore";
@@ -78,6 +80,31 @@ export async function POST(request: NextRequest) {
         }
 
         const ref = await addDoc(collection(db, "messages"), messageData);
+
+        // Look up channel name for readable agentComms entry
+        let channelName = `#${channelId}`;
+        try {
+            const chSnap = await getDoc(doc(db, "channels", channelId));
+            if (chSnap.exists()) channelName = `#${chSnap.data().name || channelId}`;
+        } catch { /* use default */ }
+
+        // Also log to agentComms so it appears in the Agent Comms feed
+        await addDoc(collection(db, "agentComms"), {
+            orgId: agentData.orgId,
+            fromAgentId: agentData.agentId,
+            fromAgentName: agentData.agentName,
+            toAgentId: channelId,
+            toAgentName: channelName,
+            type: "message",
+            content: text,
+            metadata: {
+                channelId,
+                messageId: ref.id,
+                verified: true,
+                ...(replyTo ? { replyTo } : {}),
+            },
+            createdAt: serverTimestamp(),
+        }).catch(() => { }); // non-blocking — don't fail the send if comms log fails
 
         return Response.json({
             ok: true,
