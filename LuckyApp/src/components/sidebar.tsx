@@ -9,6 +9,8 @@ const sidebarLinks = [
   { href: "/missions", label: "Tasks", icon: "🎯" },
   { href: "/swarms", label: "Projects", icon: "🐝" },
   { href: "/agents", label: "Agents", icon: "🤖" },
+  { href: "/agent-map", label: "Agent Map", icon: "🗺️" },
+  { href: "/calendar", label: "Calendar", icon: "📅" },
   { href: "/jobs", label: "Job Board", icon: "💼" },
   { href: "/analytics", label: "Analytics", icon: "📊" },
   { href: "/chat", label: "Channels", icon: "💬" },
