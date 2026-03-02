@@ -1,6 +1,6 @@
 {
   "name": "swarm-hub",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "type": "module",
   "scripts": {
     "start": "node index.mjs",
@@ -9,9 +9,7 @@
   "dependencies": {
     "express": "^4.21.0",
     "ws": "^8.18.0",
-    "jsonwebtoken": "^9.0.2",
-    "uuid": "^10.0.0",
     "cors": "^2.8.5",
-    "firebase": "^11.0.0"
+    "firebase": "^12.8.0"
   }
 }
