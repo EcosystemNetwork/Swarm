@@ -338,6 +338,21 @@ export async function getChannelsByOrg(orgId: string): Promise<Channel[]> {
   return snap.docs.map(d => ({ id: d.id, ...d.data() } as Channel));
 }
 
+export async function updateChannel(channelId: string, data: Partial<Channel>): Promise<void> {
+  await updateDoc(doc(db, "channels", channelId), data);
+}
+
+export async function deleteChannel(channelId: string): Promise<void> {
+  await deleteDoc(doc(db, "channels", channelId));
+}
+
+export async function deleteMessagesByChannel(channelId: string): Promise<void> {
+  const q = query(collection(db, "messages"), where("channelId", "==", channelId));
+  const snap = await getDocs(q);
+  const deletions = snap.docs.map(d => deleteDoc(doc(db, "messages", d.id)));
+  await Promise.all(deletions);
+}
+
 export async function ensureGeneralChannel(orgId: string): Promise<string> {
   const channels = await getChannelsByOrg(orgId);
   const generalChannel = channels.find(c => c.name.toLowerCase() === 'general');
