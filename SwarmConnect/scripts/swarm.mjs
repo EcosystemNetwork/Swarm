@@ -111,6 +111,13 @@ async function cmdRegister() {
     process.exit(1);
   }
 
+  // Warn if already registered (prevent accidental re-registration)
+  if (existsSync(CONFIG_PATH)) {
+    const existing = JSON.parse(readFileSync(CONFIG_PATH, "utf-8"));
+    console.log(`⚠️  Already registered as "${existing.agentName}" (ID: ${existing.agentId})`);
+    console.log(`   Re-registering will update the existing agent on the hub.`);
+  }
+
   // Generate or load keypair
   const { publicKey } = ensureKeypair();
 
@@ -146,12 +153,15 @@ async function cmdRegister() {
   };
   writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2) + "\n");
 
-  console.log(`✅ Registered as "${name}" (${type})`);
+  if (data.existing) {
+    console.log(`🔄 Reconnected to existing agent "${data.agentName}"`);
+  } else {
+    console.log(`✅ Registered as "${name}" (${type})`);
+  }
   console.log(`   Agent ID: ${data.agentId}`);
   console.log(`   Hub:      ${hubUrl}`);
   console.log(`   Org:      ${orgId}`);
   console.log(`   Key:      ./keys/public.pem`);
-  if (data.existing) console.log("   (reconnected with existing key)");
 }
 
 async function cmdCheck() {

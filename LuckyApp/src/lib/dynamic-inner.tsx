@@ -21,7 +21,7 @@ const wallets = [
 export function Web3ProviderInner({ children }: { children: React.ReactNode }) {
   return (
     <ThirdwebProvider>
-      <AutoConnect client={client} wallets={wallets} timeout={15000} />
+      <AutoConnect client={client} wallets={wallets} timeout={30000} />
       {children}
     </ThirdwebProvider>
   );
