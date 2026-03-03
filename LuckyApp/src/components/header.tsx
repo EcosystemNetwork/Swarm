@@ -8,7 +8,7 @@ import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
 import { ConnectButton, useActiveAccount } from 'thirdweb/react';
 import { createThirdwebClient } from 'thirdweb';
-import { base, defineChain } from 'thirdweb/chains';
+import { WALLET_CHAINS } from '@/lib/chains';
 import { useOrg } from '@/contexts/OrgContext';
 import { getProjectsByOrg, createProject, createOrganization, type Project } from '@/lib/firestore';
 import GradientText from '@/components/reactbits/GradientText';
@@ -18,12 +18,6 @@ import { Button } from '@/components/ui/button';
 
 const client = createThirdwebClient({
   clientId: process.env.NEXT_PUBLIC_THIRDWEB_CLIENT_ID || 'cbd8abcfa13db759ca2f5fa7d8a5a5e5',
-});
-
-const hedera = defineChain({
-  id: 295,
-  name: 'Hedera',
-  rpc: 'https://mainnet.hashio.io/api',
 });
 
 const navLinks = [
@@ -196,7 +190,7 @@ export function Header() {
                 {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
               </button>
             )}
-            <ConnectButton client={client} chains={[base, hedera]} />
+            <ConnectButton client={client} chains={WALLET_CHAINS} />
           </div>
         </div>
       </header>
