@@ -80,9 +80,9 @@ export default function LandingPage() {
             {Array.from({ length: ROBOT_COUNT }, (_, i) => {
               // Centered trio: left flank, center lead, right flank
               const configs = [
-                { x: -25, y: 5, scale: 0.85, opacity: 0.55, z: 0 },  // left
-                { x: 0, y: 0, scale: 1, opacity: 0.9, z: 2 },  // center
-                { x: 25, y: 5, scale: 0.85, opacity: 0.55, z: 0 },  // right
+                { x: -20, y: 5, scale: 0.85, opacity: 0.55, z: 0 },  // left
+                { x: 5, y: 0, scale: 1, opacity: 0.9, z: 2 },  // center
+                { x: 30, y: 5, scale: 0.85, opacity: 0.55, z: 0 },  // right
               ];
               const c = configs[i];
 

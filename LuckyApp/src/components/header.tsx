@@ -26,6 +26,8 @@ const navLinks = [
   { href: '/agents', label: 'Agents' },
   { href: '/jobs', label: 'Jobs' },
   { href: '/chat', label: 'Channels' },
+  { href: '/skills', label: 'Skills' },
+  { href: '/cron', label: 'Cron' },
   { href: '/settings', label: '⚙️' },
 ];
 
