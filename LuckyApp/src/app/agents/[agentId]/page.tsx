@@ -1,3 +1,4 @@
+/** Agent Detail — Individual agent profile with stats, session history, and management actions. */
 "use client";
 
 import { useState, useEffect } from "react";

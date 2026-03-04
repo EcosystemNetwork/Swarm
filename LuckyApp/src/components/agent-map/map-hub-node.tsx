@@ -1,3 +1,4 @@
+/** Map Hub Node — Custom React Flow node representing the central Swarm hub/orchestrator. */
 "use client";
 
 import { Handle, Position } from "@xyflow/react";

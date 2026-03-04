@@ -1,3 +1,4 @@
+/** Output Node — Visual workflow node representing a task output or result sink. */
 'use client';
 
 import { Handle, Position, type NodeProps } from '@xyflow/react';

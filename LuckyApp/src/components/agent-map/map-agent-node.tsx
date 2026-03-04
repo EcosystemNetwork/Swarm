@@ -1,3 +1,4 @@
+/** Map Agent Node — Custom React Flow node for an agent showing name, status, and skill badges. */
 "use client";
 
 import { Handle, Position } from "@xyflow/react";

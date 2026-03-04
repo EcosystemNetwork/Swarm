@@ -1,10 +1,11 @@
+/** Landing Page — Hero section with 3D Spline robots, wallet connect CTA, and feature showcase. */
 "use client";
 
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { ConnectButton, useActiveAccount } from "thirdweb/react";
 import { createThirdwebClient } from "thirdweb";
-import { base, defineChain } from "thirdweb/chains";
+import { WALLET_CHAINS } from "@/lib/chains";
 import { useRouter } from "next/navigation";
 import { useEffect, Suspense, lazy, useRef } from "react";
 import Image from "next/image";
@@ -16,10 +17,8 @@ const client = createThirdwebClient({
   clientId: process.env.NEXT_PUBLIC_THIRDWEB_CLIENT_ID || 'cbd8abcfa13db759ca2f5fa7d8a5a5e5',
 });
 
-const hedera = defineChain({ id: 295, name: 'Hedera', rpc: 'https://mainnet.hashio.io/api' });
-
-// 5 robots in a horizontal row, centered
-const ROBOT_COUNT = 5;
+// 3 robots — centered, wider spread, faster load
+const ROBOT_COUNT = 3;
 
 export default function LandingPage() {
   const account = useActiveAccount();
@@ -27,14 +26,19 @@ export default function LandingPage() {
   const canvasRefs = useRef<(HTMLCanvasElement | null)[]>([]);
 
   useEffect(() => {
-    if (account) router.push('/dashboard');
+    if (account) {
+      const timer = setTimeout(() => {
+        router.push('/dashboard');
+      }, 750); // Give ConnectButton modal time to close
+      return () => clearTimeout(timer);
+    }
   }, [account, router]);
 
   const handleRobotLoad = (index: number) => (spline: any) => {
     canvasRefs.current[index] = spline.canvas ?? spline._canvas ?? null;
   };
 
-  // Forward mouse to all 10 robot canvases
+  // Forward mouse to all robot canvases
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
       canvasRefs.current.forEach(canvas => {
@@ -58,7 +62,7 @@ export default function LandingPage() {
   }, []);
 
   return (
-    <div className="flex flex-col min-h-screen">
+    <div className="flex flex-col min-h-screen overflow-x-hidden">
       <header className="sticky top-0 z-50 w-full border-b border-white/5 bg-black/50 backdrop-blur-xl">
         <div className="flex h-20 items-center justify-between px-6 max-w-7xl mx-auto">
           <div className="flex items-center gap-3">
@@ -66,27 +70,22 @@ export default function LandingPage() {
             <span className="text-2xl font-bold text-[#FFD700] tracking-tight">Swarm</span>
           </div>
           <div className="flex items-center gap-4">
-            <Link href="/dashboard" className="hidden sm:block text-sm font-medium text-muted-foreground hover:text-white transition-colors">
-              Enter App
-            </Link>
-            <ConnectButton client={client} chains={[base, hedera]} />
+            <ConnectButton client={client} chains={WALLET_CHAINS} />
           </div>
         </div>
       </header>
 
-      <main className="flex-1">
+      <main className="flex-1 overflow-x-hidden">
         {/* Hero Section */}
-        <section className="relative pt-24 pb-32 min-h-[95vh] flex items-center justify-center">
-          {/* 5 Spline Robots — each gets a huge container, positioned via left offset */}
+        <section className="relative pt-24 pb-32 min-h-[95vh] flex items-center justify-center overflow-hidden">
+          {/* 3 Spline Robots — centered with wider spread */}
           <div className="absolute inset-0 z-0 pointer-events-none">
             {Array.from({ length: ROBOT_COUNT }, (_, i) => {
-              // V-formation: center front, flanks behind & outward
+              // Centered trio: left flank, center lead, right flank
               const configs = [
-                { x: -38, y: 8,  scale: 0.75, opacity: 0.4, z: 0 },  // far left, back
-                { x: -18, y: 4,  scale: 0.85, opacity: 0.6, z: 1 },  // mid left
-                { x: 0,   y: 0,  scale: 1,    opacity: 0.9, z: 2 },  // center, front
-                { x: 18,  y: 4,  scale: 0.85, opacity: 0.6, z: 1 },  // mid right
-                { x: 38,  y: 8,  scale: 0.75, opacity: 0.4, z: 0 },  // far right, back
+                { x: -20, y: 5, scale: 0.85, opacity: 0.55, z: 0 },  // left
+                { x: 5, y: 0, scale: 1, opacity: 0.9, z: 2 },  // center
+                { x: 30, y: 5, scale: 0.85, opacity: 0.55, z: 0 },  // right
               ];
               const c = configs[i];
 
@@ -139,10 +138,10 @@ export default function LandingPage() {
             </p>
 
             <div className="flex flex-col sm:flex-row items-center justify-center gap-6 animate-in delay-300 pointer-events-auto">
-              <ConnectButton client={client} chains={[base, hedera]} />
-              <Link href="/dashboard">
+              <ConnectButton client={client} chains={WALLET_CHAINS} />
+              <Link href="/docs">
                 <Button variant="outline" size="lg" className="h-12 px-8 rounded-full border-white/10 hover:bg-white/5 group bg-black/20">
-                  Platform Demo
+                  Read the Docs
                   <ArrowRight className="ml-2 w-4 h-4 transition-transform group-hover:translate-x-1" />
                 </Button>
               </Link>
@@ -155,7 +154,7 @@ export default function LandingPage() {
           <div className="max-w-4xl mx-auto px-6 text-center">
             <h2 className="text-4xl font-bold text-white mb-6 tracking-tight">Ready to orchestrate your fleet?</h2>
             <div className="flex justify-center">
-              <ConnectButton client={client} chains={[base, hedera]} />
+              <ConnectButton client={client} chains={WALLET_CHAINS} />
             </div>
           </div>
         </section>

@@ -1,3 +1,4 @@
+/** Swarm Detail — Individual project view with agents, tasks, activity, and agent comms tabs. */
 "use client";
 
 import { useState, useEffect, useRef } from "react";
@@ -47,6 +48,9 @@ import {
   getProfile,
   getProfilesByAddresses,
 } from "@/lib/firestore";
+import { db } from "@/lib/firebase";
+import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import type { DispatchPayload } from "@/components/agent-map/agent-map";
 
 const TASK_STATUS_COLORS: Record<string, string> = {
   todo: "bg-muted text-muted-foreground",
@@ -375,7 +379,6 @@ export default function ProjectDetailPage() {
       setError(null);
       for (const { jobId, agentId, jobTitle, agentName } of assignments) {
         await claimJob(jobId, agentId, currentOrg.id, projectId);
-        // Send notification to project channel
         if (channel) {
           try {
             await sendMessage({
@@ -387,15 +390,81 @@ export default function ProjectDetailPage() {
               orgId: currentOrg.id,
               createdAt: new Date(),
             });
-          } catch {
-            // notification failure is non-critical
-          }
+          } catch { /* non-critical */ }
         }
       }
       await loadProjectData();
     } catch (err) {
       console.error("Batch assign failed:", err);
       setError(err instanceof Error ? err.message : "Failed to assign agents to jobs");
+    } finally {
+      setBatchAssigning(false);
+    }
+  };
+
+  // Quick Dispatch from Agent Map — create job + assign agents + coordination comms
+  const handleDispatch = async (payload: DispatchPayload) => {
+    if (!currentOrg) return;
+    const { prompt, priority, reward, agentIds } = payload;
+    const agentNames = agentIds.map(id => assignedAgents.find(a => a.id === id)?.name || id);
+
+    try {
+      setBatchAssigning(true);
+      setError(null);
+
+      // 1. Create the job
+      const jobId = await createJob({
+        orgId: currentOrg.id,
+        projectId,
+        title: prompt.slice(0, 120) + (prompt.length > 120 ? '…' : ''),
+        description: prompt,
+        status: 'open',
+        reward: reward || undefined,
+        requiredSkills: [],
+        postedByAddress: account?.address || 'unknown',
+        priority,
+        createdAt: new Date(),
+      });
+
+      // 2. Assign each selected agent
+      for (const agentId of agentIds) {
+        await claimJob(jobId, agentId, currentOrg.id, projectId);
+      }
+
+      // 3. Post coordination to agent comms (handoff type)
+      try {
+        await addDoc(collection(db, "agentComms"), {
+          orgId: currentOrg.id,
+          fromAgentId: "system",
+          fromAgentName: "Swarm Dispatch",
+          toAgentId: agentIds.join(","),
+          toAgentName: agentNames.join(", "),
+          type: "handoff",
+          content: `🚀 **Job Dispatched**\n\n**Prompt:** ${prompt}\n\n**Assigned Agents:** ${agentNames.map(n => `@${n}`).join(", ")}\n**Priority:** ${priority}${reward ? `\n**Reward:** ${reward} HBAR` : ""}\n\nCoordinate as a team to complete this task.`,
+          metadata: { jobId, projectId, priority, reward, agentIds },
+          createdAt: serverTimestamp(),
+        });
+      } catch { /* comms log is non-critical */ }
+
+      // 4. Post prompt to project channel
+      if (channel) {
+        try {
+          await sendMessage({
+            channelId: channel.id,
+            senderId: "system",
+            senderName: "Swarm Dispatch",
+            senderType: "system" as any,
+            content: `🚀 **New Job Dispatched via Agent Map**\n\n${prompt}\n\n**Team:** ${agentNames.map(n => `@${n}`).join(", ")}\n**Priority:** ${priority}${reward ? ` · **Reward:** ${reward} HBAR` : ""}`,
+            orgId: currentOrg.id,
+            createdAt: new Date(),
+          });
+        } catch { /* non-critical */ }
+      }
+
+      await loadProjectData();
+    } catch (err) {
+      console.error("Dispatch failed:", err);
+      setError(err instanceof Error ? err.message : "Failed to dispatch job");
     } finally {
       setBatchAssigning(false);
     }
@@ -855,6 +924,7 @@ export default function ProjectDetailPage() {
                 status: j.status,
               }))}
               onAssign={handleBatchAssign}
+              onDispatch={handleDispatch}
               executing={batchAssigning}
             />
           </div>
@@ -1026,8 +1096,8 @@ export default function ProjectDetailPage() {
                         {/* Avatar */}
                         <div
                           className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${isAgent
-                              ? 'bg-amber-500/20 text-amber-400'
-                              : 'bg-blue-500/20 text-blue-400'
+                            ? 'bg-amber-500/20 text-amber-400'
+                            : 'bg-blue-500/20 text-blue-400'
                             }`}
                         >
                           {isAgent ? '🤖' : '👤'}
@@ -1039,8 +1109,8 @@ export default function ProjectDetailPage() {
                             <Badge
                               variant="secondary"
                               className={`text-[10px] px-1.5 py-0 ${isAgent
-                                  ? 'bg-amber-500/15 text-amber-500 border-amber-500/30'
-                                  : 'bg-blue-500/15 text-blue-400 border-blue-500/30'
+                                ? 'bg-amber-500/15 text-amber-500 border-amber-500/30'
+                                : 'bg-blue-500/15 text-blue-400 border-blue-500/30'
                                 }`}
                             >
                               {badgeLabel}
@@ -1053,10 +1123,10 @@ export default function ProjectDetailPage() {
                           </div>
                           <div
                             className={`inline-block rounded-lg px-3 py-1.5 text-sm break-words ${isMe
-                                ? 'bg-amber-500/15 text-foreground'
-                                : isAgent
-                                  ? 'bg-muted/60 text-foreground border border-amber-500/10'
-                                  : 'bg-muted/60 text-foreground'
+                              ? 'bg-amber-500/15 text-foreground'
+                              : isAgent
+                                ? 'bg-muted/60 text-foreground border border-amber-500/10'
+                                : 'bg-muted/60 text-foreground'
                               }`}
                           >
                             {msg.content}

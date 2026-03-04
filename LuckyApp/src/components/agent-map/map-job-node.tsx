@@ -1,3 +1,4 @@
+/** Map Job Node — Custom React Flow node representing a dispatched job with status and progress. */
 "use client";
 
 import { Handle, Position } from "@xyflow/react";

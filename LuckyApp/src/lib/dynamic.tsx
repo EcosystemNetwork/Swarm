@@ -1,3 +1,4 @@
+/** Dynamic Import Wrapper — Lazy-loads heavy components to reduce initial bundle size. */
 'use client';
 
 import dynamic from 'next/dynamic';

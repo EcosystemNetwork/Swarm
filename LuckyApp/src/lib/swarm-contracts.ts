@@ -1,14 +1,27 @@
 /**
- * BrandMover Swarm Contracts — Hedera Testnet
+ * BrandMover Swarm Contracts — Multi-Chain
  *
  * Contract addresses, ABIs, types, and helpers for interacting
- * with the SwarmTaskBoard and SwarmAgentRegistry on Hedera.
+ * with the SwarmTaskBoard and SwarmAgentRegistry.
+ *
+ * Chain config is centralized in @/lib/chains.ts.
+ * This file re-exports contract-specific helpers.
  *
  * Playbook API: https://frontend-blue-one-76.vercel.app/api/agent-playbook
  */
 
+import {
+  getContracts,
+  toNative,
+  getExplorerTxUrl,
+  getExplorerContractUrl,
+  shortAddress,
+  getCurrencySymbol,
+  CHAIN_CONFIGS,
+} from "./chains";
+
 // ============================================================
-// Network Config
+// Network Config (backwards compat — defaults to Hedera Testnet)
 // ============================================================
 
 export const HEDERA_RPC_URL = "https://testnet.hashio.io/api";
@@ -17,15 +30,18 @@ export const EXPLORER_BASE = "https://hashscan.io/testnet";
 export const HEDERA_GAS_LIMIT = 3_000_000;
 
 // ============================================================
-// Contract Addresses (Hedera Testnet)
+// Contract Addresses — defaults to Hedera, use getContracts(chainId) for multi-chain
 // ============================================================
 
 export const CONTRACTS = {
-  TASK_BOARD: "0xC02EcE9c48E20Fb5a3D59b2ff143a0691694b9a9",
-  AGENT_REGISTRY: "0x1C56831b3413B916CEa6321e0C113cc19fD250Bd",
-  BRAND_VAULT: "0x2254185AB8B6AC995F97C769a414A0281B42853b",
-  AGENT_TREASURY: "0x1AC9C959459ED904899a1d52f493e9e4A879a9f4",
+  TASK_BOARD: CHAIN_CONFIGS.hedera.contracts.taskBoard!,
+  AGENT_REGISTRY: CHAIN_CONFIGS.hedera.contracts.agentRegistry!,
+  BRAND_VAULT: CHAIN_CONFIGS.hedera.contracts.brandVault!,
+  AGENT_TREASURY: CHAIN_CONFIGS.hedera.contracts.agentTreasury!,
 } as const;
+
+/** Get contracts for a specific chain */
+export { getContracts, getCurrencySymbol };
 
 // ============================================================
 // ABIs (full — read + write)
@@ -122,36 +138,33 @@ export enum TaskStatus {
 }
 
 export const STATUS_CONFIG: Record<TaskStatus, { label: string; color: string; bg: string }> = {
-  [TaskStatus.Open]:      { label: "Open",      color: "text-green-400",  bg: "bg-green-500/20" },
-  [TaskStatus.Claimed]:   { label: "Claimed",   color: "text-yellow-400", bg: "bg-yellow-500/20" },
-  [TaskStatus.Completed]: { label: "Completed", color: "text-blue-400",   bg: "bg-blue-500/20" },
-  [TaskStatus.Expired]:   { label: "Expired",   color: "text-gray-400",   bg: "bg-gray-500/20" },
-  [TaskStatus.Disputed]:  { label: "Disputed",  color: "text-red-400",    bg: "bg-red-500/20" },
+  [TaskStatus.Open]: { label: "Open", color: "text-green-400", bg: "bg-green-500/20" },
+  [TaskStatus.Claimed]: { label: "Claimed", color: "text-yellow-400", bg: "bg-yellow-500/20" },
+  [TaskStatus.Completed]: { label: "Completed", color: "text-blue-400", bg: "bg-blue-500/20" },
+  [TaskStatus.Expired]: { label: "Expired", color: "text-gray-400", bg: "bg-gray-500/20" },
+  [TaskStatus.Disputed]: { label: "Disputed", color: "text-red-400", bg: "bg-red-500/20" },
 };
 
 // ============================================================
-// Helpers
+// Helpers (backwards compat — wrap chain-aware functions from chains.ts)
 // ============================================================
 
-/** Convert tinybars to HBAR (1 HBAR = 10^8 tinybar on Hedera EVM) */
+/** Convert tinybars to HBAR (backwards compat — use toNative from chains.ts for multi-chain) */
 export function toHbar(tinybars: bigint | number): number {
-  return Number(tinybars) / 1e8;
+  return toNative(tinybars, 296); // Hedera testnet
 }
 
-/** Shorten an address: 0x1234...5678 */
-export function shortAddr(addr: string): string {
-  if (!addr || addr === "0x0000000000000000000000000000000000000000") return "\u2014";
-  return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
-}
+/** Shorten an address (backwards compat) */
+export const shortAddr = shortAddress;
 
-/** HashScan link for a contract */
+/** HashScan link for a contract (backwards compat) */
 export function explorerContract(addr: string): string {
-  return `${EXPLORER_BASE}/contract/${addr}`;
+  return getExplorerContractUrl(addr);
 }
 
-/** HashScan link for a transaction */
+/** HashScan link for a transaction (backwards compat) */
 export function explorerTx(hash: string): string {
-  return `${EXPLORER_BASE}/transaction/${hash}`;
+  return getExplorerTxUrl(hash);
 }
 
 /** Time remaining as human-readable string */

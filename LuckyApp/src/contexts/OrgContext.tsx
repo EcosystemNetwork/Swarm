@@ -1,6 +1,7 @@
+/** Organization Context — React context providing current org, project selection, and org CRUD operations. */
 'use client';
 
-import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react';
+import { createContext, useContext, useState, useCallback, useEffect, useRef, type ReactNode } from 'react';
 import { useActiveAccount } from 'thirdweb/react';
 import {
   createOrganization,
@@ -44,6 +45,10 @@ export function useOrg() {
 
 const ORG_STORAGE_KEY = 'swarm_selected_org_id';
 
+/** Grace period (ms) before clearing state on wallet disconnect.
+ *  Rides through transient drops caused by page reloads, tab sleep, etc. */
+const DISCONNECT_GRACE_MS = 3_000;
+
 export function OrgProvider({ children }: { children: ReactNode }) {
   const account = useActiveAccount();
   const address = account?.address;
@@ -52,6 +57,9 @@ export function OrgProvider({ children }: { children: ReactNode }) {
   const [currentOrg, setCurrentOrg] = useState<Organization | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Track the grace-period timer so we can cancel if wallet reconnects
+  const disconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const getToken = useCallback(async (): Promise<string | null> => {
     // For compatibility - return null since we're not using Dynamic.xyz
@@ -143,17 +151,32 @@ export function OrgProvider({ children }: { children: ReactNode }) {
     }
   }, [address, refreshOrgs, organizations]);
 
-  // Load orgs when wallet connects
+  // Load orgs when wallet connects, debounce disconnects
   useEffect(() => {
     if (address) {
+      // Wallet (re-)connected — cancel any pending disconnect timer
+      if (disconnectTimer.current) {
+        clearTimeout(disconnectTimer.current);
+        disconnectTimer.current = null;
+      }
       refreshOrgs();
     } else {
-      // No wallet connected - clear in-memory state only
-      // Keep localStorage so org selection persists across reconnects
-      setOrganizations([]);
-      setCurrentOrg(null);
-      setLoading(false);
+      // Wallet address went falsy — start grace period before clearing state.
+      // This prevents flickers caused by page reloads, tab sleep, or slow RPC.
+      disconnectTimer.current = setTimeout(() => {
+        setOrganizations([]);
+        setCurrentOrg(null);
+        setLoading(false);
+        disconnectTimer.current = null;
+      }, DISCONNECT_GRACE_MS);
     }
+
+    return () => {
+      if (disconnectTimer.current) {
+        clearTimeout(disconnectTimer.current);
+        disconnectTimer.current = null;
+      }
+    };
   }, [address, refreshOrgs]);
 
   return (

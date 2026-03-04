@@ -1,3 +1,4 @@
+/** Agent Node — Visual workflow node representing an AI agent with config, status, and connection handles. */
 'use client';
 
 import { Handle, Position, type NodeProps } from '@xyflow/react';

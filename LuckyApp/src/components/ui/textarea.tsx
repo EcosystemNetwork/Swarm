@@ -1,3 +1,4 @@
+/** Textarea — Multi-line text input component with consistent styling and auto-resize. */
 import * as React from "react";
 import { cn } from "@/lib/utils";
 

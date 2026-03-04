@@ -1,3 +1,4 @@
+/** Node Palette — Draggable panel of available workflow node types for the visual canvas editor. */
 'use client';
 
 import type { Agent } from '@/lib/firestore';

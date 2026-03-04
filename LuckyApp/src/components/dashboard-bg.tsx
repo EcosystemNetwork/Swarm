@@ -1,3 +1,4 @@
+/** Dashboard Background — Animated dark gradient background with subtle particle effects. */
 "use client";
 
 import dynamic from "next/dynamic";

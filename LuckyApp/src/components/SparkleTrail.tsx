@@ -1,3 +1,4 @@
+/** Sparkle Trail — Cursor-following sparkle particle effect for premium UI polish. */
 "use client";
 
 import { useEffect, useCallback, useRef } from "react";

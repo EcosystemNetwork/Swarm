@@ -1,57 +1,88 @@
+/** Analytics — Live on-chain performance analytics from Hedera Testnet. */
 "use client";
 
-import { useState, useMemo } from "react";
+import { useMemo } from "react";
 import { CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { StatCard } from "@/components/analytics/stat-card";
 import { PerformanceTable, PnlDisplay, WinRateBar } from "@/components/analytics/performance-table";
 import { Leaderboard } from "@/components/leaderboard";
-import {
-  mockOverviewStats,
-  mockAgentPerformance,
-  mockSwarmPerformance,
-  mockMarketBreakdown,
-  type AgentPerformance,
-  type SwarmPerformance,
-  type MarketBreakdown,
-  type OverviewStats,
-} from "@/lib/mock-data";
 import { useSwarmData } from "@/hooks/useSwarmData";
 import { TaskStatus } from "@/lib/swarm-contracts";
 import { cn } from "@/lib/utils";
 import BlurText from "@/components/reactbits/BlurText";
 import SpotlightCard from "@/components/reactbits/SpotlightCard";
 
+// ─── Types (previously from mock-data) ───────────────────
+
+export interface AgentPerformance {
+  agentId: string;
+  name: string;
+  type: string;
+  winRate: number;
+  totalPredictions: number;
+  wins: number;
+  losses: number;
+  pending: number;
+  pnl: number;
+  streak: number;
+}
+
+export interface SwarmPerformance {
+  swarmId: string;
+  name: string;
+  status: "active" | "paused";
+  totalPnl: number;
+  missionsCompleted: number;
+  missionsActive: number;
+  winRate: number;
+  agentCount: number;
+}
+
+export interface MarketBreakdown {
+  category: string;
+  label: string;
+  icon: string;
+  totalPredictions: number;
+  wins: number;
+  losses: number;
+  pending: number;
+  winRate: number;
+  totalPnl: number;
+}
+
+interface OverviewStats {
+  totalPnl: number;
+  winRate: number;
+  totalTasks: number;
+  activeAgents: number;
+}
+
 // ─── Page ────────────────────────────────────────────────
 
-type AnalyticsView = "simulated" | "live";
-
 export default function AnalyticsPage() {
-  const [view, setView] = useState<AnalyticsView>("simulated");
   const swarm = useSwarmData();
-  const currency = view === "live" ? "HBAR" : "$";
 
   // ── Compute live data from on-chain ──
 
-  const liveOverview = useMemo<OverviewStats>(() => {
+  const stats = useMemo<OverviewStats>(() => {
     const completed = swarm.tasks.filter((t) => t.status === TaskStatus.Completed).length;
     const expired = swarm.tasks.filter((t) => t.status === TaskStatus.Expired).length;
     const disputed = swarm.tasks.filter((t) => t.status === TaskStatus.Disputed).length;
     const resolved = completed + expired + disputed;
     const winRate = resolved > 0 ? (completed / resolved) * 100 : 0;
-    // Show treasury revenue if available, otherwise total task budget
     const treasuryRevenue = swarm.treasury?.totalRevenue ?? 0;
     const totalTaskBudget = swarm.tasks.reduce((sum, t) => sum + t.budget, 0);
 
     return {
       totalPnl: treasuryRevenue > 0 ? treasuryRevenue : totalTaskBudget,
       winRate: Math.round(winRate * 10) / 10,
-      totalPredictions: swarm.totalTasks,
+      totalTasks: swarm.totalTasks,
       activeAgents: swarm.agents.filter((a) => a.active).length,
     };
   }, [swarm.tasks, swarm.treasury, swarm.totalTasks, swarm.agents]);
 
-  const liveAgentPerf = useMemo<AgentPerformance[]>(() => {
+  const agentPerfData = useMemo<AgentPerformance[]>(() => {
     return swarm.agents.map((agent) => {
       const agentTasks = swarm.tasks.filter(
         (t) => t.claimedBy?.toLowerCase() === agent.agentAddress.toLowerCase()
@@ -62,7 +93,6 @@ export default function AnalyticsPage() {
       ).length;
       const pending = agentTasks.filter((t) => t.status === TaskStatus.Claimed).length;
       const total = wins + losses + pending;
-      // Total HBAR value of all tasks handled by this agent
       const pnl = agentTasks.reduce((sum, t) => sum + t.budget, 0);
       const winRate = wins + losses > 0 ? (wins / (wins + losses)) * 100 : 0;
       const firstSkill = (agent.skills || "").split(",")[0]?.trim() || "Agent";
@@ -82,7 +112,7 @@ export default function AnalyticsPage() {
     });
   }, [swarm.agents, swarm.tasks]);
 
-  const liveSwarmPerf = useMemo<SwarmPerformance[]>(() => {
+  const swarmPerfData = useMemo<SwarmPerformance[]>(() => {
     if (!swarm.treasury) return [];
     return [
       {
@@ -92,30 +122,23 @@ export default function AnalyticsPage() {
         totalPnl: swarm.treasury.totalRevenue,
         missionsCompleted: swarm.tasks.filter((t) => t.status === TaskStatus.Completed).length,
         missionsActive: swarm.tasks.filter((t) => t.status === TaskStatus.Claimed).length,
-        winRate: liveOverview.winRate,
+        winRate: stats.winRate,
         agentCount: swarm.agents.filter((a) => a.active).length,
       },
     ];
-  }, [swarm.treasury, swarm.tasks, swarm.agents, liveOverview.winRate]);
+  }, [swarm.treasury, swarm.tasks, swarm.agents, stats.winRate]);
 
-  const liveMarketBreakdown = useMemo<MarketBreakdown[]>(() => {
+  const marketData = useMemo<MarketBreakdown[]>(() => {
     if (!swarm.treasury) return [];
     return [
-      { category: "crypto" as const, label: "Total Revenue", icon: "💰", totalPredictions: swarm.totalTasks, wins: swarm.tasks.filter((t) => t.status === TaskStatus.Completed).length, losses: swarm.tasks.filter((t) => t.status === TaskStatus.Expired || t.status === TaskStatus.Disputed).length, pending: swarm.tasks.filter((t) => t.status === TaskStatus.Claimed).length, winRate: liveOverview.winRate, totalPnl: swarm.treasury.totalRevenue },
-      { category: "sports" as const, label: "Compute", icon: "⚙️", totalPredictions: 0, wins: 0, losses: 0, pending: 0, winRate: 0, totalPnl: swarm.treasury.computeBalance },
-      { category: "esports" as const, label: "Growth", icon: "📈", totalPredictions: 0, wins: 0, losses: 0, pending: 0, winRate: 0, totalPnl: swarm.treasury.growthBalance },
-      { category: "events" as const, label: "Reserve", icon: "🏦", totalPredictions: 0, wins: 0, losses: 0, pending: 0, winRate: 0, totalPnl: swarm.treasury.reserveBalance },
+      { category: "revenue", label: "Total Revenue", icon: "💰", totalPredictions: swarm.totalTasks, wins: swarm.tasks.filter((t) => t.status === TaskStatus.Completed).length, losses: swarm.tasks.filter((t) => t.status === TaskStatus.Expired || t.status === TaskStatus.Disputed).length, pending: swarm.tasks.filter((t) => t.status === TaskStatus.Claimed).length, winRate: stats.winRate, totalPnl: swarm.treasury.totalRevenue },
+      { category: "compute", label: "Compute", icon: "⚙️", totalPredictions: 0, wins: 0, losses: 0, pending: 0, winRate: 0, totalPnl: swarm.treasury.computeBalance },
+      { category: "growth", label: "Growth", icon: "📈", totalPredictions: 0, wins: 0, losses: 0, pending: 0, winRate: 0, totalPnl: swarm.treasury.growthBalance },
+      { category: "reserve", label: "Reserve", icon: "🏦", totalPredictions: 0, wins: 0, losses: 0, pending: 0, winRate: 0, totalPnl: swarm.treasury.reserveBalance },
     ];
-  }, [swarm.treasury, swarm.totalTasks, swarm.tasks, liveOverview.winRate]);
+  }, [swarm.treasury, swarm.totalTasks, swarm.tasks, stats.winRate]);
 
-  // ── Select data based on view ──
-
-  const stats = view === "simulated" ? mockOverviewStats : liveOverview;
-  const agentPerfData = view === "simulated" ? mockAgentPerformance : liveAgentPerf;
-  const swarmPerfData = view === "simulated" ? mockSwarmPerformance : liveSwarmPerf;
-  const marketData = view === "simulated" ? mockMarketBreakdown : liveMarketBreakdown;
-
-  // ── Column definitions (need currency) ──
+  // ── Column definitions ──
 
   const agentColumns = useMemo(() => [
     {
@@ -137,14 +160,14 @@ export default function AnalyticsPage() {
     },
     {
       key: "pnl",
-      label: view === "live" ? "HBAR Value" : "P&L",
+      label: "HBAR Value",
       sortable: true,
       getValue: (a: AgentPerformance) => a.pnl,
-      render: (a: AgentPerformance) => <PnlDisplay value={a.pnl} currency={currency} />,
+      render: (a: AgentPerformance) => <PnlDisplay value={a.pnl} currency="HBAR" />,
     },
     {
-      key: "predictions",
-      label: view === "live" ? "Tasks" : "Predictions",
+      key: "tasks",
+      label: "Tasks",
       sortable: true,
       getValue: (a: AgentPerformance) => a.totalPredictions,
       render: (a: AgentPerformance) => (
@@ -170,12 +193,12 @@ export default function AnalyticsPage() {
         );
       },
     },
-  ], [currency, view]);
+  ], []);
 
   const swarmColumns = useMemo(() => [
     {
       key: "name",
-      label: view === "live" ? "Treasury" : "Project",
+      label: "Treasury",
       render: (s: SwarmPerformance) => (
         <div className="flex items-center gap-2 min-w-0">
           <span className="font-medium truncate">{s.name}</span>
@@ -193,7 +216,7 @@ export default function AnalyticsPage() {
       label: "Total P&L",
       sortable: true,
       getValue: (s: SwarmPerformance) => s.totalPnl,
-      render: (s: SwarmPerformance) => <PnlDisplay value={s.totalPnl} currency={currency} />,
+      render: (s: SwarmPerformance) => <PnlDisplay value={s.totalPnl} currency="HBAR" />,
     },
     {
       key: "winRate",
@@ -226,13 +249,11 @@ export default function AnalyticsPage() {
         <span className="text-sm">{s.agentCount} 🤖</span>
       ),
     },
-  ], [currency, view]);
+  ], []);
 
-  // ── Format P&L value for stat card ──
+  // ── Format P&L value ──
 
-  const pnlValue = currency === "HBAR"
-    ? `${stats.totalPnl.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} HBAR`
-    : `$${stats.totalPnl.toLocaleString()}`;
+  const pnlValue = `${stats.totalPnl.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} HBAR`;
 
   // ── Render ──
 
@@ -240,49 +261,25 @@ export default function AnalyticsPage() {
     <div className="space-y-6">
       <div>
         <BlurText text="Analytics" className="text-3xl font-bold tracking-tight" delay={80} animateBy="words" />
-        <p className="text-muted-foreground mt-1">Performance metrics and leaderboards</p>
-      </div>
-
-      {/* Data Source Toggle */}
-      <div className="flex gap-1 border-b border-border">
-        <button
-          onClick={() => setView("simulated")}
-          className={cn(
-            "px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px",
-            view === "simulated"
-              ? "border-amber-500 text-amber-600 dark:text-amber-400"
-              : "border-transparent text-muted-foreground hover:text-foreground"
-          )}
-        >
-          Simulated
-        </button>
-        <button
-          onClick={() => setView("live")}
-          className={cn(
-            "px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px",
-            view === "live"
-              ? "border-emerald-500 text-emerald-600 dark:text-emerald-400"
-              : "border-transparent text-muted-foreground hover:text-foreground"
-          )}
-        >
-          Live (Hedera)
-          {view === "live" && swarm.lastRefresh && (
-            <span className="text-[10px] text-muted-foreground ml-2">
-              {swarm.lastRefresh.toLocaleTimeString()}
+        <div className="flex items-center gap-2 mt-1">
+          <p className="text-muted-foreground">Live performance from Hedera Testnet</p>
+          {swarm.lastRefresh && (
+            <span className="text-[10px] text-muted-foreground">
+              Updated {swarm.lastRefresh.toLocaleTimeString()}
             </span>
           )}
-        </button>
+        </div>
       </div>
 
-      {/* Loading / Error for Live */}
-      {view === "live" && swarm.isLoading ? (
+      {/* Loading / Error */}
+      {swarm.isLoading ? (
         <div className="flex items-center justify-center py-16">
           <div className="flex flex-col items-center gap-3">
             <div className="h-8 w-8 animate-spin rounded-full border-2 border-emerald-500 border-t-transparent" />
             <p className="text-sm text-muted-foreground">Loading live data from Hedera Testnet...</p>
           </div>
         </div>
-      ) : view === "live" && swarm.error ? (
+      ) : swarm.error ? (
         <div className="p-3 rounded-md bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 text-sm text-red-600 dark:text-red-400">
           {swarm.error}
         </div>
@@ -291,39 +288,31 @@ export default function AnalyticsPage() {
           {/* Overview Stats */}
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             <StatCard
-              title={view === "live" ? "Treasury HBAR" : "Total P&L"}
+              title="Treasury HBAR"
               value={pnlValue}
               icon="💰"
-              change={stats.pnlChange}
-              changeLabel={stats.pnlChange !== undefined ? "vs last month" : undefined}
             />
             <StatCard
               title="Win Rate"
               value={`${stats.winRate}%`}
               icon="🎯"
-              change={stats.winRateChange}
-              changeLabel={stats.winRateChange !== undefined ? "vs last month" : undefined}
             />
             <StatCard
-              title={view === "live" ? "Total Tasks" : "Total Predictions"}
-              value={stats.totalPredictions.toLocaleString()}
+              title="Total Tasks"
+              value={stats.totalTasks.toLocaleString()}
               icon="📈"
-              change={stats.predictionsChange}
-              changeLabel={stats.predictionsChange !== undefined ? "vs last month" : undefined}
             />
             <StatCard
               title="Active Agents"
               value={String(stats.activeAgents)}
               icon="🤖"
-              change={stats.agentsChange}
-              changeLabel={stats.agentsChange !== undefined ? "vs last month" : undefined}
             />
           </div>
 
           {/* Agent Performance + Leaderboard */}
           <div className="grid gap-6 lg:grid-cols-3">
             <div className="lg:col-span-2">
-              <SpotlightCard className="p-0" spotlightColor="rgba(255, 191, 0, 0.06)">
+              <SpotlightCard className="p-0 overflow-hidden" spotlightColor="rgba(255, 191, 0, 0.06)">
                 <CardHeader>
                   <CardTitle className="text-lg">🤖 Agent Performance</CardTitle>
                 </CardHeader>
@@ -340,15 +329,13 @@ export default function AnalyticsPage() {
                 </CardContent>
               </SpotlightCard>
             </div>
-            <Leaderboard agents={agentPerfData} currency={currency} />
+            <Leaderboard agents={agentPerfData} currency="HBAR" />
           </div>
 
-          {/* Project / Treasury Performance */}
-          <SpotlightCard className="p-0" spotlightColor="rgba(255, 191, 0, 0.06)">
+          {/* Treasury Performance */}
+          <SpotlightCard className="p-0 overflow-hidden" spotlightColor="rgba(255, 191, 0, 0.06)">
             <CardHeader>
-              <CardTitle className="text-lg">
-                {view === "live" ? "🏦 Treasury Performance" : "📁 Project Performance"}
-              </CardTitle>
+              <CardTitle className="text-lg">🏦 Treasury Performance</CardTitle>
             </CardHeader>
             <CardContent className="overflow-x-auto">
               {swarmPerfData.length > 0 ? (
@@ -358,17 +345,15 @@ export default function AnalyticsPage() {
                   defaultSortKey="totalPnl"
                 />
               ) : (
-                <p className="text-sm text-muted-foreground text-center py-8">No data available</p>
+                <p className="text-sm text-muted-foreground text-center py-8">No treasury data available</p>
               )}
             </CardContent>
           </SpotlightCard>
 
-          {/* Market / Treasury Breakdown */}
-          <SpotlightCard className="p-0" spotlightColor="rgba(255, 191, 0, 0.06)">
+          {/* Treasury Breakdown */}
+          <SpotlightCard className="p-0 overflow-hidden" spotlightColor="rgba(255, 191, 0, 0.06)">
             <CardHeader>
-              <CardTitle className="text-lg">
-                {view === "live" ? "📊 Treasury Breakdown" : "📊 Market Breakdown"}
-              </CardTitle>
+              <CardTitle className="text-lg">📊 Treasury Breakdown</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -382,28 +367,26 @@ export default function AnalyticsPage() {
                       <span className="font-semibold">{m.label}</span>
                     </div>
                     <div className="space-y-2 text-sm">
-                      {(view === "simulated" || m.totalPredictions > 0) && (
+                      {m.totalPredictions > 0 && (
                         <div className="flex justify-between">
-                          <span className="text-muted-foreground">{view === "live" ? "Tasks" : "Predictions"}</span>
+                          <span className="text-muted-foreground">Tasks</span>
                           <span className="font-medium">{m.totalPredictions}</span>
                         </div>
                       )}
-                      {(view === "simulated" || m.winRate > 0) && (
+                      {m.winRate > 0 && (
                         <div className="flex justify-between">
                           <span className="text-muted-foreground">Win Rate</span>
                           <span className="font-medium">{m.winRate}%</span>
                         </div>
                       )}
                       <div className="flex justify-between">
-                        <span className="text-muted-foreground">{view === "live" ? "Balance" : "P&L"}</span>
+                        <span className="text-muted-foreground">Balance</span>
                         <span className={cn("font-semibold", m.totalPnl >= 0 ? "text-amber-600 dark:text-amber-400" : "text-red-500")}>
                           {m.totalPnl >= 0 ? "+" : "-"}
-                          {currency === "HBAR"
-                            ? `${Math.abs(m.totalPnl).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} HBAR`
-                            : `$${Math.abs(m.totalPnl).toLocaleString()}`}
+                          {Math.abs(m.totalPnl).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} HBAR
                         </span>
                       </div>
-                      {(view === "simulated" || m.winRate > 0) && (
+                      {m.winRate > 0 && (
                         <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden mt-1">
                           <div
                             className="h-full bg-amber-600 rounded-full"

@@ -1,3 +1,4 @@
+/** Protected Route — HOC that redirects to landing page if no wallet is connected. */
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
@@ -51,9 +52,11 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
     // Second check: organizations (only after loading is complete)
     if (!loading && isConnected) {
       if (organizations.length === 0 && pathname !== '/onboarding') {
-        router.push('/onboarding');
+        const timer = setTimeout(() => router.push('/onboarding'), 750);
+        return () => clearTimeout(timer);
       } else if (organizations.length > 0 && pathname === '/onboarding') {
-        router.push('/dashboard');
+        const timer = setTimeout(() => router.push('/dashboard'), 750);
+        return () => clearTimeout(timer);
       }
     }
   }, [isConnected, organizations.length, loading, router, pathname, graceOver]);

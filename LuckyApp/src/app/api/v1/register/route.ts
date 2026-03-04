@@ -54,7 +54,7 @@ export async function POST(request: NextRequest) {
         const existing = await getDocs(existingQ);
 
         if (!existing.empty) {
-            // Update existing agent
+            // Update existing agent (same key reconnecting)
             const existingDoc = existing.docs[0];
             await updateDoc(doc(db, "agents", existingDoc.id), {
                 status: "online",
@@ -65,6 +65,33 @@ export async function POST(request: NextRequest) {
             return Response.json({
                 agentId: existingDoc.id,
                 agentName: existingDoc.data().name || agentName,
+                registered: true,
+                existing: true,
+            });
+        }
+
+        // Fallback: check by orgId + name to prevent duplicates when
+        // the agent regenerates its keypair (e.g., deleted keys/ folder)
+        const nameQ = query(
+            collection(db, "agents"),
+            where("orgId", "==", orgId),
+            where("name", "==", agentName)
+        );
+        const nameMatch = await getDocs(nameQ);
+
+        if (!nameMatch.empty) {
+            // Same org + name → update existing agent with new key
+            const matchedDoc = nameMatch.docs[0];
+            await updateDoc(doc(db, "agents", matchedDoc.id), {
+                publicKey,
+                status: "online",
+                lastSeen: serverTimestamp(),
+                connectionType: "ed25519",
+            });
+
+            return Response.json({
+                agentId: matchedDoc.id,
+                agentName: matchedDoc.data().name || agentName,
                 registered: true,
                 existing: true,
             });

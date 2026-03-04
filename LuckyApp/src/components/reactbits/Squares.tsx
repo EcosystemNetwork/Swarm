@@ -1,3 +1,4 @@
+/** Squares — Animated grid of subtly shifting squares for background decoration. */
 import React, { useRef, useEffect } from 'react';
 
 type CanvasStrokeStyle = string | CanvasGradient | CanvasPattern;

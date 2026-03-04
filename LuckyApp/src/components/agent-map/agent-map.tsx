@@ -1,3 +1,4 @@
+/** Agent Map Canvas — React Flow graph visualization of agents, hub, and job nodes with connections. */
 "use client";
 
 import { useMemo, useCallback, useState } from "react";
@@ -47,19 +48,35 @@ interface Job {
   status: string;
 }
 
+export interface DispatchPayload {
+  prompt: string;
+  priority: "low" | "medium" | "high";
+  reward: string;
+  agentIds: string[];
+}
+
 interface AgentMapProps {
   projectName: string;
   agents: Agent[];
   tasks: Task[];
   jobs?: Job[];
   onAssign?: (assignments: { jobId: string; agentId: string; jobTitle: string; agentName: string }[]) => Promise<void>;
+  onDispatch?: (payload: DispatchPayload) => Promise<void>;
   executing?: boolean;
 }
 
 const nodeTypes = { agentNode: MapAgentNode, hubNode: MapHubNode, jobNode: MapJobNode };
 
-function AgentMapInner({ projectName, agents, tasks, jobs = [], onAssign, executing = false }: AgentMapProps) {
+function AgentMapInner({ projectName, agents, tasks, jobs = [], onAssign, onDispatch, executing = false }: AgentMapProps) {
   const [assignmentEdges, setAssignmentEdges] = useState<Edge[]>([]);
+
+  // Quick dispatch state
+  const [dispatchOpen, setDispatchOpen] = useState(false);
+  const [dispatchPrompt, setDispatchPrompt] = useState("");
+  const [dispatchPriority, setDispatchPriority] = useState<"low" | "medium" | "high">("medium");
+  const [dispatchReward, setDispatchReward] = useState("");
+  const [selectedAgentIds, setSelectedAgentIds] = useState<Set<string>>(new Set());
+  const [dispatching, setDispatching] = useState(false);
 
   const openJobs = jobs.filter((j) => j.status === "open");
 
@@ -149,14 +166,12 @@ function AgentMapInner({ projectName, agents, tasks, jobs = [], onAssign, execut
   // Handle new connections (agent → job assignments)
   const onConnect = useCallback(
     (connection: Connection) => {
-      // Only allow connections from agents to jobs
       const sourceNode = nodes.find((n) => n.id === connection.source);
       const targetNode = nodes.find((n) => n.id === connection.target);
 
       if (!sourceNode || !targetNode) return;
       if (sourceNode.type !== "agentNode" || targetNode.type !== "jobNode") return;
 
-      // Prevent duplicate assignment to the same job
       const existingAssignment = assignmentEdges.find(
         (e) => e.target === connection.target
       );
@@ -210,6 +225,46 @@ function AgentMapInner({ projectName, agents, tasks, jobs = [], onAssign, execut
     if (onAssign && assignments.length > 0) {
       await onAssign(assignments);
       setAssignmentEdges([]);
+    }
+  };
+
+  const toggleAgent = (id: string) => {
+    setSelectedAgentIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const selectAllAgents = () => {
+    if (selectedAgentIds.size === agents.length) {
+      setSelectedAgentIds(new Set());
+    } else {
+      setSelectedAgentIds(new Set(agents.map((a) => a.id)));
+    }
+  };
+
+  const handleDispatch = async () => {
+    if (!onDispatch || !dispatchPrompt.trim() || selectedAgentIds.size === 0) return;
+    try {
+      setDispatching(true);
+      await onDispatch({
+        prompt: dispatchPrompt.trim(),
+        priority: dispatchPriority,
+        reward: dispatchReward.trim(),
+        agentIds: [...selectedAgentIds],
+      });
+      // Reset form
+      setDispatchPrompt("");
+      setDispatchPriority("medium");
+      setDispatchReward("");
+      setSelectedAgentIds(new Set());
+      setDispatchOpen(false);
+    } catch (err) {
+      console.error("Dispatch failed:", err);
+    } finally {
+      setDispatching(false);
     }
   };
 
@@ -272,9 +327,9 @@ function AgentMapInner({ projectName, agents, tasks, jobs = [], onAssign, execut
               Draw connections from agents to jobs to assign
             </Badge>
           )}
-          {openJobs.length === 0 && (
+          {openJobs.length === 0 && !dispatchOpen && (
             <Badge className="bg-muted text-muted-foreground text-xs">
-              No open jobs to assign
+              No open jobs — use Quick Dispatch below to create one
             </Badge>
           )}
         </div>
@@ -299,6 +354,154 @@ function AgentMapInner({ projectName, agents, tasks, jobs = [], onAssign, execut
               : `Execute Swarm${assignments.length > 0 ? ` (${assignments.length} jobs)` : ""}`}
           </Button>
         </div>
+      </div>
+
+      {/* ═══════════════ Quick Dispatch Panel ═══════════════ */}
+      <div className="border-t border-border">
+        <button
+          onClick={() => setDispatchOpen(!dispatchOpen)}
+          className="w-full px-4 py-2.5 flex items-center justify-between text-sm font-semibold text-foreground hover:bg-muted/50 transition-colors"
+        >
+          <span className="flex items-center gap-2">
+            <span className="text-base">🚀</span>
+            Quick Dispatch — Create Job & Assign Agents
+          </span>
+          <span className={`transition-transform ${dispatchOpen ? "rotate-180" : ""}`}>▼</span>
+        </button>
+
+        {dispatchOpen && (
+          <div className="px-4 pb-4 space-y-4 bg-muted/30">
+            {/* Prompt */}
+            <div>
+              <label className="text-xs font-medium text-muted-foreground mb-1 block">
+                Job Prompt — What should the agents do?
+              </label>
+              <textarea
+                value={dispatchPrompt}
+                onChange={(e) => setDispatchPrompt(e.target.value)}
+                placeholder="e.g. Research the top 10 DeFi protocols by TVL and create a comparison report with risk analysis..."
+                className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm min-h-[80px] resize-y focus:outline-none focus:ring-2 focus:ring-amber-500/40 focus:border-amber-500/50 placeholder:text-muted-foreground/50"
+                disabled={dispatching}
+              />
+            </div>
+
+            {/* Priority + Reward row */}
+            <div className="flex gap-4">
+              <div className="flex-1">
+                <label className="text-xs font-medium text-muted-foreground mb-1 block">Priority</label>
+                <div className="flex gap-1.5">
+                  {(["low", "medium", "high"] as const).map((p) => (
+                    <button
+                      key={p}
+                      onClick={() => setDispatchPriority(p)}
+                      disabled={dispatching}
+                      className={`flex-1 px-3 py-1.5 rounded-md text-xs font-medium border transition-all ${dispatchPriority === p
+                          ? p === "high"
+                            ? "bg-orange-500/15 border-orange-500/40 text-orange-500"
+                            : p === "medium"
+                              ? "bg-amber-500/15 border-amber-500/40 text-amber-500"
+                              : "bg-muted border-border text-foreground"
+                          : "border-border/50 text-muted-foreground hover:border-border"
+                        }`}
+                    >
+                      {p === "high" ? "🔥 " : p === "medium" ? "⚡ " : ""}
+                      {p.charAt(0).toUpperCase() + p.slice(1)}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="w-40">
+                <label className="text-xs font-medium text-muted-foreground mb-1 block">Reward (HBAR)</label>
+                <input
+                  type="text"
+                  value={dispatchReward}
+                  onChange={(e) => setDispatchReward(e.target.value)}
+                  placeholder="Optional"
+                  disabled={dispatching}
+                  className="w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/40 focus:border-amber-500/50"
+                />
+              </div>
+            </div>
+
+            {/* Agent Selection */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-xs font-medium text-muted-foreground">
+                  Select Agents ({selectedAgentIds.size}/{agents.length})
+                </label>
+                <button
+                  onClick={selectAllAgents}
+                  disabled={dispatching}
+                  className="text-[11px] text-amber-500 hover:text-amber-400 transition-colors"
+                >
+                  {selectedAgentIds.size === agents.length ? "Deselect All" : "Select All"}
+                </button>
+              </div>
+
+              {agents.length === 0 ? (
+                <p className="text-xs text-muted-foreground py-2">No agents assigned to this project yet.</p>
+              ) : (
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
+                  {agents.map((agent) => {
+                    const selected = selectedAgentIds.has(agent.id);
+                    const isOnline = agent.status === "online";
+                    return (
+                      <button
+                        key={agent.id}
+                        onClick={() => toggleAgent(agent.id)}
+                        disabled={dispatching}
+                        className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-left text-xs transition-all ${selected
+                            ? "border-amber-500 bg-amber-500/10 text-foreground ring-1 ring-amber-500/30"
+                            : "border-border/50 text-muted-foreground hover:border-border hover:text-foreground"
+                          }`}
+                      >
+                        <span className={`w-2 h-2 rounded-full shrink-0 ${isOnline ? "bg-emerald-500 shadow-[0_0_4px_rgba(16,185,129,0.5)]" : "bg-red-400"
+                          }`} />
+                        <span className="truncate font-medium">{agent.name}</span>
+                        {selected && <span className="ml-auto text-amber-500">✓</span>}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Dispatch button */}
+            <div className="flex items-center justify-between pt-2 border-t border-border/50">
+              <div className="text-xs text-muted-foreground">
+                {selectedAgentIds.size > 0 && dispatchPrompt.trim() && (
+                  <span>
+                    Will create 1 job and assign {selectedAgentIds.size} agent{selectedAgentIds.size > 1 ? "s" : ""}
+                  </span>
+                )}
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setDispatchOpen(false)}
+                  disabled={dispatching}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleDispatch}
+                  disabled={dispatching || !dispatchPrompt.trim() || selectedAgentIds.size === 0 || !onDispatch}
+                  className="bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-black font-semibold px-6"
+                >
+                  {dispatching ? (
+                    <span className="flex items-center gap-2">
+                      <span className="animate-spin">⚙️</span> Dispatching...
+                    </span>
+                  ) : (
+                    <span>🚀 Dispatch</span>
+                  )}
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

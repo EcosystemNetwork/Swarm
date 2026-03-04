@@ -1,3 +1,4 @@
+/** Agents — Agent registry with status, skills, and connection management. */
 "use client";
 
 import { useState, useEffect, useRef } from "react";
@@ -468,6 +469,9 @@ export default function AgentsPage() {
                       </div>
                       <div>
                         <CardTitle className="text-lg truncate">{agent.name}</CardTitle>
+                        <p className="text-[10px] font-mono text-muted-foreground truncate mt-0.5" title={agent.id}>
+                          ID: {agent.id}
+                        </p>
                         <div className="flex items-center gap-2 mt-1">
                           <Badge className={TYPE_COLORS[agent.type] || ""}>{agent.type}</Badge>
                           <span className={`text-xs font-medium flex items-center gap-1.5 ${agent.status === "online" ? "text-emerald-400" :

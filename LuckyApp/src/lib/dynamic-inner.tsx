@@ -1,3 +1,4 @@
+/** Dynamic Inner — Internal component loaded by the dynamic wrapper after code splitting. */
 'use client';
 import { ThirdwebProvider, AutoConnect } from 'thirdweb/react';
 import { createThirdwebClient } from 'thirdweb';
@@ -21,7 +22,7 @@ const wallets = [
 export function Web3ProviderInner({ children }: { children: React.ReactNode }) {
   return (
     <ThirdwebProvider>
-      <AutoConnect client={client} wallets={wallets} timeout={15000} />
+      <AutoConnect client={client} wallets={wallets} timeout={30000} />
       {children}
     </ThirdwebProvider>
   );
