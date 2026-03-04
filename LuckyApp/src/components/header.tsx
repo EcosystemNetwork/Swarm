@@ -20,17 +20,6 @@ const client = createThirdwebClient({
   clientId: process.env.NEXT_PUBLIC_THIRDWEB_CLIENT_ID || 'cbd8abcfa13db759ca2f5fa7d8a5a5e5',
 });
 
-const navLinks = [
-  { href: '/dashboard', label: 'Dashboard' },
-  { href: '/swarms', label: 'Projects' },
-  { href: '/agents', label: 'Agents' },
-  { href: '/jobs', label: 'Jobs' },
-  { href: '/chat', label: 'Channels' },
-  { href: '/skills', label: 'Skills' },
-  { href: '/cron', label: 'Cron' },
-  { href: '/settings', label: '⚙️' },
-];
-
 export function Header() {
   const pathname = usePathname();
   const router = useRouter();
@@ -111,31 +100,12 @@ export function Header() {
   return (
     <>
       <header className="sticky top-0 z-50 w-full border-b border-gray-200 dark:border-amber-500/10 bg-white/95 dark:bg-black/95 backdrop-blur supports-[backdrop-filter]:bg-white/60 dark:supports-[backdrop-filter]:bg-black/60 dark:neon-glow-gold">
-        <div className="flex h-16 items-center justify-between px-6">
-          <div className="flex items-center gap-8">
+        <div className="flex h-14 items-center justify-between px-4">
+          <div className="flex items-center gap-4">
             <Link href="/" className="flex items-center gap-2">
-              <Image src="/lobsterlogo.png" alt="Swarm Logo" width={40} height={40} />
-              <GradientText colors={['#FFD700', '#FFA500', '#FF8C00']} animationSpeed={4} className="text-xl font-bold text-glow-gold">Swarm</GradientText>
+              <Image src="/lobsterlogo.png" alt="Swarm Logo" width={32} height={32} />
+              <GradientText colors={['#FFD700', '#FFA500', '#FF8C00']} animationSpeed={4} className="text-lg font-bold text-glow-gold">Swarm</GradientText>
             </Link>
-            {isConnected && (
-              <nav className="hidden md:flex items-center gap-6">
-                {navLinks.map((link) => (
-                  <Link
-                    key={link.href}
-                    href={link.href}
-                    className={`relative text-sm font-medium transition-all duration-300 ${pathname === link.href
-                      ? 'text-amber-400 text-glow-amber'
-                      : 'text-muted-foreground hover:text-amber-300'
-                      }`}
-                  >
-                    {link.label}
-                    {pathname === link.href && (
-                      <span className="absolute -bottom-[17px] left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-amber-400 to-transparent animate-pulse-subtle" />
-                    )}
-                  </Link>
-                ))}
-              </nav>
-            )}
           </div>
           <div className="flex items-center gap-3">
             {isConnected && currentOrg && organizations.length > 0 && (

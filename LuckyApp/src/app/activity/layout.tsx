@@ -2,9 +2,9 @@ import { HeaderWrapper as Header } from "@/components/header-wrapper";
 import { Sidebar } from "@/components/sidebar";
 import { ProtectedRoute } from "@/components/protected-route";
 
-export const metadata = { title: "Cron Scheduler — Swarm" };
+export const metadata = { title: "Activity — Swarm" };
 
-export default function CronLayout({ children }: { children: React.ReactNode }) {
+export default function ActivityLayout({ children }: { children: React.ReactNode }) {
     return (
         <ProtectedRoute>
             <div className="min-h-screen">

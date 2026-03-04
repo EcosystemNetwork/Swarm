@@ -5,6 +5,7 @@ import { Web3Provider } from "@/lib/dynamic";
 import { OrgProvider } from "@/contexts/OrgContext";
 import SparkleTrail from "@/components/SparkleTrail";
 import { ThemeProvider } from "@/components/theme-provider";
+import { CommandBar } from "@/components/command-bar";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 
@@ -33,6 +34,7 @@ export default function RootLayout({
           <Web3Provider>
             <OrgProvider>
               <SparkleTrail>
+                <CommandBar />
                 {children}
               </SparkleTrail>
             </OrgProvider>
