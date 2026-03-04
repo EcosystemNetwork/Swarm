@@ -1,3 +1,4 @@
+/** Firestore — Core data operations: organizations, projects, agents, sessions, and messages CRUD. */
 import {
   collection,
   doc,

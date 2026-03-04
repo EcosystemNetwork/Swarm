@@ -1,3 +1,4 @@
+/** Analytics — Platform-wide performance analytics and trend visualizations. */
 "use client";
 
 import { useState, useMemo } from "react";

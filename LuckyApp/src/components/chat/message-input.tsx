@@ -1,3 +1,4 @@
+/** Message Input — Chat input field with send button, file attachment, and keyboard shortcuts. */
 "use client";
 
 import { useState, useRef, useCallback } from "react";

@@ -1,3 +1,4 @@
+/** Approvals — Governance queue for sensitive actions requiring human approval. */
 "use client";
 
 import { useState, useEffect, useCallback } from "react";

@@ -1,3 +1,4 @@
+/** Root Layout — App-level providers (ThirdwebProvider, ThemeProvider, OrgProvider), global fonts, and metadata. */
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";

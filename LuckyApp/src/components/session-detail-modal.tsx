@@ -1,3 +1,4 @@
+/** Session Detail Modal — Overlay showing session stats (tokens/cost/duration), tools, and recent messages. */
 "use client";
 
 import { X, Clock, Cpu, Coins, MessageSquare, Wrench } from "lucide-react";

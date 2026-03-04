@@ -1,3 +1,4 @@
+/** Vitals Widget — 3 SVG circular gauges (CPU/RAM/Disk) with color-coded thresholds. */
 "use client";
 
 import { Cpu, HardDrive, MemoryStick, Server } from "lucide-react";

@@ -1,3 +1,4 @@
+/** Kanban Board — 5-column task board: Inbox → Up Next → In Progress → In Review → Done. */
 "use client";
 
 import { useState, useEffect, useCallback, useRef, type DragEvent } from "react";

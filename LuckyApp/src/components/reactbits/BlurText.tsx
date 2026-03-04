@@ -1,3 +1,4 @@
+/** BlurText — Text animation that blurs/unblurs on scroll or mount for reveal effects. */
 import { motion, Easing } from 'motion/react';
 import { useEffect, useRef, useState, useMemo } from 'react';
 import type { Transition } from 'motion/react';

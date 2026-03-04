@@ -1,3 +1,4 @@
+/** Calendar — Schedule view for tasks, cron jobs, and agent activity across dates. */
 "use client";
 
 import { useState, useEffect, useMemo } from "react";

@@ -1,3 +1,4 @@
+/** Cerebro — Automatic conversation topic organization with status and privacy controls. */
 "use client";
 
 import { useState, useEffect, useCallback } from "react";

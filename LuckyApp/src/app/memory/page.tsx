@@ -1,3 +1,4 @@
+/** Memory Browser — Browse and search agent memory files (journal, long-term, workspace, vector). */
 "use client";
 
 import { useState, useEffect, useCallback } from "react";

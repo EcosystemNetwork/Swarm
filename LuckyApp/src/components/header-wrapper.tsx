@@ -1,3 +1,4 @@
+/** Header Wrapper — Client-side wrapper for the Header component enabling dynamic imports. */
 'use client';
 
 import dynamic from 'next/dynamic';

@@ -1,3 +1,4 @@
+/** Predictions Feed — AI-generated predictions and insights about agent performance and upcoming tasks. */
 "use client";
 
 import { mockAgents } from "@/lib/mock-data";

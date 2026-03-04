@@ -1,3 +1,4 @@
+/** Agents — Agent registry with status, skills, and connection management. */
 "use client";
 
 import { useState, useEffect, useRef } from "react";

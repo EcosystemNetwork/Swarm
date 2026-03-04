@@ -1,3 +1,4 @@
+/** Header — Top navigation bar with org/project selectors, theme toggle, notifications, and wallet connect. */
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';

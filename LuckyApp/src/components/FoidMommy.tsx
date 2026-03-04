@@ -1,3 +1,4 @@
+/** FoidMommy — Decorative animated mascot component used for empty states and loading screens. */
 "use client";
 
 import { Canvas, useFrame } from "@react-three/fiber";

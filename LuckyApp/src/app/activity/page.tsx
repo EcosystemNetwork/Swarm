@@ -1,3 +1,4 @@
+/** Activity Feed — Real-time timeline of all org events: agent actions, task updates, deployments. */
 "use client";
 
 import { useState, useEffect, useCallback } from "react";

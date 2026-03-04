@@ -1,3 +1,4 @@
+/** Badge — Small status/label component with variant styles (default, secondary, destructive, outline). */
 import * as React from "react"
 import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "@/lib/utils"

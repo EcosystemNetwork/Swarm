@@ -1,3 +1,4 @@
+/** Notification Center — Bell icon dropdown with real-time notifications by severity (info/success/warning/error). */
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";

@@ -1,3 +1,4 @@
+/** Agent Map Canvas — React Flow graph visualization of agents, hub, and job nodes with connections. */
 "use client";
 
 import { useMemo, useCallback, useState } from "react";

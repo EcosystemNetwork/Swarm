@@ -1,3 +1,4 @@
+/** Jobs — Dispatch and track work items assigned to agents. */
 "use client";
 
 import { useState, useEffect, useMemo } from "react";

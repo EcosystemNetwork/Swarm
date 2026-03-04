@@ -1,3 +1,4 @@
+/** Onboarding — Step-by-step setup wizard for new users joining the platform. */
 'use client';
 
 import { useState } from 'react';

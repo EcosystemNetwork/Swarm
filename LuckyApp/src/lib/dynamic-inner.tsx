@@ -1,3 +1,4 @@
+/** Dynamic Inner — Internal component loaded by the dynamic wrapper after code splitting. */
 'use client';
 import { ThirdwebProvider, AutoConnect } from 'thirdweb/react';
 import { createThirdwebClient } from 'thirdweb';

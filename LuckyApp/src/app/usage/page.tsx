@@ -1,3 +1,4 @@
+/** Usage — Token consumption and cost tracking across models and agents. */
 "use client";
 
 import { useState, useEffect, useCallback } from "react";

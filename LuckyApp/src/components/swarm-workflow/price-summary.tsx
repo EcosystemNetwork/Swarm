@@ -1,3 +1,4 @@
+/** Price Summary — Cost estimation panel for the current workflow based on model pricing. */
 'use client';
 
 import { Button } from '@/components/ui/button';

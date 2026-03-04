@@ -1,3 +1,4 @@
+/** Message List — Scrollable chat message feed with auto-scroll and infinite scroll support. */
 "use client";
 
 import { useEffect, useRef } from "react";

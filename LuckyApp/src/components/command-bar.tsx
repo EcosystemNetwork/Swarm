@@ -1,3 +1,4 @@
+/** Command Bar (⌘K) — Universal search overlay for quick navigation to any page, agent, or project. */
 "use client";
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";

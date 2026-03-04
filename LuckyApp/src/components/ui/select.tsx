@@ -1,3 +1,4 @@
+/** Select — Dropdown select component with trigger, content, items, and group support. */
 import * as React from "react";
 import * as SelectPrimitive from "@radix-ui/react-select";
 import { ChevronDown } from "lucide-react";
