@@ -26,7 +26,12 @@ export default function LandingPage() {
   const canvasRefs = useRef<(HTMLCanvasElement | null)[]>([]);
 
   useEffect(() => {
-    if (account) router.push('/dashboard');
+    if (account) {
+      const timer = setTimeout(() => {
+        router.push('/dashboard');
+      }, 750); // Give ConnectButton modal time to close
+      return () => clearTimeout(timer);
+    }
   }, [account, router]);
 
   const handleRobotLoad = (index: number) => (spline: any) => {

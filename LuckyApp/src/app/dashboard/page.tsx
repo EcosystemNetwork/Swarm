@@ -113,6 +113,10 @@ function saveJSON(key: string, val: unknown) {
 /*  Widget Catalog                                                     */
 /* ------------------------------------------------------------------ */
 
+import { UsageWidget } from "@/components/usage-widget";
+import { LiveFeedWidget } from "@/components/live-feed-widget";
+import { CronWidget } from "@/components/cron-widget";
+
 interface StatCatalogEntry {
   id: string;
   icon: string;
@@ -124,7 +128,7 @@ interface WidgetCatalogEntry {
   icon: string;
   label: string;
   description: string;
-  colSpan: string;
+  colSpan?: string;
 }
 
 const ALL_STAT_CATALOG: StatCatalogEntry[] = [
@@ -148,6 +152,9 @@ const ALL_WIDGET_CATALOG: WidgetCatalogEntry[] = [
   { id: "widget-system-vitals", icon: "🖥️", label: "System Vitals", description: "CPU, memory, and disk usage gauges", colSpan: "" },
   { id: "widget-agent-status", icon: "🟢", label: "Agent Status", description: "Online, offline, and busy agent breakdown", colSpan: "" },
   { id: "widget-task-breakdown", icon: "📈", label: "Task Breakdown", description: "Visual breakdown of task statuses", colSpan: "" },
+  { id: "widget-llm-usage", icon: "💰", label: "API Usage & Costs", description: "Live tracking of LLM token costs & rate limits", colSpan: "lg:col-span-2" },
+  { id: "widget-live-stream", icon: "Terminal", label: "Live Feed Stream", description: "Raw I/O stream of agent messages", colSpan: "lg:col-span-2" },
+  { id: "widget-cron-jobs", icon: "🕒", label: "Cron Jobs", description: "Manage background scheduled agent tasks", colSpan: "lg:col-span-2" },
 ];
 
 const DEFAULT_ACTIVE_STATS = [
@@ -155,7 +162,7 @@ const DEFAULT_ACTIVE_STATS = [
 ];
 
 const DEFAULT_ACTIVE_WIDGETS = [
-  "widget-recent-tasks", "widget-quick-actions", "widget-recent-jobs", "widget-org-info",
+  "widget-recent-tasks", "widget-quick-actions", "widget-recent-jobs", "widget-org-info", "widget-live-stream", "widget-cron-jobs",
 ];
 
 /* ------------------------------------------------------------------ */
@@ -823,6 +830,21 @@ export default function DashboardPage() {
         );
       },
     },
+    "widget-llm-usage": {
+      label: "API Usage & Costs",
+      colSpan: "lg:col-span-2",
+      render: () => <UsageWidget />,
+    },
+    "widget-live-stream": {
+      label: "Live Feed Stream",
+      colSpan: "lg:col-span-2",
+      render: () => <LiveFeedWidget />,
+    },
+    "widget-cron-jobs": {
+      label: "Cron Jobs",
+      colSpan: "lg:col-span-2",
+      render: () => <CronWidget />,
+    },
   };
 
   /* ── Guards ── */
@@ -940,9 +962,8 @@ export default function DashboardPage() {
                       onDrop={(e) => onStatDrop(e as unknown as DragEvent, id)}
                       onDragEnd={onStatDragEnd}
                       onDragLeave={() => setDropTargetStat(null)}
-                      className={`relative group cursor-grab active:cursor-grabbing transition-all duration-200 rounded-lg overflow-hidden ${
-                        isDragging ? "opacity-40 scale-95" : ""
-                      } ${isDropTarget ? "ring-2 ring-amber-500 ring-offset-2 ring-offset-background" : ""}`}
+                      className={`relative group cursor-grab active:cursor-grabbing transition-all duration-200 rounded-lg overflow-hidden ${isDragging ? "opacity-40 scale-95" : ""
+                        } ${isDropTarget ? "ring-2 ring-amber-500 ring-offset-2 ring-offset-background" : ""}`}
                     >
                       <div className="absolute top-2 right-2 z-10 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button
@@ -982,9 +1003,8 @@ export default function DashboardPage() {
                       onDrop={(e) => onWidgetDrop(e as unknown as DragEvent, id)}
                       onDragEnd={onWidgetDragEnd}
                       onDragLeave={() => setDropTargetWidget(null)}
-                      className={`relative group cursor-grab active:cursor-grabbing transition-all duration-200 overflow-hidden rounded-lg ${widget.colSpan} ${
-                        isDragging ? "opacity-40 scale-[0.98]" : ""
-                      } ${isDropTarget ? "ring-2 ring-amber-500 ring-offset-2 ring-offset-background" : ""}`}
+                      className={`relative group cursor-grab active:cursor-grabbing transition-all duration-200 overflow-hidden rounded-lg ${widget.colSpan} ${isDragging ? "opacity-40 scale-[0.98]" : ""
+                        } ${isDropTarget ? "ring-2 ring-amber-500 ring-offset-2 ring-offset-background" : ""}`}
                     >
                       <div className="absolute top-3 right-3 z-10 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button
@@ -1041,11 +1061,10 @@ export default function DashboardPage() {
                     <button
                       key={entry.id}
                       onClick={() => toggleStat(entry.id)}
-                      className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors ${
-                        isActive
-                          ? "bg-amber-500/10 text-foreground"
-                          : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                      }`}
+                      className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors ${isActive
+                        ? "bg-amber-500/10 text-foreground"
+                        : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                        }`}
                     >
                       <span className="text-base shrink-0">{entry.icon}</span>
                       <span className="flex-1 text-left font-medium">{entry.label}</span>
@@ -1068,11 +1087,10 @@ export default function DashboardPage() {
                     <button
                       key={entry.id}
                       onClick={() => toggleWidget(entry.id)}
-                      className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors ${
-                        isActive
-                          ? "bg-amber-500/10 text-foreground"
-                          : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                      }`}
+                      className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors ${isActive
+                        ? "bg-amber-500/10 text-foreground"
+                        : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                        }`}
                     >
                       <span className="text-base shrink-0">{entry.icon}</span>
                       <div className="flex-1 text-left">
