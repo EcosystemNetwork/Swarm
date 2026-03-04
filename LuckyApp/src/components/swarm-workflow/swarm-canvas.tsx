@@ -1,3 +1,4 @@
+/** Swarm Canvas — React Flow visual workflow editor for building agent orchestration pipelines. */
 'use client';
 
 import { useCallback, useRef, useState, useMemo } from 'react';

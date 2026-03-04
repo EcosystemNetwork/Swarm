@@ -1,3 +1,4 @@
+/** Sidebar — 25-link draggable navigation with 4 sections (Core/Operations/Intelligence/System). */
 "use client";
 
 import { useState, useEffect, useCallback, type DragEvent } from "react";

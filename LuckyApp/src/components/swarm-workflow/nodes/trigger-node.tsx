@@ -1,3 +1,4 @@
+/** Trigger Node — Visual workflow node representing an event trigger (cron, webhook, manual). */
 'use client';
 
 import { Handle, Position, type NodeProps } from '@xyflow/react';

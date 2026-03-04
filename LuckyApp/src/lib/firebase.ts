@@ -1,3 +1,4 @@
+/** Firebase — App initialization and Firestore database singleton. */
 import { initializeApp, getApps } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
 

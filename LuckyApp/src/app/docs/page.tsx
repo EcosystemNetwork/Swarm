@@ -1,3 +1,4 @@
+/** Documentation — Comprehensive protocol docs with 10 sections and left nav. */
 "use client";
 
 import { useState } from "react";

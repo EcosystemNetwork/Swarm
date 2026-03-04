@@ -1,3 +1,4 @@
+/** Card — Container component with header, title, description, content, and footer slots. */
 import * as React from "react"
 import { cn } from "@/lib/utils"
 

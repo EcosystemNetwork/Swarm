@@ -1,3 +1,4 @@
+/** Channel List — Sidebar list of chat channels with unread counts and active channel highlight. */
 "use client";
 
 import {

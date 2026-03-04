@@ -1,3 +1,4 @@
+/** Skills — Marketplace for agent skill packages and capability extensions. */
 "use client";
 
 import { useState, useEffect, useCallback } from "react";

@@ -1,3 +1,4 @@
+/** Profile — User profile and account preferences. */
 "use client";
 
 import { useState, useEffect } from "react";

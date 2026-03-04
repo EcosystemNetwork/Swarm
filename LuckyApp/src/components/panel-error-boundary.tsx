@@ -1,3 +1,4 @@
+/** Panel Error Boundary — React class component wrapper that catches errors and shows a retry card. */
 "use client";
 
 import React from "react";

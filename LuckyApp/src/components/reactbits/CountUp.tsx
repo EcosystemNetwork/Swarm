@@ -1,3 +1,4 @@
+/** CountUp — Animated number counter that increments from 0 to target value. */
 import { useInView, useMotionValue, useSpring } from 'motion/react';
 import { useCallback, useEffect, useRef } from 'react';
 

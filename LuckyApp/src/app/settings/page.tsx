@@ -1,3 +1,4 @@
+/** Settings — Organization configuration, project management, and preferences. */
 'use client';
 
 import { useState, useEffect, useRef } from 'react';

@@ -1,3 +1,4 @@
+/** Organization Context — React context providing current org, project selection, and org CRUD operations. */
 'use client';
 
 import { createContext, useContext, useState, useCallback, useEffect, useRef, type ReactNode } from 'react';

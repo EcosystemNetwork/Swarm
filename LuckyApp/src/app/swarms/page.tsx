@@ -1,3 +1,4 @@
+/** Swarms/Projects — Create and manage projects that group agents, tasks, and resources. */
 "use client";
 
 import { useState, useEffect } from "react";
@@ -9,14 +10,15 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useOrg } from "@/contexts/OrgContext";
-import { 
-  getProjectsByOrg, 
-  getAgentsByOrg, 
-  getTasksByOrg, 
+import {
+  getProjectsByOrg,
+  getAgentsByOrg,
+  getTasksByOrg,
   createProject,
-  type Project, 
-  type Agent, 
-  type Task 
+  createChannel,
+  type Project,
+  type Agent,
+  type Task
 } from "@/lib/firestore";
 import BlurText from "@/components/reactbits/BlurText";
 import SpotlightCard from "@/components/reactbits/SpotlightCard";
@@ -94,12 +96,20 @@ export default function ProjectsPage() {
       setCreating(true);
       setError(null);
 
-      await createProject({
+      const projectId = await createProject({
         orgId: currentOrg.id,
         name: name.trim(),
         description: description.trim() || undefined,
         status: 'active',
         agentIds: [],
+        createdAt: new Date(),
+      });
+
+      // Auto-create a project channel
+      await createChannel({
+        orgId: currentOrg.id,
+        projectId,
+        name: `${name.trim()}`,
         createdAt: new Date(),
       });
 

@@ -1,3 +1,4 @@
+/** Operators — User tracking with role management (admin/member/viewer). */
 "use client";
 
 import { useState, useEffect, useCallback } from "react";

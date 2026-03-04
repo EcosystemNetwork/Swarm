@@ -1,3 +1,4 @@
+/** DecryptedText — Text animation that simulates decryption with random character cycling. */
 import { useEffect, useState, useRef } from 'react';
 import { motion } from 'motion/react';
 

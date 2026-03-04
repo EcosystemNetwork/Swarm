@@ -1,3 +1,4 @@
+/** Missions — Strategic objectives and milestone tracking for agent operations. */
 "use client";
 
 import { useState, useEffect } from "react";

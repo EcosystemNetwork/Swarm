@@ -1,3 +1,4 @@
+/** Chat — Real-time messaging channels between operators and agents. */
 "use client";
 
 import { useState, useCallback, useEffect, useRef } from "react";
@@ -77,6 +78,7 @@ export default function ChatPage() {
 
   // Channels / conversations
   const [channels, setChannels] = useState<Channel[]>([]);
+  const [projectChannels, setProjectChannels] = useState<Channel[]>([]);
   const [activeChannel, setActiveChannel] = useState<Channel | null>(null);
   const [lastMsgTs, setLastMsgTs] = useState<Map<string, number>>(new Map());
 
@@ -106,13 +108,15 @@ export default function ChatPage() {
       setLoading(true);
       setError(null);
       const all = await getChannelsByOrg(currentOrg.id);
-      // Filter to chat channels only (exclude project channels)
       const chatChannels = all.filter(c => !c.projectId);
+      const projChannels = all.filter(c => !!c.projectId);
       setChannels(chatChannels);
+      setProjectChannels(projChannels);
 
       // Auto-select first if nothing selected
-      if (!activeChannel && chatChannels.length > 0) {
-        const sorted = sortByLatest(chatChannels, lastMsgTs);
+      const allVisible = [...chatChannels, ...projChannels];
+      if (!activeChannel && allVisible.length > 0) {
+        const sorted = sortByLatest(allVisible, lastMsgTs);
         setActiveChannel(sorted[0]);
       }
     } catch (err) {
@@ -268,6 +272,7 @@ export default function ChatPage() {
 
   const onlineAgents = agents.filter(a => a.status === "online");
   const sortedChannels = sortByLatest(channels, lastMsgTs);
+  const sortedProjectChannels = sortByLatest(projectChannels, lastMsgTs);
 
   /* ── Render ── */
 
@@ -302,72 +307,106 @@ export default function ChatPage() {
           <div className="flex-1 overflow-y-auto">
             {loading ? (
               <div className="p-4 text-sm text-muted-foreground">Loading…</div>
-            ) : sortedChannels.length === 0 ? (
-              <div className="p-4 text-center text-sm text-muted-foreground">
-                <div className="text-3xl mb-2">💬</div>
-                <p>No conversations yet</p>
-                <Button onClick={handleNewConversation} size="sm" className="mt-2 text-xs">
-                  Start your first chat
-                </Button>
-              </div>
             ) : (
-              <div className="py-1">
-                {sortedChannels.map((ch) => (
-                  <div
-                    key={ch.id}
-                    className={`group relative flex items-center gap-2 px-3 py-2.5 text-sm cursor-pointer transition-colors ${activeChannel?.id === ch.id
-                        ? "bg-amber-500/10 border-r-2 border-amber-500 text-amber-600 dark:text-amber-400"
-                        : "text-muted-foreground hover:bg-card hover:text-foreground"
-                      }`}
-                    onClick={() => {
-                      if (renamingId !== ch.id) setActiveChannel(ch);
-                    }}
-                  >
-                    <span className="text-base shrink-0">💬</span>
-
-                    {renamingId === ch.id ? (
-                      <input
-                        autoFocus
-                        value={renameValue}
-                        onChange={(e) => setRenameValue(e.target.value)}
-                        onBlur={() => handleRename(ch.id)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") handleRename(ch.id);
-                          if (e.key === "Escape") setRenamingId(null);
-                        }}
-                        className="flex-1 bg-transparent border-b border-amber-500 outline-none text-sm py-0.5 min-w-0"
-                        onClick={(e) => e.stopPropagation()}
-                      />
-                    ) : (
-                      <span
-                        className="flex-1 truncate"
-                        onDoubleClick={(e) => {
-                          e.stopPropagation();
-                          setRenamingId(ch.id);
-                          setRenameValue(ch.name);
-                        }}
-                        title="Double-click to rename"
-                      >
-                        {ch.name}
-                      </span>
-                    )}
-
-                    {/* Delete button — visible on hover */}
-                    {renamingId !== ch.id && (
-                      <button
-                        className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-red-400 text-xs shrink-0 p-1"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setDeleteTarget(ch);
-                        }}
-                        title="Delete conversation"
-                      >
-                        🗑️
-                      </button>
-                    )}
+              <>
+                {/* ── Chat Channels ── */}
+                {sortedChannels.length === 0 && sortedProjectChannels.length === 0 ? (
+                  <div className="p-4 text-center text-sm text-muted-foreground">
+                    <div className="text-3xl mb-2">💬</div>
+                    <p>No conversations yet</p>
+                    <Button onClick={handleNewConversation} size="sm" className="mt-2 text-xs">
+                      Start your first chat
+                    </Button>
                   </div>
-                ))}
-              </div>
+                ) : (
+                  <>
+                    {sortedChannels.length > 0 && (
+                      <div className="py-1">
+                        <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider px-3 pt-2 pb-1">
+                          Chats
+                        </p>
+                        {sortedChannels.map((ch) => (
+                          <div
+                            key={ch.id}
+                            className={`group relative flex items-center gap-2 px-3 py-2.5 text-sm cursor-pointer transition-colors ${activeChannel?.id === ch.id
+                                ? "bg-amber-500/10 border-r-2 border-amber-500 text-amber-600 dark:text-amber-400"
+                                : "text-muted-foreground hover:bg-card hover:text-foreground"
+                              }`}
+                            onClick={() => {
+                              if (renamingId !== ch.id) setActiveChannel(ch);
+                            }}
+                          >
+                            <span className="text-base shrink-0">💬</span>
+
+                            {renamingId === ch.id ? (
+                              <input
+                                autoFocus
+                                value={renameValue}
+                                onChange={(e) => setRenameValue(e.target.value)}
+                                onBlur={() => handleRename(ch.id)}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") handleRename(ch.id);
+                                  if (e.key === "Escape") setRenamingId(null);
+                                }}
+                                className="flex-1 bg-transparent border-b border-amber-500 outline-none text-sm py-0.5 min-w-0"
+                                onClick={(e) => e.stopPropagation()}
+                              />
+                            ) : (
+                              <span
+                                className="flex-1 truncate"
+                                onDoubleClick={(e) => {
+                                  e.stopPropagation();
+                                  setRenamingId(ch.id);
+                                  setRenameValue(ch.name);
+                                }}
+                                title="Double-click to rename"
+                              >
+                                {ch.name}
+                              </span>
+                            )}
+
+                            {/* Delete button — visible on hover */}
+                            {renamingId !== ch.id && (
+                              <button
+                                className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-red-400 text-xs shrink-0 p-1"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setDeleteTarget(ch);
+                                }}
+                                title="Delete conversation"
+                              >
+                                🗑️
+                              </button>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* ── Project Channels ── */}
+                    {sortedProjectChannels.length > 0 && (
+                      <div className="py-1">
+                        <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider px-3 pt-2 pb-1">
+                          Project Channels
+                        </p>
+                        {sortedProjectChannels.map((ch) => (
+                          <div
+                            key={ch.id}
+                            className={`group relative flex items-center gap-2 px-3 py-2.5 text-sm cursor-pointer transition-colors ${activeChannel?.id === ch.id
+                                ? "bg-amber-500/10 border-r-2 border-amber-500 text-amber-600 dark:text-amber-400"
+                                : "text-muted-foreground hover:bg-card hover:text-foreground"
+                              }`}
+                            onClick={() => setActiveChannel(ch)}
+                          >
+                            <span className="text-base shrink-0">#</span>
+                            <span className="flex-1 truncate">{ch.name}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                )}
+              </>
             )}
           </div>
         </div>

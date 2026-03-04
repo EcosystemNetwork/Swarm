@@ -1,3 +1,4 @@
+/** Agent Comms — Direct communication channel between operators and connected agents. */
 "use client";
 
 import { useState, useEffect, useRef } from "react";

@@ -1,3 +1,4 @@
+/** Protected Route — HOC that redirects to landing page if no wallet is connected. */
 'use client';
 
 import { useState, useEffect, useRef } from 'react';

@@ -1,3 +1,4 @@
+/** Swarm Detail — Individual project view with agents, tasks, activity, and agent comms tabs. */
 "use client";
 
 import { useState, useEffect, useRef } from "react";

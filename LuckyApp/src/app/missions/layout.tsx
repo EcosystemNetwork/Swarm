@@ -1,3 +1,4 @@
+/** Layout for /missions — wraps page with Header, Sidebar, and ProtectedRoute. */
 import { HeaderWrapper as Header } from "@/components/header-wrapper";
 import { Sidebar } from "@/components/sidebar";
 import { ProtectedRoute } from "@/components/protected-route";

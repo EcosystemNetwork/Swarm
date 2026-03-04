@@ -1,3 +1,4 @@
+/** Landing Page — Hero section with 3D Spline robots, wallet connect CTA, and feature showcase. */
 "use client";
 
 import { Button } from "@/components/ui/button";

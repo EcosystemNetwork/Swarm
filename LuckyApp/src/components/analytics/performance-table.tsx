@@ -1,3 +1,4 @@
+/** Performance Table — Sortable table of agent performance metrics (tasks, latency, uptime). */
 "use client";
 
 import { useState } from "react";

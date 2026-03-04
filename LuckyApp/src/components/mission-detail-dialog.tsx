@@ -1,3 +1,4 @@
+/** Mission Detail Dialog — Modal overlay showing mission objectives, progress, and assigned agents. */
 "use client";
 
 import { Dialog, DialogHeader, DialogTitle, DialogContent } from "@/components/ui/dialog";

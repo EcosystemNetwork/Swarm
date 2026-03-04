@@ -1,3 +1,4 @@
+/** Gateways — Connect and manage remote execution gateways for distributed agent deployment. */
 "use client";
 
 import { useState, useEffect, useCallback } from "react";

@@ -1,3 +1,4 @@
+/** Dialog — Modal overlay component with trigger, content, header, footer, and close button. */
 "use client";
 
 import * as React from "react";

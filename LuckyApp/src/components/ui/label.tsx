@@ -1,3 +1,4 @@
+/** Label — Form label component with required/disabled state support. */
 import * as React from "react";
 import { cn } from "@/lib/utils";
 

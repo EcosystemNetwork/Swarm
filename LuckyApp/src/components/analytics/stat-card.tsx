@@ -1,3 +1,4 @@
+/** Stat Card — Reusable analytics card with title, value, trend indicator, and optional sparkline. */
 "use client";
 
 import { cn } from "@/lib/utils";

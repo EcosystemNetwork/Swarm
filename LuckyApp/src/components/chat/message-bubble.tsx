@@ -1,3 +1,4 @@
+/** Message Bubble — Individual chat message with sender avatar, timestamp, and content formatting. */
 "use client";
 
 import { CommandMessage } from "@/lib/mock-data";

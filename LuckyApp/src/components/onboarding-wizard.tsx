@@ -1,3 +1,4 @@
+/** Onboarding Wizard — 4-step setup flow: connect wallet → create org → create project → connect agent. */
 "use client";
 
 import { useState } from "react";

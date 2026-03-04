@@ -1,3 +1,4 @@
+/** Agent Map — Visual node graph of all agents showing status, connections, and workload. */
 "use client";
 
 import { useState, useEffect } from "react";

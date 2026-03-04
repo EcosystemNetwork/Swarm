@@ -1,3 +1,4 @@
+/** SpotlightCard — Card with a mouse-following spotlight/glow effect on hover. */
 import React, { useRef, useState } from 'react';
 
 interface Position {

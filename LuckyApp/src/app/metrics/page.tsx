@@ -1,3 +1,4 @@
+/** Metrics — Platform performance indicators and operational statistics. */
 "use client";
 
 import { useState, useEffect, useCallback } from "react";

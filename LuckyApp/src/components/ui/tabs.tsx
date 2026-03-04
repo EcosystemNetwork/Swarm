@@ -1,3 +1,4 @@
+/** Tabs — Tabbed navigation component with trigger list and content panels. */
 "use client";
 
 import * as React from "react";

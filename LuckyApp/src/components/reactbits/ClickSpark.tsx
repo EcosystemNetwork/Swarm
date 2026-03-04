@@ -1,3 +1,4 @@
+/** ClickSpark — Click-triggered particle burst effect for interactive feedback. */
 import React, { useRef, useEffect, useCallback } from 'react';
 
 interface ClickSparkProps {

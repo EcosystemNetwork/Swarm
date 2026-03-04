@@ -1,3 +1,4 @@
+/** Doctor — System health diagnostics across Infrastructure, Agents, and Security categories. */
 "use client";
 
 import { useState, useCallback } from "react";

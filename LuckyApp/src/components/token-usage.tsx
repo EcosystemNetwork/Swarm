@@ -1,3 +1,4 @@
+/** Token Usage — Inline token consumption display widget for headers and cards. */
 "use client";
 
 /**

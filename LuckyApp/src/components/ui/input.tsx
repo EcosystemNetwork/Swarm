@@ -1,3 +1,4 @@
+/** Input — Form text input component with consistent styling and focus states. */
 import * as React from "react";
 import { cn } from "@/lib/utils";
 

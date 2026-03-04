@@ -1,3 +1,4 @@
+/** Cron Scheduler — Create and manage recurring tasks with cron expressions. */
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
