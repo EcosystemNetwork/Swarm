@@ -6,7 +6,7 @@
  */
 
 import { defineChain, type Chain } from "thirdweb/chains";
-import { avalanche, base } from "thirdweb/chains";
+import { ethereum, avalanche, base } from "thirdweb/chains";
 
 // ═══════════════════════════════════════════════════════════════
 // Types
@@ -14,7 +14,7 @@ import { avalanche, base } from "thirdweb/chains";
 
 export interface ChainConfig {
     /** Internal key */
-    key: "avalanche" | "base" | "hedera" | "filecoin";
+    key: "ethereum" | "avalanche" | "base" | "hedera" | "filecoin";
     /** Human-readable name */
     name: string;
     /** EVM chain ID */
@@ -77,6 +77,25 @@ const filecoin = defineChain({
 // ═══════════════════════════════════════════════════════════════
 
 export const CHAIN_CONFIGS: Record<string, ChainConfig> = {
+    ethereum: {
+        key: "ethereum",
+        name: "Ethereum",
+        chainId: 1,
+        thirdwebChain: ethereum,
+        rpc: "https://ethereum-rpc.publicnode.com",
+        nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
+        explorer: {
+            name: "Etherscan",
+            baseUrl: "https://etherscan.io",
+            txUrl: (h) => `https://etherscan.io/tx/${h}`,
+            addressUrl: (a) => `https://etherscan.io/address/${a}`,
+            contractUrl: (a) => `https://etherscan.io/address/${a}`,
+        },
+        contracts: {},
+        enabled: true,
+        logo: "/chains/ethereum.svg",
+    },
+
     avalanche: {
         key: "avalanche",
         name: "Avalanche",
@@ -180,15 +199,15 @@ export function getChain(key: string): ChainConfig | undefined {
     return CHAIN_CONFIGS[key];
 }
 
-/** Get native currency symbol for a chain (default: "HBAR" for backwards compat) */
+/** Get native currency symbol for a chain (default: "ETH") */
 export function getCurrencySymbol(chainId?: number): string {
-    if (!chainId) return "HBAR"; // default for existing code
+    if (!chainId) return "ETH";
     return getChainById(chainId)?.nativeCurrency.symbol ?? "ETH";
 }
 
 /** Get native currency decimals for a chain */
 export function getCurrencyDecimals(chainId?: number): number {
-    if (!chainId) return 8; // HBAR default
+    if (!chainId) return 18; // ETH default
     return getChainById(chainId)?.nativeCurrency.decimals ?? 18;
 }
 
@@ -200,21 +219,21 @@ export function toNative(rawAmount: bigint | number, chainId?: number): number {
 
 /** Get explorer TX link for a chain */
 export function getExplorerTxUrl(hash: string, chainId?: number): string {
-    if (!chainId) return `https://hashscan.io/testnet/transaction/${hash}`;
+    if (!chainId) return `https://etherscan.io/tx/${hash}`;
     const chain = getChainById(chainId);
     return chain?.explorer.txUrl(hash) ?? `#`;
 }
 
 /** Get explorer contract link for a chain */
 export function getExplorerContractUrl(addr: string, chainId?: number): string {
-    if (!chainId) return `https://hashscan.io/testnet/contract/${addr}`;
+    if (!chainId) return `https://etherscan.io/address/${addr}`;
     const chain = getChainById(chainId);
     return chain?.explorer.contractUrl(addr) ?? `#`;
 }
 
 /** Get deployed contract addresses for a chain (returns empty object if none) */
 export function getContracts(chainId?: number) {
-    if (!chainId) return CHAIN_CONFIGS.hedera.contracts;
+    if (!chainId) return CHAIN_CONFIGS.ethereum.contracts;
     return getChainById(chainId)?.contracts ?? {};
 }
 

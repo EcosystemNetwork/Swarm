@@ -21,16 +21,22 @@ import {
 } from "./chains";
 
 // ============================================================
-// Network Config (backwards compat — defaults to Hedera Testnet)
+// Network Config — defaults to Ethereum Mainnet
 // ============================================================
 
-export const HEDERA_RPC_URL = "https://testnet.hashio.io/api";
-export const HEDERA_CHAIN_ID = 296;
-export const EXPLORER_BASE = "https://hashscan.io/testnet";
-export const HEDERA_GAS_LIMIT = 3_000_000;
+export const DEFAULT_RPC_URL = "https://ethereum-rpc.publicnode.com";
+export const DEFAULT_CHAIN_ID = 1;
+export const EXPLORER_BASE = "https://etherscan.io";
+export const DEFAULT_GAS_LIMIT = 3_000_000;
+
+// Backwards-compat aliases
+export const HEDERA_RPC_URL = DEFAULT_RPC_URL;
+export const HEDERA_CHAIN_ID = DEFAULT_CHAIN_ID;
+export const HEDERA_GAS_LIMIT = DEFAULT_GAS_LIMIT;
 
 // ============================================================
-// Contract Addresses — defaults to Hedera, use getContracts(chainId) for multi-chain
+// Contract Addresses — defaults to Hedera (where contracts are deployed)
+// Use getContracts(chainId) for multi-chain
 // ============================================================
 
 export const CONTRACTS = {

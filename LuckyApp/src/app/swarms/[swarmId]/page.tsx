@@ -566,29 +566,122 @@ export default function ProjectDetailPage() {
         </div>
       )}
 
-      {/* Cost Breakdown */}
-      {jobs.length > 0 && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          {[
-            { label: "Total Budget", value: totalBudget, icon: "💰", color: "text-amber-500" },
-            { label: "Open", value: openBudget, icon: "📢", color: "text-muted-foreground" },
-            { label: "In Progress", value: inProgressBudget, icon: "⚙️", color: "text-amber-400" },
-            { label: "Completed", value: spentBudget, icon: "✅", color: "text-emerald-500" },
-          ].map((stat) => (
-            <Card key={stat.label} className="border-border">
-              <CardContent className="p-3">
-                <div className="flex items-center gap-1.5 mb-1">
-                  <span className="text-xs">{stat.icon}</span>
-                  <p className="text-[11px] text-muted-foreground">{stat.label}</p>
-                </div>
-                <p className={`text-lg font-bold ${stat.color}`}>
-                  {stat.value.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} <span className="text-xs font-normal text-muted-foreground">HBAR</span>
-                </p>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      )}
+      {/* Project Metrics Overview */}
+      {(() => {
+        const tasksDone = tasks.filter(t => t.status === 'done').length;
+        const tasksInProgress = tasks.filter(t => t.status === 'in_progress').length;
+        const tasksTodo = tasks.filter(t => t.status === 'todo').length;
+        const taskCompletionRate = tasks.length > 0 ? Math.round((tasksDone / tasks.length) * 100) : 0;
+
+        const jobsOpenCount = jobs.filter(j => j.status === 'open').length;
+        const jobsActiveCount = jobs.filter(j => j.status === 'in_progress' || j.status === 'claimed').length;
+        const jobsCompletedCount = jobs.filter(j => j.status === 'completed' || j.status === 'closed').length;
+        const jobCompletionRate = jobs.length > 0 ? Math.round((jobsCompletedCount / jobs.length) * 100) : 0;
+
+        const highPriorityTasks = tasks.filter(t => t.priority === 'high' && t.status !== 'done').length;
+        const unassignedTasks = tasks.filter(t => !t.assigneeAgentId).length;
+
+        return (
+          <div className="space-y-4">
+            {/* KPI Cards */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
+              {[
+                { label: "Agents", value: assignedAgents.length, icon: "🤖" },
+                { label: "Tasks", value: tasks.length, icon: "🎯" },
+                { label: "Done", value: tasksDone, icon: "✅", color: "text-emerald-500" },
+                { label: "Active", value: tasksInProgress, icon: "⚙️", color: "text-amber-500" },
+                { label: "Todo", value: tasksTodo, icon: "📋" },
+                { label: "Jobs", value: jobs.length, icon: "💼" },
+                { label: "High Priority", value: highPriorityTasks, icon: "🔴", color: highPriorityTasks > 0 ? "text-orange-500" : undefined },
+                { label: "Unassigned", value: unassignedTasks, icon: "👤", color: unassignedTasks > 0 ? "text-yellow-500" : undefined },
+              ].map((s) => (
+                <Card key={s.label} className="border-border">
+                  <CardContent className="p-2.5">
+                    <div className="flex items-center gap-1 mb-0.5">
+                      <span className="text-[10px]">{s.icon}</span>
+                      <p className="text-[10px] text-muted-foreground truncate">{s.label}</p>
+                    </div>
+                    <p className={`text-lg font-bold ${s.color || ''}`}>{s.value}</p>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+
+            {/* Progress bars row */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Task progress */}
+              <Card className="border-border">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-medium">Task Completion</span>
+                    <span className="text-sm font-bold text-amber-600 dark:text-amber-400">{taskCompletionRate}%</span>
+                  </div>
+                  <div className="h-3 bg-muted rounded-full overflow-hidden flex">
+                    {tasks.length > 0 && (
+                      <>
+                        <div className="h-full bg-emerald-500 transition-all" style={{ width: `${(tasksDone / tasks.length) * 100}%` }} />
+                        <div className="h-full bg-amber-500 transition-all" style={{ width: `${(tasksInProgress / tasks.length) * 100}%` }} />
+                      </>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-4 mt-2 text-[11px]">
+                    <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-500" />{tasksDone} done</span>
+                    <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-amber-500" />{tasksInProgress} active</span>
+                    <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-muted-foreground/40" />{tasksTodo} todo</span>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Job progress */}
+              <Card className="border-border">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-medium">Job Completion</span>
+                    <span className="text-sm font-bold text-amber-600 dark:text-amber-400">{jobCompletionRate}%</span>
+                  </div>
+                  <div className="h-3 bg-muted rounded-full overflow-hidden flex">
+                    {jobs.length > 0 && (
+                      <>
+                        <div className="h-full bg-emerald-500 transition-all" style={{ width: `${(jobsCompletedCount / jobs.length) * 100}%` }} />
+                        <div className="h-full bg-amber-500 transition-all" style={{ width: `${(jobsActiveCount / jobs.length) * 100}%` }} />
+                      </>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-4 mt-2 text-[11px]">
+                    <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-500" />{jobsCompletedCount} completed</span>
+                    <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-amber-500" />{jobsActiveCount} active</span>
+                    <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-blue-500" />{jobsOpenCount} open</span>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Budget breakdown */}
+            {jobs.length > 0 && (
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {[
+                  { label: "Total Budget", value: totalBudget, icon: "💰", color: "text-amber-500" },
+                  { label: "Open", value: openBudget, icon: "📢", color: "text-blue-500" },
+                  { label: "In Progress", value: inProgressBudget, icon: "⚙️", color: "text-amber-400" },
+                  { label: "Completed", value: spentBudget, icon: "✅", color: "text-emerald-500" },
+                ].map((stat) => (
+                  <Card key={stat.label} className="border-border">
+                    <CardContent className="p-3">
+                      <div className="flex items-center gap-1.5 mb-1">
+                        <span className="text-xs">{stat.icon}</span>
+                        <p className="text-[11px] text-muted-foreground">{stat.label}</p>
+                      </div>
+                      <p className={`text-lg font-bold ${stat.color}`}>
+                        {stat.value.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} <span className="text-xs font-normal text-muted-foreground">HBAR</span>
+                      </p>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList>
