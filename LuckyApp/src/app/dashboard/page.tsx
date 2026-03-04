@@ -18,7 +18,6 @@ import SpotlightCard from "@/components/reactbits/SpotlightCard";
 import ShinyText from "@/components/reactbits/ShinyText";
 import DecryptedText from "@/components/reactbits/DecryptedText";
 import { VitalsWidget } from "@/components/vitals-widget";
-import { PredictionsFeed } from "@/components/predictions-feed";
 import { GripVertical, RotateCcw, Plus, X, Check } from "lucide-react";
 import {
   getOrgStats,
@@ -148,7 +147,6 @@ const ALL_WIDGET_CATALOG: WidgetCatalogEntry[] = [
   { id: "widget-activity-feed", icon: "📜", label: "Activity Feed", description: "Recent system events and audit log", colSpan: "lg:col-span-2" },
   { id: "widget-system-vitals", icon: "🖥️", label: "System Vitals", description: "CPU, memory, and disk usage gauges", colSpan: "" },
   { id: "widget-agent-status", icon: "🟢", label: "Agent Status", description: "Online, offline, and busy agent breakdown", colSpan: "" },
-  { id: "widget-predictions", icon: "🔮", label: "Predictions", description: "AI-generated predictions and insights", colSpan: "lg:col-span-2" },
   { id: "widget-task-breakdown", icon: "📈", label: "Task Breakdown", description: "Visual breakdown of task statuses", colSpan: "" },
 ];
 
@@ -157,7 +155,7 @@ const DEFAULT_ACTIVE_STATS = [
 ];
 
 const DEFAULT_ACTIVE_WIDGETS = [
-  "widget-recent-tasks", "widget-recent-jobs", "widget-quick-actions", "widget-org-info",
+  "widget-recent-tasks", "widget-quick-actions", "widget-recent-jobs", "widget-org-info",
 ];
 
 /* ------------------------------------------------------------------ */
@@ -166,16 +164,22 @@ const DEFAULT_ACTIVE_WIDGETS = [
 
 function applySavedOrder(key: string, activeIds: string[]): string[] {
   const saved = loadJSON<string[]>(key);
-  if (!saved) return activeIds;
+  if (!saved) return [...activeIds];
   const result: string[] = [];
   const used = new Set<string>();
   for (const id of saved) {
-    if (activeIds.includes(id)) { result.push(id); used.add(id); }
+    if (activeIds.includes(id) && !used.has(id)) { result.push(id); used.add(id); }
   }
   for (const id of activeIds) {
-    if (!used.has(id)) result.push(id);
+    if (!used.has(id)) { result.push(id); used.add(id); }
   }
   return result;
+}
+
+/** Deduplicate an array preserving order */
+function dedupe(arr: string[]): string[] {
+  const seen = new Set<string>();
+  return arr.filter(id => { if (seen.has(id)) return false; seen.add(id); return true; });
 }
 
 function reorder(list: string[], fromId: string, toId: string): string[] {
@@ -383,16 +387,17 @@ export default function DashboardPage() {
 
   const toggleStat = useCallback((id: string) => {
     setActiveStatIds(prev => {
-      const next = prev.includes(id) ? prev.filter(s => s !== id) : [...prev, id];
+      const removing = prev.includes(id);
+      const next = removing ? prev.filter(s => s !== id) : [...prev, id];
       saveJSON(ACTIVE_STATS_KEY, next);
-      // Update order too
       setStatOrder(order => {
-        if (prev.includes(id)) {
-          const newOrder = order.filter(s => s !== id);
-          saveJSON(STAT_ORDER_KEY, newOrder);
-          return newOrder;
+        let newOrder: string[];
+        if (removing) {
+          newOrder = order.filter(s => s !== id);
+        } else {
+          newOrder = order.includes(id) ? order : [...order, id];
         }
-        const newOrder = [...order, id];
+        newOrder = dedupe(newOrder);
         saveJSON(STAT_ORDER_KEY, newOrder);
         return newOrder;
       });
@@ -402,16 +407,17 @@ export default function DashboardPage() {
 
   const toggleWidget = useCallback((id: string) => {
     setActiveWidgetIds(prev => {
-      const next = prev.includes(id) ? prev.filter(w => w !== id) : [...prev, id];
+      const removing = prev.includes(id);
+      const next = removing ? prev.filter(w => w !== id) : [...prev, id];
       saveJSON(ACTIVE_WIDGETS_KEY, next);
-      // Update order too
       setWidgetOrder(order => {
-        if (prev.includes(id)) {
-          const newOrder = order.filter(w => w !== id);
-          saveJSON(WIDGET_ORDER_KEY, newOrder);
-          return newOrder;
+        let newOrder: string[];
+        if (removing) {
+          newOrder = order.filter(w => w !== id);
+        } else {
+          newOrder = order.includes(id) ? order : [...order, id];
         }
-        const newOrder = [...order, id];
+        newOrder = dedupe(newOrder);
         saveJSON(WIDGET_ORDER_KEY, newOrder);
         return newOrder;
       });
@@ -483,7 +489,7 @@ export default function DashboardPage() {
       label: "Recent Tasks",
       colSpan: "lg:col-span-2",
       render: () => (
-        <SpotlightCard className="p-0 glass-card-enhanced h-full" spotlightColor="rgba(255, 191, 0, 0.06)">
+        <SpotlightCard className="p-0 glass-card-enhanced h-full overflow-hidden" spotlightColor="rgba(255, 191, 0, 0.06)">
           <CardHeader className="flex flex-row items-center justify-between px-6 pt-6">
             <CardTitle className="text-lg">
               📋 <DecryptedText text="Recent Tasks" speed={30} maxIterations={6} animateOn="view" sequential className="text-lg font-semibold" encryptedClassName="text-lg font-semibold text-amber-500/40" />
@@ -527,7 +533,7 @@ export default function DashboardPage() {
       label: "Recent Jobs",
       colSpan: "lg:col-span-2",
       render: () => (
-        <SpotlightCard className="p-0 glass-card-enhanced h-full" spotlightColor="rgba(255, 191, 0, 0.06)">
+        <SpotlightCard className="p-0 glass-card-enhanced h-full overflow-hidden" spotlightColor="rgba(255, 191, 0, 0.06)">
           <CardHeader className="flex flex-row items-center justify-between px-6 pt-6">
             <CardTitle className="text-lg">
               💼 <DecryptedText text="Recent Jobs" speed={30} maxIterations={6} animateOn="view" sequential className="text-lg font-semibold" encryptedClassName="text-lg font-semibold text-amber-500/40" />
@@ -572,7 +578,7 @@ export default function DashboardPage() {
       label: "Quick Actions",
       colSpan: "",
       render: () => (
-        <SpotlightCard className="p-0 glass-card-enhanced h-full" spotlightColor="rgba(255, 191, 0, 0.06)">
+        <SpotlightCard className="p-0 glass-card-enhanced h-full overflow-hidden" spotlightColor="rgba(255, 191, 0, 0.06)">
           <CardHeader>
             <CardTitle className="text-lg">
               ⚡ <DecryptedText text="Quick Actions" speed={30} maxIterations={6} animateOn="view" sequential className="text-lg font-semibold" encryptedClassName="text-lg font-semibold text-amber-500/40" />
@@ -602,7 +608,7 @@ export default function DashboardPage() {
       label: "Organization",
       colSpan: "",
       render: () => (
-        <SpotlightCard className="p-0 glass-card-enhanced h-full" spotlightColor="rgba(255, 191, 0, 0.06)">
+        <SpotlightCard className="p-0 glass-card-enhanced h-full overflow-hidden" spotlightColor="rgba(255, 191, 0, 0.06)">
           <CardHeader>
             <CardTitle className="text-lg">
               🏢 <DecryptedText text="Organization" speed={30} maxIterations={6} animateOn="view" sequential className="text-lg font-semibold" encryptedClassName="text-lg font-semibold text-amber-500/40" />
@@ -634,7 +640,7 @@ export default function DashboardPage() {
       label: "Activity Feed",
       colSpan: "lg:col-span-2",
       render: () => (
-        <SpotlightCard className="p-0 glass-card-enhanced h-full" spotlightColor="rgba(255, 191, 0, 0.06)">
+        <SpotlightCard className="p-0 glass-card-enhanced h-full overflow-hidden" spotlightColor="rgba(255, 191, 0, 0.06)">
           <CardHeader className="flex flex-row items-center justify-between px-6 pt-6">
             <CardTitle className="text-lg">
               📜 <DecryptedText text="Activity Feed" speed={30} maxIterations={6} animateOn="view" sequential className="text-lg font-semibold" encryptedClassName="text-lg font-semibold text-amber-500/40" />
@@ -681,11 +687,7 @@ export default function DashboardPage() {
       label: "System Vitals",
       colSpan: "",
       render: () => (
-        <SpotlightCard className="p-0 glass-card-enhanced h-full" spotlightColor="rgba(255, 191, 0, 0.06)">
-          <div className="p-4">
-            <VitalsWidget />
-          </div>
-        </SpotlightCard>
+        <VitalsWidget />
       ),
     },
     "widget-agent-status": {
@@ -694,7 +696,7 @@ export default function DashboardPage() {
       render: () => {
         const total = agents.length;
         return (
-          <SpotlightCard className="p-0 glass-card-enhanced h-full" spotlightColor="rgba(255, 191, 0, 0.06)">
+          <SpotlightCard className="p-0 glass-card-enhanced h-full overflow-hidden" spotlightColor="rgba(255, 191, 0, 0.06)">
             <CardHeader>
               <CardTitle className="text-lg">
                 🟢 <DecryptedText text="Agent Status" speed={30} maxIterations={6} animateOn="view" sequential className="text-lg font-semibold" encryptedClassName="text-lg font-semibold text-amber-500/40" />
@@ -740,22 +742,6 @@ export default function DashboardPage() {
         );
       },
     },
-    "widget-predictions": {
-      label: "Predictions",
-      colSpan: "lg:col-span-2",
-      render: () => (
-        <SpotlightCard className="p-0 glass-card-enhanced h-full" spotlightColor="rgba(255, 191, 0, 0.06)">
-          <CardHeader>
-            <CardTitle className="text-lg">
-              🔮 <DecryptedText text="Predictions" speed={30} maxIterations={6} animateOn="view" sequential className="text-lg font-semibold" encryptedClassName="text-lg font-semibold text-amber-500/40" />
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="px-6 pb-6">
-            <PredictionsFeed />
-          </CardContent>
-        </SpotlightCard>
-      ),
-    },
     "widget-task-breakdown": {
       label: "Task Breakdown",
       colSpan: "",
@@ -766,7 +752,7 @@ export default function DashboardPage() {
         const total = todo + inProgress + done;
 
         return (
-          <SpotlightCard className="p-0 glass-card-enhanced h-full" spotlightColor="rgba(255, 191, 0, 0.06)">
+          <SpotlightCard className="p-0 glass-card-enhanced h-full overflow-hidden" spotlightColor="rgba(255, 191, 0, 0.06)">
             <CardHeader>
               <CardTitle className="text-lg">
                 📈 <DecryptedText text="Task Breakdown" speed={30} maxIterations={6} animateOn="view" sequential className="text-lg font-semibold" encryptedClassName="text-lg font-semibold text-amber-500/40" />
@@ -878,8 +864,8 @@ export default function DashboardPage() {
   const isCustomized =
     JSON.stringify(activeStatIds) !== JSON.stringify(DEFAULT_ACTIVE_STATS) ||
     JSON.stringify(activeWidgetIds) !== JSON.stringify(DEFAULT_ACTIVE_WIDGETS) ||
-    JSON.stringify(statOrder) !== JSON.stringify(applySavedOrder(STAT_ORDER_KEY, DEFAULT_ACTIVE_STATS)) ||
-    JSON.stringify(widgetOrder) !== JSON.stringify(applySavedOrder(WIDGET_ORDER_KEY, DEFAULT_ACTIVE_WIDGETS));
+    JSON.stringify(statOrder) !== JSON.stringify(DEFAULT_ACTIVE_STATS) ||
+    JSON.stringify(widgetOrder) !== JSON.stringify(DEFAULT_ACTIVE_WIDGETS);
 
   /* ── Render ── */
 
@@ -954,7 +940,7 @@ export default function DashboardPage() {
                       onDrop={(e) => onStatDrop(e as unknown as DragEvent, id)}
                       onDragEnd={onStatDragEnd}
                       onDragLeave={() => setDropTargetStat(null)}
-                      className={`relative group cursor-grab active:cursor-grabbing transition-all duration-200 rounded-lg ${
+                      className={`relative group cursor-grab active:cursor-grabbing transition-all duration-200 rounded-lg overflow-hidden ${
                         isDragging ? "opacity-40 scale-95" : ""
                       } ${isDropTarget ? "ring-2 ring-amber-500 ring-offset-2 ring-offset-background" : ""}`}
                     >
@@ -996,9 +982,9 @@ export default function DashboardPage() {
                       onDrop={(e) => onWidgetDrop(e as unknown as DragEvent, id)}
                       onDragEnd={onWidgetDragEnd}
                       onDragLeave={() => setDropTargetWidget(null)}
-                      className={`relative group cursor-grab active:cursor-grabbing transition-all duration-200 ${widget.colSpan} ${
+                      className={`relative group cursor-grab active:cursor-grabbing transition-all duration-200 overflow-hidden rounded-lg ${widget.colSpan} ${
                         isDragging ? "opacity-40 scale-[0.98]" : ""
-                      } ${isDropTarget ? "ring-2 ring-amber-500 ring-offset-2 ring-offset-background rounded-lg" : ""}`}
+                      } ${isDropTarget ? "ring-2 ring-amber-500 ring-offset-2 ring-offset-background" : ""}`}
                     >
                       <div className="absolute top-3 right-3 z-10 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button

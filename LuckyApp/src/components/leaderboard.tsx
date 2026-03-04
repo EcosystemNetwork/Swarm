@@ -2,9 +2,15 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import type { AgentPerformance } from "@/lib/mock-data";
-
 const medals = ["🥇", "🥈", "🥉"];
+
+interface AgentPerformance {
+  agentId: string;
+  name: string;
+  type: string;
+  winRate: number;
+  pnl: number;
+}
 
 interface LeaderboardProps {
   agents: AgentPerformance[];

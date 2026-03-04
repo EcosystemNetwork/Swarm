@@ -3,7 +3,7 @@ import { HeaderWrapper as Header } from "@/components/header-wrapper";
 import { Sidebar } from "@/components/sidebar";
 import { ProtectedRoute } from "@/components/protected-route";
 
-export const metadata = { title: "Board — Swarm" };
+export const metadata = { title: "Boards — Swarm" };
 
 export default function KanbanLayout({ children }: { children: React.ReactNode }) {
     return (

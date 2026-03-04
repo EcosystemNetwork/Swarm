@@ -1,10 +1,11 @@
-/** Cron Scheduler — Create and manage recurring tasks with cron expressions. */
+/** Cron Scheduler — Create and manage recurring tasks with cron expressions and agent assignments. */
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
 import {
     Plus, Clock, Play, Pause, Trash2, Edit, X, Calendar,
     CheckCircle2, XCircle, Loader2, Timer, AlertCircle, Zap,
+    Bot, CheckSquare, Users,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -13,6 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useOrg } from "@/contexts/OrgContext";
 import { useActiveAccount } from "thirdweb/react";
+import { getAgentsByOrg, type Agent } from "@/lib/firestore";
 import {
     type CronJob, type CronJobCreateInput,
     SCHEDULE_PRESETS, parseCronToHuman,
@@ -24,9 +26,10 @@ import {
 // ═══════════════════════════════════════════════════════════════
 
 function TaskDialog({
-    job, onClose, onSave,
+    job, agents, onClose, onSave,
 }: {
     job?: CronJob;
+    agents: Agent[];
     onClose: () => void;
     onSave: (input: CronJobCreateInput) => Promise<void>;
 }) {
@@ -38,8 +41,24 @@ function TaskDialog({
     const [useCustom, setUseCustom] = useState(false);
     const [priority, setPriority] = useState<"low" | "medium" | "high">(job?.priority || "medium");
     const [enabled, setEnabled] = useState(job?.enabled ?? true);
+    const [selectedAgents, setSelectedAgents] = useState<string[]>(job?.agentIds || []);
+    const [showAgentPicker, setShowAgentPicker] = useState(false);
     const account = useActiveAccount();
     const { currentOrg } = useOrg();
+
+    const toggleAgent = (agentId: string) => {
+        setSelectedAgents(prev =>
+            prev.includes(agentId) ? prev.filter(id => id !== agentId) : [...prev, agentId]
+        );
+    };
+
+    const selectAll = () => {
+        if (selectedAgents.length === agents.length) {
+            setSelectedAgents([]);
+        } else {
+            setSelectedAgents(agents.map(a => a.id));
+        }
+    };
 
     const handleSubmit = async () => {
         if (!name.trim() || !message.trim() || !currentOrg) return;
@@ -55,6 +74,7 @@ function TaskDialog({
                 scheduleLabel: parseCronToHuman(finalSchedule),
                 priority,
                 enabled,
+                agentIds: selectedAgents.length > 0 ? selectedAgents : undefined,
                 createdBy: account?.address || "unknown",
             });
             onClose();
@@ -64,6 +84,8 @@ function TaskDialog({
             setSaving(false);
         }
     };
+
+    const selectedAgentDetails = agents.filter(a => selectedAgents.includes(a.id));
 
     return (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" onClick={onClose}>
@@ -97,6 +119,95 @@ function TaskDialog({
                             onChange={(e) => setMessage(e.target.value)}
                             rows={3}
                         />
+                    </div>
+
+                    {/* Assign Agents */}
+                    <div>
+                        <div className="flex items-center justify-between mb-2">
+                            <label className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+                                <Bot className="h-3.5 w-3.5" />
+                                Assign Agents
+                                {selectedAgents.length > 0 && (
+                                    <Badge variant="outline" className="text-[9px] px-1 py-0 ml-1">
+                                        {selectedAgents.length} selected
+                                    </Badge>
+                                )}
+                            </label>
+                            {agents.length > 1 && (
+                                <button
+                                    type="button"
+                                    onClick={selectAll}
+                                    className="text-xs text-amber-500 hover:text-amber-400 transition-colors"
+                                >
+                                    {selectedAgents.length === agents.length ? "Deselect all" : "Select all"}
+                                </button>
+                            )}
+                        </div>
+
+                        {/* Selected agent chips */}
+                        {selectedAgentDetails.length > 0 && (
+                            <div className="flex flex-wrap gap-1.5 mb-2">
+                                {selectedAgentDetails.map(agent => (
+                                    <button
+                                        key={agent.id}
+                                        type="button"
+                                        onClick={() => toggleAgent(agent.id)}
+                                        className="flex items-center gap-1 px-2 py-1 rounded-md bg-amber-500/10 border border-amber-500/30 text-xs text-amber-400 hover:bg-red-500/10 hover:border-red-500/30 hover:text-red-400 transition-colors"
+                                    >
+                                        <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                                            agent.status === "online" ? "bg-emerald-500" :
+                                            agent.status === "busy" ? "bg-amber-500" : "bg-muted-foreground/40"
+                                        }`} />
+                                        {agent.name}
+                                        <X className="h-2.5 w-2.5 ml-0.5" />
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+
+                        {/* Toggle agent list */}
+                        <button
+                            type="button"
+                            onClick={() => setShowAgentPicker(!showAgentPicker)}
+                            className="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border border-dashed border-border text-xs text-muted-foreground hover:text-foreground hover:border-amber-500/30 transition-colors"
+                        >
+                            <Users className="h-3.5 w-3.5" />
+                            {showAgentPicker ? "Hide agent list" : selectedAgents.length > 0 ? "Change agents" : "Choose agents"}
+                        </button>
+
+                        {showAgentPicker && (
+                            <div className="mt-2 space-y-1 max-h-[180px] overflow-y-auto rounded-lg border border-border p-1">
+                                {agents.length === 0 ? (
+                                    <p className="text-xs text-muted-foreground py-3 text-center">No agents registered</p>
+                                ) : (
+                                    agents.map(agent => {
+                                        const isSelected = selectedAgents.includes(agent.id);
+                                        return (
+                                            <button
+                                                key={agent.id}
+                                                type="button"
+                                                onClick={() => toggleAgent(agent.id)}
+                                                className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-colors ${
+                                                    isSelected ? "bg-amber-500/10 border border-amber-500/30" : "hover:bg-muted/50 border border-transparent"
+                                                }`}
+                                            >
+                                                <div className={`w-2 h-2 rounded-full shrink-0 ${
+                                                    agent.status === "online" ? "bg-emerald-500" :
+                                                    agent.status === "busy" ? "bg-amber-500" : "bg-muted-foreground/40"
+                                                }`} />
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="text-sm font-medium truncate">{agent.name}</p>
+                                                    <p className="text-[10px] text-muted-foreground">{agent.type}</p>
+                                                </div>
+                                                {isSelected && (
+                                                    <CheckSquare className="h-4 w-4 text-amber-500 shrink-0" />
+                                                )}
+                                            </button>
+                                        );
+                                    })
+                                )}
+                            </div>
+                        )}
                     </div>
 
                     {/* Schedule */}
@@ -188,6 +299,7 @@ export default function CronPage() {
     const { currentOrg } = useOrg();
     const account = useActiveAccount();
     const [jobs, setJobs] = useState<CronJob[]>([]);
+    const [agents, setAgents] = useState<Agent[]>([]);
     const [loading, setLoading] = useState(true);
     const [showDialog, setShowDialog] = useState(false);
     const [editingJob, setEditingJob] = useState<CronJob | undefined>();
@@ -207,7 +319,17 @@ export default function CronPage() {
         }
     }, [currentOrg]);
 
-    useEffect(() => { loadJobs(); }, [loadJobs]);
+    const loadAgents = useCallback(async () => {
+        if (!currentOrg) return;
+        try {
+            const data = await getAgentsByOrg(currentOrg.id);
+            setAgents(data);
+        } catch (err) {
+            console.error("Failed to load agents:", err);
+        }
+    }, [currentOrg]);
+
+    useEffect(() => { loadJobs(); loadAgents(); }, [loadJobs, loadAgents]);
 
     const handleCreate = async (input: CronJobCreateInput) => {
         await createCronJob(input);
@@ -223,6 +345,7 @@ export default function CronPage() {
             scheduleLabel: input.scheduleLabel,
             priority: input.priority,
             enabled: input.enabled,
+            agentIds: input.agentIds,
         });
         await loadJobs();
     };
@@ -245,6 +368,15 @@ export default function CronPage() {
         } finally {
             setDeletingId(null);
         }
+    };
+
+    /** Resolve agent IDs to names for display */
+    const getAgentNames = (agentIds?: string[]) => {
+        if (!agentIds || agentIds.length === 0) return [];
+        return agentIds.map(id => {
+            const agent = agents.find(a => a.id === id);
+            return agent ? { id: agent.id, name: agent.name, status: agent.status } : null;
+        }).filter(Boolean) as { id: string; name: string; status: string }[];
     };
 
     if (!account) {
@@ -334,104 +466,127 @@ export default function CronPage() {
                 </Card>
             ) : (
                 <div className="space-y-3">
-                    {jobs.map((job) => (
-                        <Card
-                            key={job.id}
-                            className={`p-4 bg-card border-border transition-all hover:border-amber-500/20 ${!job.enabled ? "opacity-60" : ""
-                                }`}
-                        >
-                            <div className="flex items-start justify-between gap-4">
-                                <div className="flex-1 min-w-0">
-                                    <div className="flex items-center gap-2 mb-1">
-                                        <h3 className="font-semibold truncate">{job.name}</h3>
-                                        <Badge variant="outline" className={`text-[10px] ${job.priority === "high" ? "border-red-500/30 text-red-400" :
-                                                job.priority === "low" ? "border-emerald-500/30 text-emerald-400" :
-                                                    "border-amber-500/30 text-amber-400"
-                                            }`}>
-                                            {job.priority || "medium"}
-                                        </Badge>
-                                        {job.enabled ? (
-                                            <Badge className="bg-emerald-500/10 text-emerald-400 border-emerald-500/20 text-[10px]">
-                                                <Play className="h-2.5 w-2.5 mr-0.5" /> Active
+                    {jobs.map((job) => {
+                        const assignedAgents = getAgentNames(job.agentIds);
+                        return (
+                            <Card
+                                key={job.id}
+                                className={`p-4 bg-card border-border transition-all hover:border-amber-500/20 ${!job.enabled ? "opacity-60" : ""
+                                    }`}
+                            >
+                                <div className="flex items-start justify-between gap-4">
+                                    <div className="flex-1 min-w-0">
+                                        <div className="flex items-center gap-2 mb-1 flex-wrap">
+                                            <h3 className="font-semibold truncate">{job.name}</h3>
+                                            <Badge variant="outline" className={`text-[10px] ${job.priority === "high" ? "border-red-500/30 text-red-400" :
+                                                    job.priority === "low" ? "border-emerald-500/30 text-emerald-400" :
+                                                        "border-amber-500/30 text-amber-400"
+                                                }`}>
+                                                {job.priority || "medium"}
                                             </Badge>
-                                        ) : (
-                                            <Badge className="bg-muted text-muted-foreground text-[10px]">
-                                                <Pause className="h-2.5 w-2.5 mr-0.5" /> Paused
-                                            </Badge>
+                                            {job.enabled ? (
+                                                <Badge className="bg-emerald-500/10 text-emerald-400 border-emerald-500/20 text-[10px]">
+                                                    <Play className="h-2.5 w-2.5 mr-0.5" /> Active
+                                                </Badge>
+                                            ) : (
+                                                <Badge className="bg-muted text-muted-foreground text-[10px]">
+                                                    <Pause className="h-2.5 w-2.5 mr-0.5" /> Paused
+                                                </Badge>
+                                            )}
+                                        </div>
+
+                                        <p className="text-sm text-muted-foreground line-clamp-2 mb-2">{job.message}</p>
+
+                                        {/* Assigned agents */}
+                                        {assignedAgents.length > 0 && (
+                                            <div className="flex items-center gap-1.5 mb-2 flex-wrap">
+                                                <Bot className="h-3 w-3 text-muted-foreground shrink-0" />
+                                                {assignedAgents.map(agent => (
+                                                    <Badge
+                                                        key={agent.id}
+                                                        variant="outline"
+                                                        className="text-[10px] px-1.5 py-0 gap-1"
+                                                    >
+                                                        <span className={`w-1.5 h-1.5 rounded-full ${
+                                                            agent.status === "online" ? "bg-emerald-500" :
+                                                            agent.status === "busy" ? "bg-amber-500" : "bg-muted-foreground/40"
+                                                        }`} />
+                                                        {agent.name}
+                                                    </Badge>
+                                                ))}
+                                            </div>
                                         )}
-                                    </div>
 
-                                    <p className="text-sm text-muted-foreground line-clamp-2 mb-2">{job.message}</p>
-
-                                    <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                                        <span className="flex items-center gap-1">
-                                            <Clock className="h-3 w-3" />
-                                            {job.scheduleLabel || parseCronToHuman(job.schedule)}
-                                        </span>
-                                        {job.lastRun && (
+                                        <div className="flex items-center gap-4 text-xs text-muted-foreground">
                                             <span className="flex items-center gap-1">
-                                                {job.lastRun.success ? (
-                                                    <CheckCircle2 className="h-3 w-3 text-emerald-400" />
-                                                ) : (
-                                                    <XCircle className="h-3 w-3 text-red-400" />
-                                                )}
-                                                Last: {job.lastRun.time.toLocaleString()}
-                                                {job.lastRun.durationMs && ` (${(job.lastRun.durationMs / 1000).toFixed(1)}s)`}
+                                                <Clock className="h-3 w-3" />
+                                                {job.scheduleLabel || parseCronToHuman(job.schedule)}
                                             </span>
-                                        )}
-                                        {job.lastRun?.error && (
-                                            <span className="flex items-center gap-1 text-red-400">
-                                                <AlertCircle className="h-3 w-3" />
-                                                {job.lastRun.error}
-                                            </span>
-                                        )}
+                                            {job.lastRun && (
+                                                <span className="flex items-center gap-1">
+                                                    {job.lastRun.success ? (
+                                                        <CheckCircle2 className="h-3 w-3 text-emerald-400" />
+                                                    ) : (
+                                                        <XCircle className="h-3 w-3 text-red-400" />
+                                                    )}
+                                                    Last: {job.lastRun.time.toLocaleString()}
+                                                    {job.lastRun.durationMs && ` (${(job.lastRun.durationMs / 1000).toFixed(1)}s)`}
+                                                </span>
+                                            )}
+                                            {job.lastRun?.error && (
+                                                <span className="flex items-center gap-1 text-red-400">
+                                                    <AlertCircle className="h-3 w-3" />
+                                                    {job.lastRun.error}
+                                                </span>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    <div className="flex items-center gap-1.5 shrink-0">
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-8 w-8"
+                                            onClick={() => handleToggle(job)}
+                                            disabled={togglingId === job.id}
+                                            title={job.enabled ? "Pause" : "Resume"}
+                                        >
+                                            {togglingId === job.id ? (
+                                                <Loader2 className="h-4 w-4 animate-spin" />
+                                            ) : job.enabled ? (
+                                                <Pause className="h-4 w-4" />
+                                            ) : (
+                                                <Play className="h-4 w-4" />
+                                            )}
+                                        </Button>
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-8 w-8"
+                                            onClick={() => { setEditingJob(job); setShowDialog(true); }}
+                                            title="Edit"
+                                        >
+                                            <Edit className="h-4 w-4" />
+                                        </Button>
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-8 w-8 text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                                            onClick={() => handleDelete(job.id)}
+                                            disabled={deletingId === job.id}
+                                            title="Delete"
+                                        >
+                                            {deletingId === job.id ? (
+                                                <Loader2 className="h-4 w-4 animate-spin" />
+                                            ) : (
+                                                <Trash2 className="h-4 w-4" />
+                                            )}
+                                        </Button>
                                     </div>
                                 </div>
-
-                                <div className="flex items-center gap-1.5 shrink-0">
-                                    <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        className="h-8 w-8"
-                                        onClick={() => handleToggle(job)}
-                                        disabled={togglingId === job.id}
-                                        title={job.enabled ? "Pause" : "Resume"}
-                                    >
-                                        {togglingId === job.id ? (
-                                            <Loader2 className="h-4 w-4 animate-spin" />
-                                        ) : job.enabled ? (
-                                            <Pause className="h-4 w-4" />
-                                        ) : (
-                                            <Play className="h-4 w-4" />
-                                        )}
-                                    </Button>
-                                    <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        className="h-8 w-8"
-                                        onClick={() => { setEditingJob(job); setShowDialog(true); }}
-                                        title="Edit"
-                                    >
-                                        <Edit className="h-4 w-4" />
-                                    </Button>
-                                    <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        className="h-8 w-8 text-red-400 hover:text-red-300 hover:bg-red-500/10"
-                                        onClick={() => handleDelete(job.id)}
-                                        disabled={deletingId === job.id}
-                                        title="Delete"
-                                    >
-                                        {deletingId === job.id ? (
-                                            <Loader2 className="h-4 w-4 animate-spin" />
-                                        ) : (
-                                            <Trash2 className="h-4 w-4" />
-                                        )}
-                                    </Button>
-                                </div>
-                            </div>
-                        </Card>
-                    ))}
+                            </Card>
+                        );
+                    })}
                 </div>
             )}
 
@@ -439,6 +594,7 @@ export default function CronPage() {
             {showDialog && (
                 <TaskDialog
                     job={editingJob}
+                    agents={agents}
                     onClose={() => { setShowDialog(false); setEditingJob(undefined); }}
                     onSave={editingJob ? handleUpdate : handleCreate}
                 />

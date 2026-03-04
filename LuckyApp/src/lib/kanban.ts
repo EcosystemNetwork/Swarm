@@ -1,8 +1,8 @@
 /**
- * Kanban Board — Types + Firestore CRUD
+ * Kanban Boards — Types + Firestore CRUD
  *
- * 5-column task board inspired by ClawDeck:
- * Inbox → Up Next → In Progress → In Review → Done
+ * Multi-board system with agent assignments.
+ * Each board has 5 columns: Inbox → Up Next → In Progress → In Review → Done
  */
 
 import {
@@ -48,9 +48,32 @@ export interface SubTask {
     completed: boolean;
 }
 
+// ── Board ──
+
+export interface KanbanBoard {
+    id: string;
+    orgId: string;
+    name: string;
+    description?: string;
+    /** Agent IDs assigned to this board */
+    agentIds: string[];
+    createdAt: Date | null;
+    updatedAt: Date | null;
+}
+
+export interface KanbanBoardInput {
+    orgId: string;
+    name: string;
+    description?: string;
+    agentIds?: string[];
+}
+
+// ── Task ──
+
 export interface KanbanTask {
     id: string;
     orgId: string;
+    boardId: string;
     projectId?: string;
     title: string;
     description?: string;
@@ -67,6 +90,7 @@ export interface KanbanTask {
 
 export interface KanbanTaskInput {
     orgId: string;
+    boardId: string;
     projectId?: string;
     title: string;
     description?: string;
@@ -79,16 +103,69 @@ export interface KanbanTaskInput {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// Firestore CRUD
+// Board CRUD
+// ═══════════════════════════════════════════════════════════════
+
+const BOARD_COLLECTION = "kanbanBoards";
+
+export async function createBoard(input: KanbanBoardInput): Promise<string> {
+    const ref = await addDoc(collection(db, BOARD_COLLECTION), {
+        ...input,
+        agentIds: input.agentIds || [],
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+    });
+    return ref.id;
+}
+
+export async function updateBoard(id: string, updates: Partial<Omit<KanbanBoard, "id" | "createdAt">>): Promise<void> {
+    const ref = doc(db, BOARD_COLLECTION, id);
+    await updateDoc(ref, { ...updates, updatedAt: serverTimestamp() });
+}
+
+export async function deleteBoard(id: string): Promise<void> {
+    // Delete all tasks belonging to this board
+    const q = query(collection(db, KANBAN_COLLECTION), where("boardId", "==", id));
+    const snap = await getDocs(q);
+    const deletes = snap.docs.map(d => deleteDoc(doc(db, KANBAN_COLLECTION, d.id)));
+    await Promise.all(deletes);
+    // Delete the board itself
+    await deleteDoc(doc(db, BOARD_COLLECTION, id));
+}
+
+export async function getBoards(orgId: string): Promise<KanbanBoard[]> {
+    const q = query(
+        collection(db, BOARD_COLLECTION),
+        where("orgId", "==", orgId),
+        orderBy("createdAt", "asc"),
+    );
+    const snap = await getDocs(q);
+    return snap.docs.map((d) => {
+        const data = d.data();
+        return {
+            id: d.id,
+            orgId: data.orgId,
+            name: data.name,
+            description: data.description,
+            agentIds: data.agentIds || [],
+            createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate() : null,
+            updatedAt: data.updatedAt instanceof Timestamp ? data.updatedAt.toDate() : null,
+        } as KanbanBoard;
+    });
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Task CRUD
 // ═══════════════════════════════════════════════════════════════
 
 const KANBAN_COLLECTION = "kanbanTasks";
 
 export async function createKanbanTask(input: KanbanTaskInput): Promise<string> {
-    // Get max position in the target column
+    // Get max position in the target column for this board
     const q = query(
         collection(db, KANBAN_COLLECTION),
         where("orgId", "==", input.orgId),
+        where("boardId", "==", input.boardId),
         where("status", "==", input.status || "inbox"),
     );
     const snap = await getDocs(q);
@@ -122,10 +199,11 @@ export async function deleteKanbanTask(id: string): Promise<void> {
     await deleteDoc(doc(db, KANBAN_COLLECTION, id));
 }
 
-export async function getKanbanTasks(orgId: string): Promise<KanbanTask[]> {
+export async function getKanbanTasks(orgId: string, boardId: string): Promise<KanbanTask[]> {
     const q = query(
         collection(db, KANBAN_COLLECTION),
         where("orgId", "==", orgId),
+        where("boardId", "==", boardId),
         orderBy("position", "asc"),
     );
     const snap = await getDocs(q);
@@ -134,6 +212,7 @@ export async function getKanbanTasks(orgId: string): Promise<KanbanTask[]> {
         return {
             id: d.id,
             orgId: data.orgId,
+            boardId: data.boardId,
             projectId: data.projectId,
             title: data.title,
             description: data.description,

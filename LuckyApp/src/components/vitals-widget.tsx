@@ -20,8 +20,8 @@ function CircularGauge({ value, label, icon: Icon, detail }: {
     const bg = vitalBg(value);
 
     return (
-        <div className="flex flex-col items-center gap-2">
-            <div className="relative w-24 h-24">
+        <div className="flex flex-col items-center gap-2 min-w-0 shrink">
+            <div className="relative w-20 h-20 sm:w-24 sm:h-24">
                 <svg className="w-full h-full -rotate-90" viewBox="0 0 86 86">
                     <circle cx="43" cy="43" r={radius} fill="none" stroke="currentColor"
                         strokeWidth={stroke} className="text-muted/20" />
@@ -35,9 +35,9 @@ function CircularGauge({ value, label, icon: Icon, detail }: {
                     <span className={`text-lg font-bold ${color}`}>{value}%</span>
                 </div>
             </div>
-            <div className="text-center">
-                <p className="text-xs font-medium">{label}</p>
-                {detail && <p className="text-[9px] text-muted-foreground">{detail}</p>}
+            <div className="text-center max-w-full">
+                <p className="text-xs font-medium truncate">{label}</p>
+                {detail && <p className="text-[9px] text-muted-foreground truncate">{detail}</p>}
             </div>
         </div>
     );
@@ -66,19 +66,19 @@ export function VitalsWidget({ data }: { data?: VitalsData | null }) {
     };
 
     return (
-        <Card className="p-4 bg-card/80 border-border">
+        <Card className="p-4 bg-card/80 border-border overflow-hidden">
             <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2">
                     <Server className="h-4 w-4 text-muted-foreground" />
                     <h3 className="text-sm font-semibold">System Vitals</h3>
                 </div>
                 {vitals.hostname && (
-                    <span className="text-[9px] text-muted-foreground font-mono">
+                    <span className="text-[9px] text-muted-foreground font-mono truncate ml-2">
                         {vitals.hostname} {vitals.uptime && `· ${vitals.uptime}`}
                     </span>
                 )}
             </div>
-            <div className="flex justify-around">
+            <div className="flex justify-around gap-2 overflow-hidden">
                 <CircularGauge
                     value={vitals.cpu.usage}
                     label="CPU"

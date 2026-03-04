@@ -22,7 +22,7 @@ export function StatCard({ title, value, icon, change, changeLabel, prefix }: St
   const isNumeric = !isNaN(numericValue) && isFinite(numericValue);
 
   return (
-    <div className="gradient-border-spin">
+    <div className="gradient-border-spin overflow-hidden rounded-xl">
       <SpotlightCard
         className="p-6"
         spotlightColor="rgba(255, 191, 0, 0.08)"

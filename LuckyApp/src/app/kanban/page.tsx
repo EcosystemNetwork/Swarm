@@ -1,22 +1,27 @@
-/** Kanban Board — 5-column task board: Inbox → Up Next → In Progress → In Review → Done. */
+/** Kanban Boards — Multi-board task management with agent assignments. */
 "use client";
 
 import { useState, useEffect, useCallback, useRef, type DragEvent } from "react";
 import {
     Plus, GripVertical, Loader2, LayoutGrid, Trash2, ChevronDown, ChevronUp,
-    CheckSquare, Square, Calendar, X,
+    CheckSquare, Square, Calendar, X, Users, Bot, Settings2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { useOrg } from "@/contexts/OrgContext";
 import { useActiveAccount } from "thirdweb/react";
+import { getAgentsByOrg, type Agent } from "@/lib/firestore";
 import {
-    type KanbanTask, type KanbanStatus, type SubTask,
+    type KanbanTask, type KanbanBoard, type KanbanStatus, type SubTask,
     KANBAN_COLUMNS, PRIORITY_CONFIG,
     createKanbanTask, updateKanbanTask, moveTask, deleteKanbanTask,
     getKanbanTasks, groupByStatus,
+    createBoard, updateBoard, deleteBoard, getBoards,
 } from "@/lib/kanban";
 
 // ═══════════════════════════════════════════════════════════════
@@ -245,34 +250,195 @@ function KanbanColumn({
 }
 
 // ═══════════════════════════════════════════════════════════════
+// Board Tab
+// ═══════════════════════════════════════════════════════════════
+
+function BoardTab({
+    board, isActive, onClick, onDelete,
+}: {
+    board: KanbanBoard;
+    isActive: boolean;
+    onClick: () => void;
+    onDelete: (id: string) => void;
+}) {
+    return (
+        <button
+            onClick={onClick}
+            className={`group relative flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap ${
+                isActive
+                    ? "bg-amber-500/10 text-amber-500 border border-amber-500/30"
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted/50 border border-transparent"
+            }`}
+        >
+            <LayoutGrid className="h-3.5 w-3.5 shrink-0" />
+            <span className="truncate max-w-[120px]">{board.name}</span>
+            {board.agentIds.length > 0 && (
+                <Badge variant="outline" className="text-[8px] px-1 py-0 h-3.5 shrink-0">
+                    <Bot className="h-2 w-2 mr-0.5" />
+                    {board.agentIds.length}
+                </Badge>
+            )}
+            <button
+                onClick={(e) => { e.stopPropagation(); onDelete(board.id); }}
+                className="p-0.5 rounded opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-red-400 transition-all shrink-0"
+                title="Delete board"
+            >
+                <X className="h-3 w-3" />
+            </button>
+        </button>
+    );
+}
+
+// ═══════════════════════════════════════════════════════════════
 // Main Page
 // ═══════════════════════════════════════════════════════════════
 
 export default function KanbanPage() {
     const { currentOrg } = useOrg();
     const account = useActiveAccount();
-    const [tasks, setTasks] = useState<KanbanTask[]>([]);
-    const [loading, setLoading] = useState(true);
 
-    const loadTasks = useCallback(async () => {
+    // Boards
+    const [boards, setBoards] = useState<KanbanBoard[]>([]);
+    const [activeBoardId, setActiveBoardId] = useState<string | null>(null);
+    const [loadingBoards, setLoadingBoards] = useState(true);
+
+    // Tasks for active board
+    const [tasks, setTasks] = useState<KanbanTask[]>([]);
+    const [loadingTasks, setLoadingTasks] = useState(false);
+
+    // Agents for assignment
+    const [agents, setAgents] = useState<Agent[]>([]);
+
+    // Dialogs
+    const [showCreateBoard, setShowCreateBoard] = useState(false);
+    const [showBoardSettings, setShowBoardSettings] = useState(false);
+    const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+
+    // Create board form
+    const [newBoardName, setNewBoardName] = useState("");
+    const [newBoardDesc, setNewBoardDesc] = useState("");
+    const [newBoardAgents, setNewBoardAgents] = useState<string[]>([]);
+
+    // Edit board form (for settings dialog)
+    const [editBoardName, setEditBoardName] = useState("");
+    const [editBoardDesc, setEditBoardDesc] = useState("");
+    const [editBoardAgents, setEditBoardAgents] = useState<string[]>([]);
+
+    const activeBoard = boards.find(b => b.id === activeBoardId) || null;
+
+    // ── Load boards ──
+
+    const loadBoards = useCallback(async () => {
         if (!currentOrg) return;
         try {
-            setLoading(true);
-            const data = await getKanbanTasks(currentOrg.id);
+            setLoadingBoards(true);
+            const data = await getBoards(currentOrg.id);
+            setBoards(data);
+            // Select first board if none selected or current no longer exists
+            if (data.length > 0 && (!activeBoardId || !data.find(b => b.id === activeBoardId))) {
+                setActiveBoardId(data[0].id);
+            }
+            if (data.length === 0) {
+                setActiveBoardId(null);
+            }
+        } catch (err) {
+            console.error("Failed to load boards:", err);
+        } finally {
+            setLoadingBoards(false);
+        }
+    }, [currentOrg, activeBoardId]);
+
+    // ── Load tasks for active board ──
+
+    const loadTasks = useCallback(async () => {
+        if (!currentOrg || !activeBoardId) { setTasks([]); return; }
+        try {
+            setLoadingTasks(true);
+            const data = await getKanbanTasks(currentOrg.id, activeBoardId);
             setTasks(data);
         } catch (err) {
             console.error("Failed to load kanban tasks:", err);
         } finally {
-            setLoading(false);
+            setLoadingTasks(false);
+        }
+    }, [currentOrg, activeBoardId]);
+
+    // ── Load agents ──
+
+    const loadAgents = useCallback(async () => {
+        if (!currentOrg) return;
+        try {
+            const data = await getAgentsByOrg(currentOrg.id);
+            setAgents(data);
+        } catch (err) {
+            console.error("Failed to load agents:", err);
         }
     }, [currentOrg]);
 
+    useEffect(() => { loadBoards(); loadAgents(); }, [loadBoards, loadAgents]);
     useEffect(() => { loadTasks(); }, [loadTasks]);
 
     const grouped = groupByStatus(tasks);
 
+    // ── Board CRUD ──
+
+    const handleCreateBoard = async () => {
+        if (!currentOrg || !newBoardName.trim()) return;
+        try {
+            const id = await createBoard({
+                orgId: currentOrg.id,
+                name: newBoardName.trim(),
+                description: newBoardDesc.trim() || undefined,
+                agentIds: newBoardAgents,
+            });
+            setShowCreateBoard(false);
+            setNewBoardName("");
+            setNewBoardDesc("");
+            setNewBoardAgents([]);
+            await loadBoards();
+            setActiveBoardId(id);
+        } catch (err) {
+            console.error("Failed to create board:", err);
+        }
+    };
+
+    const handleDeleteBoard = async (id: string) => {
+        try {
+            await deleteBoard(id);
+            setConfirmDeleteId(null);
+            if (activeBoardId === id) setActiveBoardId(null);
+            await loadBoards();
+        } catch (err) {
+            console.error("Failed to delete board:", err);
+        }
+    };
+
+    const handleUpdateBoard = async () => {
+        if (!activeBoard || !editBoardName.trim()) return;
+        try {
+            await updateBoard(activeBoard.id, {
+                name: editBoardName.trim(),
+                description: editBoardDesc.trim() || undefined,
+                agentIds: editBoardAgents,
+            });
+            setShowBoardSettings(false);
+            await loadBoards();
+        } catch (err) {
+            console.error("Failed to update board:", err);
+        }
+    };
+
+    const openBoardSettings = () => {
+        if (!activeBoard) return;
+        setEditBoardName(activeBoard.name);
+        setEditBoardDesc(activeBoard.description || "");
+        setEditBoardAgents([...activeBoard.agentIds]);
+        setShowBoardSettings(true);
+    };
+
+    // ── Task CRUD ──
+
     const handleDrop = async (taskId: string, newStatus: KanbanStatus) => {
-        // Optimistic update
         setTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: newStatus } : t));
         try {
             const col = grouped[newStatus];
@@ -284,9 +450,9 @@ export default function KanbanPage() {
     };
 
     const handleAddTask = async (status: KanbanStatus, title: string) => {
-        if (!currentOrg) return;
+        if (!currentOrg || !activeBoardId) return;
         try {
-            await createKanbanTask({ orgId: currentOrg.id, title, status });
+            await createKanbanTask({ orgId: currentOrg.id, boardId: activeBoardId, title, status });
             await loadTasks();
         } catch (err) {
             console.error("Failed to create task:", err);
@@ -303,14 +469,68 @@ export default function KanbanPage() {
         try { await updateKanbanTask(id, updates); } catch { loadTasks(); }
     };
 
+    // ── Agent toggle helper ──
+
+    const toggleAgent = (agentId: string, list: string[], setList: (ids: string[]) => void) => {
+        if (list.includes(agentId)) {
+            setList(list.filter(id => id !== agentId));
+        } else {
+            setList([...list, agentId]);
+        }
+    };
+
+    // ── Guards ──
+
     if (!account) {
         return (
             <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4 text-muted-foreground">
                 <LayoutGrid className="h-12 w-12 opacity-30" />
-                <p>Connect your wallet to use the board</p>
+                <p>Connect your wallet to use boards</p>
             </div>
         );
     }
+
+    // ── Agent picker component ──
+
+    const AgentPicker = ({ selected, onToggle }: { selected: string[]; onToggle: (id: string) => void }) => (
+        <div className="space-y-1 max-h-[200px] overflow-y-auto">
+            {agents.length === 0 ? (
+                <p className="text-xs text-muted-foreground py-2">No agents registered in this org</p>
+            ) : (
+                agents.map(agent => {
+                    const isSelected = selected.includes(agent.id);
+                    return (
+                        <button
+                            key={agent.id}
+                            type="button"
+                            onClick={() => onToggle(agent.id)}
+                            className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-colors ${
+                                isSelected ? "bg-amber-500/10 border border-amber-500/30" : "hover:bg-muted/50 border border-transparent"
+                            }`}
+                        >
+                            <div className={`w-2 h-2 rounded-full shrink-0 ${
+                                agent.status === "online" ? "bg-emerald-500" :
+                                agent.status === "busy" ? "bg-amber-500" : "bg-muted-foreground/40"
+                            }`} />
+                            <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium truncate">{agent.name}</p>
+                                <p className="text-[10px] text-muted-foreground">{agent.type}</p>
+                            </div>
+                            {isSelected && (
+                                <CheckSquare className="h-4 w-4 text-amber-500 shrink-0" />
+                            )}
+                        </button>
+                    );
+                })
+            )}
+        </div>
+    );
+
+    // ── Assigned agents for active board ──
+
+    const assignedAgents = activeBoard
+        ? agents.filter(a => activeBoard.agentIds.includes(a.id))
+        : [];
 
     return (
         <div className="max-w-[1400px] mx-auto px-4 py-8">
@@ -321,37 +541,234 @@ export default function KanbanPage() {
                         <div className="p-2 rounded-xl bg-amber-500/10 border border-amber-500/20">
                             <LayoutGrid className="h-6 w-6 text-amber-500" />
                         </div>
-                        Board
+                        Boards
                     </h1>
                     <p className="text-sm text-muted-foreground mt-2">
-                        Kanban-style task management — drag cards between columns
+                        Kanban-style task management — create boards, assign agents, drag cards
                     </p>
                 </div>
-                <Badge variant="outline" className="text-xs">
-                    {tasks.length} tasks
-                </Badge>
+                <div className="flex items-center gap-2">
+                    {activeBoard && (
+                        <Badge variant="outline" className="text-xs">
+                            {tasks.length} tasks
+                        </Badge>
+                    )}
+                    <Button size="sm" variant="outline" onClick={() => setShowCreateBoard(true)} className="gap-1.5">
+                        <Plus className="h-3.5 w-3.5" />
+                        New Board
+                    </Button>
+                </div>
             </div>
 
-            {/* Board */}
-            {loading ? (
+            {/* Loading */}
+            {loadingBoards ? (
                 <div className="flex items-center justify-center py-20">
                     <Loader2 className="h-6 w-6 animate-spin text-amber-500" />
                 </div>
-            ) : (
-                <div className="flex gap-3 overflow-x-auto pb-4">
-                    {KANBAN_COLUMNS.map((col) => (
-                        <KanbanColumn
-                            key={col.key}
-                            column={col}
-                            tasks={grouped[col.key]}
-                            onDrop={handleDrop}
-                            onAddTask={handleAddTask}
-                            onDeleteTask={handleDeleteTask}
-                            onUpdateTask={handleUpdateTask}
-                        />
-                    ))}
+            ) : boards.length === 0 ? (
+                /* Empty state — no boards */
+                <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
+                    <LayoutGrid className="h-16 w-16 opacity-20 mb-4" />
+                    <p className="text-lg font-medium mb-1">No boards yet</p>
+                    <p className="text-sm mb-4">Create your first board to start organizing tasks</p>
+                    <Button onClick={() => setShowCreateBoard(true)} className="bg-amber-600 hover:bg-amber-700 text-black gap-1.5">
+                        <Plus className="h-4 w-4" />
+                        Create Board
+                    </Button>
                 </div>
+            ) : (
+                <>
+                    {/* Board tabs + settings */}
+                    <div className="flex items-center gap-2 mb-6 overflow-x-auto pb-1">
+                        <div className="flex items-center gap-1.5 flex-1 min-w-0 overflow-x-auto">
+                            {boards.map(board => (
+                                <BoardTab
+                                    key={board.id}
+                                    board={board}
+                                    isActive={board.id === activeBoardId}
+                                    onClick={() => setActiveBoardId(board.id)}
+                                    onDelete={(id) => setConfirmDeleteId(id)}
+                                />
+                            ))}
+                        </div>
+                        {activeBoard && (
+                            <div className="flex items-center gap-1.5 shrink-0 border-l border-border pl-3 ml-1">
+                                {/* Assigned agent avatars */}
+                                {assignedAgents.length > 0 && (
+                                    <div className="flex items-center -space-x-1 mr-1">
+                                        {assignedAgents.slice(0, 4).map(agent => (
+                                            <div
+                                                key={agent.id}
+                                                title={agent.name}
+                                                className="w-6 h-6 rounded-full bg-muted border-2 border-background flex items-center justify-center text-[9px] font-bold"
+                                            >
+                                                {agent.name.charAt(0).toUpperCase()}
+                                            </div>
+                                        ))}
+                                        {assignedAgents.length > 4 && (
+                                            <div className="w-6 h-6 rounded-full bg-muted border-2 border-background flex items-center justify-center text-[9px] font-medium text-muted-foreground">
+                                                +{assignedAgents.length - 4}
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                                <Button size="sm" variant="ghost" onClick={openBoardSettings} className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground">
+                                    <Settings2 className="h-3.5 w-3.5" />
+                                </Button>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Kanban columns */}
+                    {loadingTasks ? (
+                        <div className="flex items-center justify-center py-20">
+                            <Loader2 className="h-6 w-6 animate-spin text-amber-500" />
+                        </div>
+                    ) : activeBoardId ? (
+                        <div className="flex gap-3 overflow-x-auto pb-4">
+                            {KANBAN_COLUMNS.map((col) => (
+                                <KanbanColumn
+                                    key={col.key}
+                                    column={col}
+                                    tasks={grouped[col.key]}
+                                    onDrop={handleDrop}
+                                    onAddTask={handleAddTask}
+                                    onDeleteTask={handleDeleteTask}
+                                    onUpdateTask={handleUpdateTask}
+                                />
+                            ))}
+                        </div>
+                    ) : null}
+                </>
             )}
+
+            {/* ═══ Create Board Dialog ═══ */}
+            <Dialog open={showCreateBoard} onOpenChange={setShowCreateBoard}>
+                <DialogContent className="max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>Create Board</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4 pt-2">
+                        <div className="space-y-2">
+                            <Label>Board Name</Label>
+                            <Input
+                                value={newBoardName}
+                                onChange={e => setNewBoardName(e.target.value)}
+                                placeholder="e.g. Sprint 12, Research Tasks..."
+                                onKeyDown={e => { if (e.key === "Enter" && newBoardName.trim()) handleCreateBoard(); }}
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label>Description <span className="text-muted-foreground text-xs">(optional)</span></Label>
+                            <Textarea
+                                value={newBoardDesc}
+                                onChange={e => setNewBoardDesc(e.target.value)}
+                                placeholder="What is this board for?"
+                                rows={2}
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label className="flex items-center gap-1.5">
+                                <Users className="h-3.5 w-3.5" />
+                                Assign Agents
+                                {newBoardAgents.length > 0 && (
+                                    <Badge variant="outline" className="text-[9px] px-1 py-0 ml-1">
+                                        {newBoardAgents.length} selected
+                                    </Badge>
+                                )}
+                            </Label>
+                            <AgentPicker
+                                selected={newBoardAgents}
+                                onToggle={(id) => toggleAgent(id, newBoardAgents, setNewBoardAgents)}
+                            />
+                        </div>
+                        <div className="flex justify-end gap-2 pt-2">
+                            <Button variant="ghost" onClick={() => setShowCreateBoard(false)}>Cancel</Button>
+                            <Button
+                                onClick={handleCreateBoard}
+                                disabled={!newBoardName.trim()}
+                                className="bg-amber-600 hover:bg-amber-700 text-black"
+                            >
+                                Create Board
+                            </Button>
+                        </div>
+                    </div>
+                </DialogContent>
+            </Dialog>
+
+            {/* ═══ Board Settings Dialog ═══ */}
+            <Dialog open={showBoardSettings} onOpenChange={setShowBoardSettings}>
+                <DialogContent className="max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>Board Settings</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4 pt-2">
+                        <div className="space-y-2">
+                            <Label>Board Name</Label>
+                            <Input
+                                value={editBoardName}
+                                onChange={e => setEditBoardName(e.target.value)}
+                                placeholder="Board name..."
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label>Description <span className="text-muted-foreground text-xs">(optional)</span></Label>
+                            <Textarea
+                                value={editBoardDesc}
+                                onChange={e => setEditBoardDesc(e.target.value)}
+                                placeholder="What is this board for?"
+                                rows={2}
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label className="flex items-center gap-1.5">
+                                <Users className="h-3.5 w-3.5" />
+                                Assigned Agents
+                                {editBoardAgents.length > 0 && (
+                                    <Badge variant="outline" className="text-[9px] px-1 py-0 ml-1">
+                                        {editBoardAgents.length} selected
+                                    </Badge>
+                                )}
+                            </Label>
+                            <AgentPicker
+                                selected={editBoardAgents}
+                                onToggle={(id) => toggleAgent(id, editBoardAgents, setEditBoardAgents)}
+                            />
+                        </div>
+                        <div className="flex justify-end gap-2 pt-2">
+                            <Button variant="ghost" onClick={() => setShowBoardSettings(false)}>Cancel</Button>
+                            <Button
+                                onClick={handleUpdateBoard}
+                                disabled={!editBoardName.trim()}
+                                className="bg-amber-600 hover:bg-amber-700 text-black"
+                            >
+                                Save Changes
+                            </Button>
+                        </div>
+                    </div>
+                </DialogContent>
+            </Dialog>
+
+            {/* ═══ Delete Confirmation Dialog ═══ */}
+            <Dialog open={!!confirmDeleteId} onOpenChange={() => setConfirmDeleteId(null)}>
+                <DialogContent className="max-w-sm">
+                    <DialogHeader>
+                        <DialogTitle>Delete Board</DialogTitle>
+                    </DialogHeader>
+                    <p className="text-sm text-muted-foreground">
+                        This will permanently delete the board and all its tasks. This action cannot be undone.
+                    </p>
+                    <div className="flex justify-end gap-2 pt-4">
+                        <Button variant="ghost" onClick={() => setConfirmDeleteId(null)}>Cancel</Button>
+                        <Button
+                            variant="destructive"
+                            onClick={() => confirmDeleteId && handleDeleteBoard(confirmDeleteId)}
+                        >
+                            Delete Board
+                        </Button>
+                    </div>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

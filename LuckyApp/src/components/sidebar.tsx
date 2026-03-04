@@ -38,7 +38,7 @@ const DEFAULT_SECTIONS: NavSection[] = [
       { id: "dashboard", href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
       { id: "projects", href: "/swarms", label: "Projects", icon: FolderKanban },
       { id: "agents", href: "/agents", label: "Agents", icon: Users },
-      { id: "board", href: "/kanban", label: "Board", icon: LayoutGrid },
+      { id: "board", href: "/kanban", label: "Boards", icon: LayoutGrid },
     ],
   },
   {
