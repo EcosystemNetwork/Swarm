@@ -18,6 +18,7 @@ import SpotlightCard from "@/components/reactbits/SpotlightCard";
 import ShinyText from "@/components/reactbits/ShinyText";
 import DecryptedText from "@/components/reactbits/DecryptedText";
 import { VitalsWidget } from "@/components/vitals-widget";
+import { useChainCurrency } from "@/hooks/useChainCurrency";
 import { GripVertical, RotateCcw, Plus, X, Check } from "lucide-react";
 import {
   getOrgStats,
@@ -35,13 +36,13 @@ import {
   type ActivityEvent,
 } from "@/lib/activity";
 
-const SwarmCanvas = dynamic(
-  () => import('@/components/swarm-workflow/swarm-canvas').then(mod => ({ default: mod.SwarmCanvas })),
+const AgentMap = dynamic(
+  () => import('@/components/agent-map/agent-map'),
   {
     ssr: false,
     loading: () => (
       <div className="flex items-center justify-center h-96 text-muted-foreground">
-        Loading workflow editor...
+        Loading agent map...
       </div>
     ),
   }
@@ -218,9 +219,12 @@ function formatRelativeTime(date: Date | null): string {
 
 export default function DashboardPage() {
   const { currentOrg } = useOrg();
+  const { symbol: currencySymbol } = useChainCurrency();
   const [stats, setStats] = useState<OrgStats | null>(null);
   const [recentTasks, setRecentTasks] = useState<(Task & { agentName?: string; projectName?: string })[]>([]);
   const [recentJobs, setRecentJobs] = useState<Job[]>([]);
+  const [allTasks, setAllTasks] = useState<Task[]>([]);
+  const [allJobs, setAllJobs] = useState<Job[]>([]);
   const [agents, setAgents] = useState<Agent[]>([]);
   const [activityFeed, setActivityFeed] = useState<ActivityEvent[]>([]);
   const [loading, setLoading] = useState(true);
@@ -276,6 +280,8 @@ export default function DashboardPage() {
         ]);
 
         setAgents(agentsData);
+        setAllTasks(tasks);
+        setAllJobs(jobs);
 
         const projectMap = new Map(projects.map(p => [p.id, p.name]));
         const agentMap = new Map(agentsData.map(a => [a.id, a.name]));
@@ -931,7 +937,7 @@ export default function DashboardPage() {
       <Tabs defaultValue="overview">
         <TabsList>
           <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="swarm">Swarm Workflow</TabsTrigger>
+          <TabsTrigger value="swarm">Agent Map</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview">
@@ -1039,7 +1045,26 @@ export default function DashboardPage() {
         </TabsContent>
 
         <TabsContent value="swarm">
-          <SwarmCanvas agents={agents} />
+          <AgentMap
+            projectName={currentOrg?.name || "Organization"}
+            agents={agents.map((a) => {
+              const activeJob = allJobs.find(j => j.takenByAgentId === a.id && j.status === 'in_progress');
+              const agentJobs = allJobs.filter(j => j.takenByAgentId === a.id);
+              const parseReward = (r?: string) => { if (!r) return 0; const n = parseFloat(r.replace(/[^0-9.]/g, '')); return isNaN(n) ? 0 : n; };
+              const agentCost = agentJobs.reduce((s, j) => s + parseReward(j.reward), 0);
+              return {
+                id: a.id,
+                name: a.name,
+                type: a.type,
+                status: activeJob ? 'busy' : a.status,
+                activeJobName: activeJob?.title,
+                assignedCost: agentCost,
+              };
+            })}
+            tasks={allTasks.map((t) => ({ id: t.id, status: t.status, assigneeAgentId: t.assigneeAgentId }))}
+            jobs={allJobs.map((j) => ({ id: j.id, title: j.title, reward: j.reward, priority: j.priority, requiredSkills: j.requiredSkills ?? [], status: j.status }))}
+            currencySymbol={currencySymbol}
+          />
         </TabsContent>
       </Tabs>
 
