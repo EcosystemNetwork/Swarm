@@ -7,7 +7,6 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useActiveAccount } from "thirdweb/react";
 import { useOrg } from "@/contexts/OrgContext";
-import BlurText from "@/components/reactbits/BlurText";
 import {
   getChannelsByOrg,
   onMessagesByChannel,
@@ -255,7 +254,6 @@ export default function ChatPage() {
   if (!currentOrg) {
     return (
       <div className="space-y-6">
-        <BlurText text="Chat" className="text-3xl font-bold tracking-tight" delay={80} animateBy="words" />
         <p className="text-muted-foreground mt-1">No organization selected</p>
       </div>
     );
@@ -264,7 +262,6 @@ export default function ChatPage() {
   if (!address) {
     return (
       <div className="space-y-6">
-        <BlurText text="Chat" className="text-3xl font-bold tracking-tight" delay={80} animateBy="words" />
         <p className="text-muted-foreground mt-1">Connect your wallet to start chatting</p>
       </div>
     );

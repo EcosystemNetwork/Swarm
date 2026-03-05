@@ -5,11 +5,11 @@ import { useState, useCallback, useRef, useEffect } from "react";
 import { Handle, Position, NodeResizer } from "@xyflow/react";
 
 const STICKY_COLORS: Record<string, { bg: string; border: string; text: string }> = {
-  yellow: { bg: "bg-yellow-100 dark:bg-yellow-900/30", border: "border-yellow-300 dark:border-yellow-700", text: "text-yellow-900 dark:text-yellow-200" },
-  green: { bg: "bg-emerald-100 dark:bg-emerald-900/30", border: "border-emerald-300 dark:border-emerald-700", text: "text-emerald-900 dark:text-emerald-200" },
-  blue: { bg: "bg-blue-100 dark:bg-blue-900/30", border: "border-blue-300 dark:border-blue-700", text: "text-blue-900 dark:text-blue-200" },
-  purple: { bg: "bg-purple-100 dark:bg-purple-900/30", border: "border-purple-300 dark:border-purple-700", text: "text-purple-900 dark:text-purple-200" },
-  pink: { bg: "bg-pink-100 dark:bg-pink-900/30", border: "border-pink-300 dark:border-pink-700", text: "text-pink-900 dark:text-pink-200" },
+  yellow: { bg: "bg-yellow-100 dark:bg-yellow-900", border: "border-yellow-300 dark:border-yellow-700", text: "text-yellow-900 dark:text-yellow-200" },
+  green: { bg: "bg-emerald-100 dark:bg-emerald-900", border: "border-emerald-300 dark:border-emerald-700", text: "text-emerald-900 dark:text-emerald-200" },
+  blue: { bg: "bg-blue-100 dark:bg-blue-900", border: "border-blue-300 dark:border-blue-700", text: "text-blue-900 dark:text-blue-200" },
+  purple: { bg: "bg-purple-100 dark:bg-purple-900", border: "border-purple-300 dark:border-purple-700", text: "text-purple-900 dark:text-purple-200" },
+  pink: { bg: "bg-pink-100 dark:bg-pink-900", border: "border-pink-300 dark:border-pink-700", text: "text-pink-900 dark:text-pink-200" },
 };
 
 const COLOR_DOTS: Array<{ key: string; dot: string }> = [

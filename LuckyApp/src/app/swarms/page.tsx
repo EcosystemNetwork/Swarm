@@ -23,7 +23,6 @@ import {
   type Job,
 } from "@/lib/firestore";
 import { useChainCurrency } from "@/hooks/useChainCurrency";
-import BlurText from "@/components/reactbits/BlurText";
 import SpotlightCard from "@/components/reactbits/SpotlightCard";
 
 interface ProjectWithStats extends Project {
@@ -177,23 +176,14 @@ export default function ProjectsPage() {
   if (!currentOrg) {
     return (
       <div className="space-y-6">
-        <div>
-          <BlurText text="Projects" className="text-3xl font-bold tracking-tight" delay={80} animateBy="words" />
-          <p className="text-muted-foreground mt-1">No organization selected</p>
-        </div>
+        <p className="text-muted-foreground mt-1">No organization selected</p>
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <BlurText text="Projects" className="text-3xl font-bold tracking-tight" delay={80} animateBy="words" />
-          <p className="text-muted-foreground mt-1">
-            Manage your agent projects and workflows
-          </p>
-        </div>
+      <div className="flex items-center justify-end">
         <Button
           onClick={() => setShowCreate(true)}
           className="bg-amber-600 hover:bg-amber-700 text-black"

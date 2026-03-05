@@ -19,7 +19,6 @@ import { useSwarmWrite } from "@/hooks/useSwarmWrite";
 import { useSwarmData } from "@/hooks/useSwarmData";
 import { shortAddr } from "@/lib/swarm-contracts";
 import { SKILL_REGISTRY, getInstalledSkills } from "@/lib/skills";
-import BlurText from "@/components/reactbits/BlurText";
 import SpotlightCard from "@/components/reactbits/SpotlightCard";
 
 const TYPE_COLORS: Record<string, string> = {
@@ -400,24 +399,14 @@ export default function AgentsPage() {
   if (!currentOrg) {
     return (
       <div className="space-y-6">
-        <div>
-          <BlurText text="Agent Fleet" className="text-3xl font-bold tracking-tight" delay={80} animateBy="words" />
-          <p className="text-muted-foreground mt-1">No organization selected</p>
-        </div>
+        <p className="text-muted-foreground mt-1">No organization selected</p>
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <BlurText text="Agent Fleet" className="text-3xl font-bold tracking-tight" delay={80} animateBy="words" />
-          <p className="text-muted-foreground mt-1">
-            Monitor and manage your enterprise AI agents
-          </p>
-        </div>
-        <div className="flex gap-2">
+      <div className="flex items-center justify-end gap-2">
           <Button
             onClick={() => setShowOnchainRegister(true)}
             variant="outline"
@@ -431,7 +420,6 @@ export default function AgentsPage() {
           >
             + Register Agent
           </Button>
-        </div>
       </div>
 
       {currentOrg.inviteCode && (

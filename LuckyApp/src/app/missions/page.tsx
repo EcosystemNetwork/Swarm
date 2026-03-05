@@ -22,7 +22,6 @@ import {
 } from "@/lib/firestore";
 import { collection, query, where, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import BlurText from "@/components/reactbits/BlurText";
 import SpotlightCard from "@/components/reactbits/SpotlightCard";
 
 const columns = [
@@ -175,23 +174,16 @@ export default function TasksPage() {
   if (!currentOrg) {
     return (
       <div className="space-y-6">
-        <div>
-          <BlurText text="Tasks" className="text-3xl font-bold tracking-tight" delay={80} animateBy="words" />
-          <p className="text-muted-foreground mt-1">No organization selected</p>
-        </div>
+        <p className="text-muted-foreground mt-1">No organization selected</p>
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <BlurText text="Tasks" className="text-3xl font-bold tracking-tight" delay={80} animateBy="words" />
-          <p className="text-muted-foreground mt-1">Track agent tasks and deliverables</p>
-        </div>
-        <Button 
-          onClick={() => setCreateOpen(true)} 
+      <div className="flex items-center justify-end">
+        <Button
+          onClick={() => setCreateOpen(true)}
           className="bg-amber-600 hover:bg-amber-700 text-black"
           disabled={projects.length === 0}
         >

@@ -7,7 +7,6 @@ import {
   ReactFlowProvider,
   Background,
   BackgroundVariant,
-  Controls,
   MiniMap,
   Panel,
   addEdge,
@@ -26,13 +25,14 @@ import { MapJobNode } from "./map-job-node";
 import { createWorkflowNodeType } from "./map-workflow-node";
 import { MapConditionNode, MapSwitchNode, MapMergeNode } from "./map-logic-node";
 import { MapStickyNode } from "./map-sticky-node";
+import { MapPromptNode } from "./map-prompt-node";
 import { MapCustomEdge } from "./map-custom-edge";
 import { MapContextMenu, buildCanvasMenuActions, buildNodeMenuActions } from "./map-context-menu";
 import { withNodeWrapper } from "./map-node-wrapper";
-import { AgentMapPalette } from "./agent-map-palette";
+import { AgentMapPalette, type DockPosition } from "./agent-map-palette";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { PanelRightClose, PanelRightOpen, Maximize, Trash2, Play } from "lucide-react";
+import { PanelLeftClose, PanelLeftOpen, Maximize, Trash2, Play, Plus, Minus, LocateFixed, Map } from "lucide-react";
 
 interface Agent {
   id: string;
@@ -85,6 +85,8 @@ const nodeTypes = {
   agentNode: MapAgentNode,
   hubNode: MapHubNode,
   jobNode: MapJobNode,
+  // Prompt input
+  mapPrompt: withNodeWrapper(MapPromptNode),
   // Triggers
   mapTriggerManual: wrappedWorkflow("mapTriggerManual"),
   mapTriggerWebhook: wrappedWorkflow("mapTriggerWebhook"),
@@ -118,12 +120,16 @@ const edgeTypes = {
 let mapNodeId = 0;
 const getMapNodeId = () => `map_wf_${mapNodeId++}`;
 
-function AgentMapInner({ projectName, agents, tasks, jobs = [], onAssign, onDispatch, executing = false, currencySymbol = "$" }: AgentMapProps) {
+function AgentMapInner({ projectName: _projectName, agents, tasks, jobs = [], onAssign, onDispatch, executing = false, currencySymbol = "$" }: AgentMapProps) {
+  void _projectName; // reserved for future use
   const [assignmentEdges, setAssignmentEdges] = useState<Edge[]>([]);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [reactFlowInstance, setReactFlowInstance] = useState<any>(null);
   const [showPalette, setShowPalette] = useState(true);
+  const [dockPosition, setDockPosition] = useState<DockPosition>("left");
   const [userWorkflowNodes, setUserWorkflowNodes] = useState<Node[]>([]);
+  const [showMiniMap, setShowMiniMap] = useState(true);
+  const [miniMapColor, setMiniMapColor] = useState<"default" | "mono" | "warm">("default");
 
   // Context menu state
   const [contextMenu, setContextMenu] = useState<{
@@ -145,51 +151,19 @@ function AgentMapInner({ projectName, agents, tasks, jobs = [], onAssign, onDisp
   const openJobs = useMemo(() => jobs.filter((j) => j.status === "open"), [jobs]);
 
   const { initialNodes, initialEdges } = useMemo(() => {
-    const activeTasks = tasks.filter((t) => t.status === "in_progress");
-    const doneTasks = tasks.filter((t) => t.status === "done");
+    // Agent nodes — left side, stacked vertically
+    const agentStartX = 80;
+    const agentStartY = 80;
+    const agentSpacing = 100;
 
-    // Dynamic hub position — center vertically based on node count
-    const maxCount = Math.max(agents.length, openJobs.length, 1);
-    const hubX = 400;
-    const hubY = Math.max(250, 80 + maxCount * 50);
-
-    const hubNode: Node = {
-      id: "hub",
-      type: "hubNode",
-      position: { x: hubX - 110, y: hubY - 50 },
-      data: {
-        label: "Hub",
-        projectName,
-        agentCount: agents.length,
-        taskCount: tasks.length,
-        activeCount: activeTasks.length,
-        doneCount: doneTasks.length,
-      },
-    };
-
-    // Agent nodes — left semi-arc around hub
-    const agentRadius = Math.max(280, agents.length * 45);
     const agentNodes: Node[] = agents.map((agent, i) => {
       const agentTasks = tasks.filter((t) => t.assigneeAgentId === agent.id);
       const agentActive = agentTasks.filter((t) => t.status === "in_progress");
 
-      let posX: number, posY: number;
-      if (agents.length === 1) {
-        posX = hubX - 320;
-        posY = hubY - 50;
-      } else {
-        const angleRange = Math.PI * 0.8;
-        const startAngle = -angleRange / 2;
-        const angleStep = angleRange / (agents.length - 1);
-        const angle = startAngle + i * angleStep;
-        posX = hubX - agentRadius * Math.cos(angle) - 180;
-        posY = hubY + agentRadius * Math.sin(angle) - 50;
-      }
-
       return {
         id: agent.id,
         type: "agentNode",
-        position: { x: posX, y: posY },
+        position: { x: agentStartX, y: agentStartY + i * agentSpacing },
         data: {
           label: agent.name,
           agentName: agent.name,
@@ -205,68 +179,36 @@ function AgentMapInner({ projectName, agents, tasks, jobs = [], onAssign, onDisp
       };
     });
 
-    // Job nodes — right semi-arc around hub
-    const jobRadius = Math.max(280, openJobs.length * 45);
-    const jobNodes: Node[] = openJobs.map((job, i) => {
-      let posX: number, posY: number;
-      if (openJobs.length === 1) {
-        posX = hubX + 320;
-        posY = hubY - 50;
-      } else {
-        const angleRange = Math.PI * 0.8;
-        const startAngle = -angleRange / 2;
-        const angleStep = angleRange / (openJobs.length - 1);
-        const angle = startAngle + i * angleStep;
-        posX = hubX + jobRadius * Math.cos(angle);
-        posY = hubY + jobRadius * Math.sin(angle) - 50;
-      }
+    // Prompt node — right side, vertically centered
+    const agentBlockHeight = Math.max(0, (agents.length - 1) * agentSpacing);
+    const startX = 500;
+    const startY = agentStartY + agentBlockHeight / 2;
 
-      return {
-        id: `job-${job.id}`,
-        type: "jobNode",
-        position: { x: posX, y: posY },
-        data: {
-          label: job.title,
-          jobTitle: job.title,
-          priority: job.priority,
-          reward: job.reward || "",
-          status: job.status,
-          requiredSkills: job.requiredSkills ?? [],
-          currencySymbol,
-        },
-      };
-    });
+    const promptNode: Node = {
+      id: "prompt-start",
+      type: "mapPrompt",
+      position: { x: startX, y: startY },
+      data: { label: "Prompt", prompt: "" },
+    };
 
-    // Hub → agent edges with labels
-    const hubEdges: Edge[] = agents.map((agent) => {
-      const agentTasks = tasks.filter((t) => t.assigneeAgentId === agent.id);
-      const hasActive = agentTasks.some((t) => t.status === "in_progress");
-      const allDone = agentTasks.length > 0 && agentTasks.every((t) => t.status === "done");
-      const activeCount = agentTasks.filter((t) => t.status === "in_progress").length;
-      return {
-        id: `hub-${agent.id}`,
-        source: "hub",
-        sourceHandle: "left",
-        target: agent.id,
-        animated: hasActive,
-        label: activeCount > 0 ? `${activeCount} active` : undefined,
-        labelStyle: { fontSize: 10, fill: "#d97706", fontWeight: 600 },
-        labelBgStyle: { fill: "rgba(0,0,0,0.6)", fillOpacity: 0.8 },
-        labelBgPadding: [4, 2] as [number, number],
-        labelBgBorderRadius: 4,
-        style: {
-          stroke: "#d97706",
-          strokeWidth: 2,
-          strokeDasharray: !hasActive && !allDone ? "5 5" : undefined,
-        },
-      };
-    });
+    // Edges from each agent → prompt node
+    const startEdges: Edge[] = agents.map((agent) => ({
+      id: `start-${agent.id}`,
+      source: agent.id,
+      target: "prompt-start",
+      animated: false,
+      style: {
+        stroke: "#d97706",
+        strokeWidth: 2,
+        strokeDasharray: "5 5",
+      },
+    }));
 
     return {
-      initialNodes: [hubNode, ...agentNodes, ...jobNodes],
-      initialEdges: hubEdges,
+      initialNodes: [...agentNodes, promptNode],
+      initialEdges: startEdges,
     };
-  }, [projectName, agents, tasks, openJobs, currencySymbol]);
+  }, [agents, tasks, currencySymbol]);
 
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState([...initialEdges, ...assignmentEdges]);
@@ -280,35 +222,23 @@ function AgentMapInner({ projectName, agents, tasks, jobs = [], onAssign, onDisp
     setEdges([...initialEdges, ...assignmentEdges]);
   }, [initialEdges, setEdges, assignmentEdges]);
 
-  // Handle new connections (agent → job assignments)
+  // Handle new connections — any node to any node
   const onConnect = useCallback(
     (connection: Connection) => {
-      const sourceNode = nodes.find((n) => n.id === connection.source);
-      const targetNode = nodes.find((n) => n.id === connection.target);
-
-      if (!sourceNode || !targetNode) return;
-      if (sourceNode.type !== "agentNode" || targetNode.type !== "jobNode") return;
-
-      const existingAssignment = assignmentEdges.find(
-        (e) => e.target === connection.target
+      if (!connection.source || !connection.target) return;
+      // Prevent duplicate edges
+      const exists = edges.some(
+        (e) => e.source === connection.source && e.target === connection.target
       );
-      if (existingAssignment) return;
+      if (exists) return;
 
-      const newEdge: Edge = {
-        ...connection,
-        id: `assign-${connection.source}-${connection.target}`,
-        animated: true,
-        style: { stroke: "#10b981", strokeWidth: 3 },
-      } as Edge;
-
-      setAssignmentEdges((prev) => [...prev, newEdge]);
       setEdges((eds) => addEdge({
         ...connection,
         animated: true,
-        style: { stroke: "#10b981", strokeWidth: 3 },
+        style: { stroke: "#d97706", strokeWidth: 2 },
       }, eds));
     },
-    [nodes, assignmentEdges, setEdges]
+    [edges, setEdges]
   );
 
   // Compute assignments from edges
@@ -441,12 +371,17 @@ function AgentMapInner({ projectName, agents, tasks, jobs = [], onAssign, onDisp
       const target = e.target as HTMLElement;
       if (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable) return;
 
-      // Delete selected user nodes
+      // Delete selected user nodes + selected edges
       if (e.key === "Delete" || e.key === "Backspace") {
         const selectedNodes = nodes.filter((n) => n.selected && isUserNode(n.id));
-        if (selectedNodes.length > 0) {
+        const selectedEdgeIds = edges.filter((e) => e.selected).map((e) => e.id);
+
+        if (selectedNodes.length > 0 || selectedEdgeIds.length > 0) {
           e.preventDefault();
           selectedNodes.forEach((n) => handleDeleteNode(n.id));
+          if (selectedEdgeIds.length > 0) {
+            setEdges((eds) => eds.filter((edge) => !selectedEdgeIds.includes(edge.id)));
+          }
         }
       }
 
@@ -454,12 +389,13 @@ function AgentMapInner({ projectName, agents, tasks, jobs = [], onAssign, onDisp
       if (e.key === "a" && (e.ctrlKey || e.metaKey)) {
         e.preventDefault();
         setNodes((nds) => nds.map((n) => ({ ...n, selected: true })));
+        setEdges((eds) => eds.map((e) => ({ ...e, selected: true })));
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [nodes, isUserNode, handleDeleteNode, setNodes]);
+  }, [nodes, edges, isUserNode, handleDeleteNode, setNodes, setEdges]);
 
   // ─── Edge delete event listener ───
   useEffect(() => {
@@ -537,109 +473,248 @@ function AgentMapInner({ projectName, agents, tasks, jobs = [], onAssign, onDisp
   const maxNodes = Math.max(agents.length, openJobs.length);
   const canvasHeight = Math.max(500, Math.min(900, 300 + maxNodes * 80));
 
+  const isHorizontalDock = dockPosition === "top" || dockPosition === "bottom";
+
+  // Handle dock drop zones — detect where palette was dragged
+  const handleDockDragOver = useCallback((e: React.DragEvent) => {
+    if (e.dataTransfer.types.includes("application/palette-dock")) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "move";
+    }
+  }, []);
+
+  const handleDockDrop = useCallback((position: DockPosition) => (e: React.DragEvent) => {
+    if (e.dataTransfer.types.includes("application/palette-dock")) {
+      e.preventDefault();
+      setDockPosition(position);
+    }
+  }, []);
+
+  // Palette element
+  const paletteEl = showPalette ? (
+    <AgentMapPalette agents={agents} dockPosition={dockPosition} onDockChange={setDockPosition} />
+  ) : null;
+
+  // Canvas element
+  const canvasEl = (
+    <div className="flex-1 min-h-0 min-w-0 relative overflow-hidden" style={{ width: 0 }}>
+      {/* Dock drop zones — visible during palette drag */}
+      {showPalette && (
+        <>
+          <div
+            className="absolute inset-y-0 left-0 w-8 z-10 opacity-0 hover:opacity-100 transition-opacity"
+            onDragOver={handleDockDragOver}
+            onDrop={handleDockDrop("left")}
+          >
+            <div className="h-full w-1 bg-amber-500/30 rounded-r" />
+          </div>
+          <div
+            className="absolute inset-y-0 right-0 w-8 z-10 opacity-0 hover:opacity-100 transition-opacity"
+            onDragOver={handleDockDragOver}
+            onDrop={handleDockDrop("right")}
+          >
+            <div className="h-full w-1 bg-amber-500/30 rounded-l ml-auto" />
+          </div>
+          <div
+            className="absolute inset-x-0 top-0 h-8 z-10 opacity-0 hover:opacity-100 transition-opacity"
+            onDragOver={handleDockDragOver}
+            onDrop={handleDockDrop("top")}
+          >
+            <div className="w-full h-1 bg-amber-500/30 rounded-b" />
+          </div>
+          <div
+            className="absolute inset-x-0 bottom-0 h-8 z-10 opacity-0 hover:opacity-100 transition-opacity"
+            onDragOver={handleDockDragOver}
+            onDrop={handleDockDrop("bottom")}
+          >
+            <div className="w-full h-1 bg-amber-500/30 rounded-t mt-auto" />
+          </div>
+        </>
+      )}
+      <ReactFlow
+        nodes={nodes}
+        edges={edges}
+        onNodesChange={onNodesChange}
+        onEdgesChange={onEdgesChange}
+        onConnect={onConnect}
+        onInit={setReactFlowInstance}
+        onDrop={onDrop}
+        onDragOver={onDragOver}
+        onPaneClick={closeContextMenu}
+        onPaneContextMenu={onPaneContextMenu}
+        onNodeContextMenu={onNodeContextMenu}
+        nodeTypes={nodeTypes}
+        edgeTypes={edgeTypes}
+        defaultEdgeOptions={{
+          type: "mapCustomEdge",
+          animated: true,
+          style: { stroke: "#d97706", strokeWidth: 2 },
+        }}
+        edgesFocusable
+        edgesReconnectable
+        snapToGrid
+        snapGrid={[20, 20]}
+        fitView
+        fitViewOptions={{ maxZoom: 1.5, minZoom: 0.3 }}
+        proOptions={{ hideAttribution: true }}
+        className="bg-muted"
+      >
+        <Background variant={BackgroundVariant.Dots} color="#d4d4d4" gap={20} size={1.5} />
+
+        {/* Custom zoom controls — styled to match theme */}
+        <Panel position="bottom-left">
+          <div className="flex flex-col gap-0.5 bg-card/90 backdrop-blur border border-border rounded-lg shadow-sm overflow-hidden">
+            <button
+              onClick={() => rfInstance.zoomIn({ duration: 200 })}
+              className="p-2 hover:bg-accent transition-colors border-b border-border/50"
+              title="Zoom in"
+            >
+              <Plus className="w-4 h-4 text-muted-foreground" />
+            </button>
+            <button
+              onClick={() => rfInstance.zoomOut({ duration: 200 })}
+              className="p-2 hover:bg-accent transition-colors border-b border-border/50"
+              title="Zoom out"
+            >
+              <Minus className="w-4 h-4 text-muted-foreground" />
+            </button>
+            <button
+              onClick={() => rfInstance.fitView({ duration: 300 })}
+              className="p-2 hover:bg-accent transition-colors"
+              title="Fit view"
+            >
+              <LocateFixed className="w-4 h-4 text-muted-foreground" />
+            </button>
+          </div>
+        </Panel>
+
+        {/* MiniMap — hideable with color modes */}
+        {showMiniMap && (
+          <MiniMap
+            nodeColor={(node) => {
+              if (miniMapColor === "mono") return "#a0a0a0";
+              if (miniMapColor === "warm") {
+                if (node.type === "agentNode") return "#f59e0b";
+                if (node.type === "mapSticky") return "#eab308";
+                return "#fb923c";
+              }
+              if (node.type === "agentNode") return "#fbbf24";
+              if (node.type === "mapSticky") return "#eab308";
+              if (node.type === "mapPrompt" || node.type === "mapTriggerManual") return "#f59e0b";
+              return "#60a5fa";
+            }}
+            style={{
+              background: miniMapColor === "default" ? "#1e293b" : miniMapColor === "mono" ? "#18181b" : "#1c1917",
+            }}
+            maskColor={
+              miniMapColor === "default" ? "rgba(30, 41, 59, 0.7)"
+                : miniMapColor === "mono" ? "rgba(24, 24, 27, 0.7)"
+                : "rgba(28, 25, 23, 0.7)"
+            }
+            className="!border !border-border !rounded-lg !shadow-sm"
+          />
+        )}
+
+        {/* Canvas toolbar panel — top right */}
+        <Panel position="top-right">
+          <div className="flex items-center gap-1.5 bg-card/90 backdrop-blur border border-border rounded-lg px-2 py-1.5 shadow-sm">
+            <Badge variant="outline" className="text-[10px] font-medium">
+              {userWorkflowNodes.length} node{userWorkflowNodes.length !== 1 ? "s" : ""}
+            </Badge>
+            <div className="w-px h-4 bg-border" />
+            <button
+              onClick={() => rfInstance.fitView({ duration: 300 })}
+              className="p-1.5 rounded hover:bg-accent transition-colors"
+              title="Fit View"
+            >
+              <Maximize className="w-3.5 h-3.5 text-muted-foreground" />
+            </button>
+            {userWorkflowNodes.length > 0 && (
+              <button
+                onClick={() => {
+                  setUserWorkflowNodes([]);
+                  setNodes(initialNodes);
+                }}
+                className="p-1.5 rounded hover:bg-destructive/10 transition-colors"
+                title="Clear workflow nodes"
+              >
+                <Trash2 className="w-3.5 h-3.5 text-destructive" />
+              </button>
+            )}
+            <button
+              onClick={() => {
+                userWorkflowNodes.forEach((n) => {
+                  rfInstance.updateNodeData(n.id, { executionState: "running" });
+                });
+                setTimeout(() => {
+                  userWorkflowNodes.forEach((n) => {
+                    rfInstance.updateNodeData(n.id, { executionState: "success" });
+                  });
+                  setTimeout(() => {
+                    userWorkflowNodes.forEach((n) => {
+                      rfInstance.updateNodeData(n.id, { executionState: "idle" });
+                    });
+                  }, 2000);
+                }, 2000);
+              }}
+              className="p-1.5 rounded hover:bg-emerald-500/10 transition-colors"
+              title="Run workflow (demo)"
+              disabled={userWorkflowNodes.length === 0}
+            >
+              <Play className="w-3.5 h-3.5 text-emerald-500" />
+            </button>
+            <div className="w-px h-4 bg-border" />
+            {/* MiniMap toggle + color */}
+            <button
+              onClick={() => setShowMiniMap(!showMiniMap)}
+              className={`p-1.5 rounded transition-colors ${
+                showMiniMap ? "bg-amber-500/10 text-amber-500" : "hover:bg-accent text-muted-foreground"
+              }`}
+              title={showMiniMap ? "Hide minimap" : "Show minimap"}
+            >
+              <Map className="w-3.5 h-3.5" />
+            </button>
+            {showMiniMap && (["default", "mono", "warm"] as const).map((c) => (
+              <button
+                key={c}
+                onClick={() => setMiniMapColor(c)}
+                className={`w-3.5 h-3.5 rounded-full border-2 transition-all ${
+                  miniMapColor === c ? "scale-110 border-amber-500" : "border-border hover:border-muted-foreground"
+                }`}
+                style={{
+                  background: c === "default" ? "#60a5fa" : c === "mono" ? "#888" : "#f59e0b",
+                }}
+                title={`${c.charAt(0).toUpperCase() + c.slice(1)} colors`}
+              />
+            ))}
+          </div>
+        </Panel>
+      </ReactFlow>
+
+      {/* Context menu */}
+      {contextMenu && (
+        <MapContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          actions={contextMenuActions}
+          onClose={closeContextMenu}
+        />
+      )}
+    </div>
+  );
+
   return (
     <div className="flex flex-col rounded-lg border border-border overflow-hidden bg-card">
-      <div className="flex flex-1 min-h-0" style={{ height: `${canvasHeight}px` }}>
-        <div className="flex-1">
-          <ReactFlow
-            nodes={nodes}
-            edges={edges}
-            onNodesChange={onNodesChange}
-            onEdgesChange={onEdgesChange}
-            onConnect={onConnect}
-            onInit={setReactFlowInstance}
-            onDrop={onDrop}
-            onDragOver={onDragOver}
-            onPaneClick={closeContextMenu}
-            onPaneContextMenu={onPaneContextMenu}
-            onNodeContextMenu={onNodeContextMenu}
-            nodeTypes={nodeTypes}
-            edgeTypes={edgeTypes}
-            defaultEdgeOptions={{
-              type: "mapCustomEdge",
-              animated: true,
-              style: { stroke: "#10b981", strokeWidth: 3 },
-            }}
-            snapToGrid
-            snapGrid={[20, 20]}
-            fitView
-            fitViewOptions={{ maxZoom: 1.5, minZoom: 0.3 }}
-            proOptions={{ hideAttribution: true }}
-            className="bg-muted"
-          >
-            <Background variant={BackgroundVariant.Dots} color="#d4d4d4" gap={20} size={1.5} />
-            <Controls />
-            <MiniMap
-              nodeColor={(node) => {
-                if (node.type === "hubNode") return "#f59e0b";
-                if (node.type === "jobNode") return "#10b981";
-                if (node.type === "mapSticky") return "#eab308";
-                return "#fbbf24";
-              }}
-            />
-            {/* Canvas toolbar panel */}
-            <Panel position="top-right">
-              <div className="flex items-center gap-1.5 bg-card/90 backdrop-blur border border-border rounded-lg px-2 py-1.5 shadow-sm">
-                <Badge variant="outline" className="text-[10px] font-medium">
-                  {userWorkflowNodes.length} workflow node{userWorkflowNodes.length !== 1 ? "s" : ""}
-                </Badge>
-                <button
-                  onClick={() => rfInstance.fitView({ duration: 300 })}
-                  className="p-1.5 rounded hover:bg-accent transition-colors"
-                  title="Fit View"
-                >
-                  <Maximize className="w-3.5 h-3.5 text-muted-foreground" />
-                </button>
-                {userWorkflowNodes.length > 0 && (
-                  <button
-                    onClick={() => {
-                      setUserWorkflowNodes([]);
-                      setNodes(initialNodes);
-                    }}
-                    className="p-1.5 rounded hover:bg-destructive/10 transition-colors"
-                    title="Clear workflow nodes"
-                  >
-                    <Trash2 className="w-3.5 h-3.5 text-destructive" />
-                  </button>
-                )}
-                <button
-                  onClick={() => {
-                    // Demo: set all workflow nodes to "running" then "success"
-                    userWorkflowNodes.forEach((n) => {
-                      rfInstance.updateNodeData(n.id, { executionState: "running" });
-                    });
-                    setTimeout(() => {
-                      userWorkflowNodes.forEach((n) => {
-                        rfInstance.updateNodeData(n.id, { executionState: "success" });
-                      });
-                      setTimeout(() => {
-                        userWorkflowNodes.forEach((n) => {
-                          rfInstance.updateNodeData(n.id, { executionState: "idle" });
-                        });
-                      }, 2000);
-                    }, 2000);
-                  }}
-                  className="p-1.5 rounded hover:bg-emerald-500/10 transition-colors"
-                  title="Run workflow (demo)"
-                  disabled={userWorkflowNodes.length === 0}
-                >
-                  <Play className="w-3.5 h-3.5 text-emerald-500" />
-                </button>
-              </div>
-            </Panel>
-          </ReactFlow>
-
-          {/* Context menu */}
-          {contextMenu && (
-            <MapContextMenu
-              x={contextMenu.x}
-              y={contextMenu.y}
-              actions={contextMenuActions}
-              onClose={closeContextMenu}
-            />
-          )}
-        </div>
-        {showPalette && <AgentMapPalette agents={agents} />}
+      {/* Main canvas area — flex direction changes based on dock position */}
+      <div
+        className={`flex min-h-0 overflow-hidden ${
+          isHorizontalDock ? "flex-col" : "flex-row"
+        }`}
+        style={{ height: `${canvasHeight}px` }}
+      >
+        {(dockPosition === "left" || dockPosition === "top") && paletteEl}
+        {canvasEl}
+        {(dockPosition === "right" || dockPosition === "bottom") && paletteEl}
       </div>
 
       {/* Assignment Summary Bar */}
@@ -703,12 +778,12 @@ function AgentMapInner({ projectName, agents, tasks, jobs = [], onAssign, onDisp
             onClick={() => setShowPalette(!showPalette)}
             title={showPalette ? "Hide Node Palette" : "Show Node Palette"}
           >
-            {showPalette ? <PanelRightClose className="w-4 h-4" /> : <PanelRightOpen className="w-4 h-4" />}
+            {showPalette ? <PanelLeftClose className="w-4 h-4" /> : <PanelLeftOpen className="w-4 h-4" />}
           </Button>
         </div>
       </div>
 
-      {/* ═══════════════ Quick Dispatch Panel ═══════════════ */}
+      {/* Quick Dispatch Panel */}
       <div className="border-t border-border">
         <button
           onClick={() => setDispatchOpen(!dispatchOpen)}
@@ -723,7 +798,6 @@ function AgentMapInner({ projectName, agents, tasks, jobs = [], onAssign, onDisp
 
         {dispatchOpen && (
           <div className="px-4 pb-4 space-y-4 bg-muted/30">
-            {/* Prompt */}
             <div>
               <label className="text-xs font-medium text-muted-foreground mb-1 block">
                 Job Prompt — What should the agents do?
@@ -737,7 +811,6 @@ function AgentMapInner({ projectName, agents, tasks, jobs = [], onAssign, onDisp
               />
             </div>
 
-            {/* Priority + Reward row */}
             <div className="flex gap-4">
               <div className="flex-1">
                 <label className="text-xs font-medium text-muted-foreground mb-1 block">Priority</label>
@@ -776,7 +849,6 @@ function AgentMapInner({ projectName, agents, tasks, jobs = [], onAssign, onDisp
               </div>
             </div>
 
-            {/* Agent Selection */}
             <div>
               <div className="flex items-center justify-between mb-2">
                 <label className="text-xs font-medium text-muted-foreground">
@@ -819,7 +891,6 @@ function AgentMapInner({ projectName, agents, tasks, jobs = [], onAssign, onDisp
               )}
             </div>
 
-            {/* Dispatch button */}
             <div className="flex items-center justify-between pt-2 border-t border-border/50">
               <div className="text-xs text-muted-foreground">
                 {selectedAgentIds.size > 0 && dispatchPrompt.trim() && (

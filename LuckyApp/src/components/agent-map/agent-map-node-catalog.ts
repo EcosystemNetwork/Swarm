@@ -23,6 +23,14 @@ export const NODE_CATALOG: CatalogCategory[] = [
     icon: "⚡",
     items: [
       {
+        nodeType: "mapPrompt",
+        label: "Prompt",
+        description: "Enter a prompt to start the workflow",
+        icon: "💬",
+        defaultData: { label: "Prompt", prompt: "" },
+        color: "amber",
+      },
+      {
         nodeType: "mapTriggerManual",
         label: "Manual Start",
         description: "Manually trigger the workflow",

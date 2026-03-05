@@ -10,7 +10,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getProfile, setProfile } from "@/lib/firestore";
-import BlurText from "@/components/reactbits/BlurText";
 import SpotlightCard from "@/components/reactbits/SpotlightCard";
 
 export default function ProfilePage() {
@@ -62,7 +61,7 @@ export default function ProfilePage() {
       <div className="max-w-lg mx-auto">
         <SpotlightCard className="p-0 border-[#1a1a2e] bg-[#0f0f1a]" spotlightColor="rgba(212, 168, 83, 0.1)">
           <CardHeader>
-            <BlurText text="Profile" className="text-[#d4a853] text-xl font-bold" delay={80} animateBy="words" />
+            <CardTitle className="text-[#d4a853]">Profile</CardTitle>
             <p className="text-sm text-muted-foreground font-mono">{truncated}</p>
           </CardHeader>
           <CardContent className="space-y-5">

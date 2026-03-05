@@ -9,7 +9,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { useOrg } from '@/contexts/OrgContext';
 import { useActiveAccount } from 'thirdweb/react';
 import { updateOrganization } from '@/lib/firestore';
-import BlurText from "@/components/reactbits/BlurText";
+import { Badge } from '@/components/ui/badge';
+import { GitHubIcon } from '@/components/github/github-icon';
 import SpotlightCard from "@/components/reactbits/SpotlightCard";
 
 export default function SettingsPage() {
@@ -25,6 +26,8 @@ export default function SettingsPage() {
   const [twitter, setTwitter] = useState('');
   const [discord, setDiscord] = useState('');
   const [telegram, setTelegram] = useState('');
+
+  const [disconnectingGH, setDisconnectingGH] = useState(false);
 
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
@@ -132,21 +135,13 @@ export default function SettingsPage() {
   if (!currentOrg) {
     return (
       <div className="space-y-6">
-        <div>
-          <BlurText text="Settings" className="text-3xl font-bold tracking-tight" delay={80} animateBy="words" />
-          <p className="text-muted-foreground mt-1">No organization selected</p>
-        </div>
+        <p className="text-muted-foreground mt-1">No organization selected</p>
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
-      <div>
-        <BlurText text="Settings" className="text-3xl font-bold tracking-tight" delay={80} animateBy="words" />
-        <p className="text-muted-foreground mt-1">Manage your organization settings</p>
-      </div>
-
       <div className="max-w-2xl space-y-6">
         <Card>
           <CardHeader>
@@ -280,6 +275,99 @@ export default function SettingsPage() {
                 </Button>
               </div>
             </form>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <GitHubIcon className="w-5 h-5" />
+              GitHub Integration
+            </CardTitle>
+            <CardDescription>Connect your GitHub organization or account to link repos to projects</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {currentOrg.githubInstallationId ? (
+              <div className="space-y-4">
+                <div className="flex items-center gap-3 p-3 rounded-md bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800">
+                  {currentOrg.githubAccountAvatarUrl && (
+                    <img
+                      src={currentOrg.githubAccountAvatarUrl}
+                      alt={currentOrg.githubAccountLogin || ''}
+                      className="w-10 h-10 rounded-full"
+                    />
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium">{currentOrg.githubAccountLogin}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {currentOrg.githubAccountType} · Connected {formatDate(currentOrg.githubConnectedAt)}
+                    </p>
+                  </div>
+                  <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400">
+                    Connected
+                  </Badge>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    asChild
+                  >
+                    <a
+                      href={`https://github.com/settings/installations/${currentOrg.githubInstallationId}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      Manage Permissions
+                    </a>
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30"
+                    disabled={disconnectingGH}
+                    onClick={async () => {
+                      setDisconnectingGH(true);
+                      try {
+                        await fetch('/api/github/disconnect', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ orgId: currentOrg.id }),
+                        });
+                        await refreshOrgs();
+                        setMessage({ type: 'success', text: 'GitHub disconnected' });
+                      } catch {
+                        setMessage({ type: 'error', text: 'Failed to disconnect GitHub' });
+                      } finally {
+                        setDisconnectingGH(false);
+                      }
+                    }}
+                  >
+                    {disconnectingGH ? 'Disconnecting...' : 'Disconnect'}
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <p className="text-sm text-muted-foreground">
+                  Install the GitHub App to connect repositories, view PRs, commits, and issues directly in your projects.
+                </p>
+                <Button
+                  className="bg-[#24292f] hover:bg-[#32383f] text-white"
+                  onClick={() => {
+                    const slug = process.env.NEXT_PUBLIC_GITHUB_APP_SLUG;
+                    if (slug) {
+                      window.location.href = `https://github.com/apps/${slug}/installations/new?state=${currentOrg.id}`;
+                    } else {
+                      setMessage({ type: 'error', text: 'GitHub App not configured. Set NEXT_PUBLIC_GITHUB_APP_SLUG.' });
+                    }
+                  }}
+                >
+                  <GitHubIcon className="w-4 h-4 mr-2" />
+                  Install GitHub App
+                </Button>
+              </div>
+            )}
           </CardContent>
         </Card>
 

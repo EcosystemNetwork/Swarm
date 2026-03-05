@@ -1,54 +1,132 @@
 /** Agent Map — Visual node graph of all agents showing status, connections, and workload. */
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useOrg } from "@/contexts/OrgContext";
+import { useActiveAccount } from "thirdweb/react";
+import { useChainCurrency } from "@/hooks/useChainCurrency";
 import { motion } from "motion/react";
-import BlurText from "@/components/reactbits/BlurText";
 import { AgentMap } from "@/components/agent-map";
+import type { DispatchPayload } from "@/components/agent-map/agent-map";
 import {
     getAgentsByOrg,
     getTasksByOrg,
     getJobsByOrg,
     getProjectsByOrg,
+    createJob,
+    claimJob,
     type Agent,
     type Task,
     type Job,
     type Project,
 } from "@/lib/firestore";
+import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export default function AgentMapPage() {
     const { currentOrg } = useOrg();
+    const { symbol: currencySymbol } = useChainCurrency();
+    const account = useActiveAccount();
     const [agents, setAgents] = useState<Agent[]>([]);
     const [tasks, setTasks] = useState<Task[]>([]);
     const [jobs, setJobs] = useState<Job[]>([]);
     const [projects, setProjects] = useState<Project[]>([]);
     const [selectedProject, setSelectedProject] = useState<string>("all");
     const [loading, setLoading] = useState(true);
+    const [dispatching, setDispatching] = useState(false);
 
-    useEffect(() => {
+    const loadData = useCallback(async () => {
         if (!currentOrg) return;
-        setLoading(true);
-
-        Promise.all([
-            getAgentsByOrg(currentOrg.id),
-            getTasksByOrg(currentOrg.id),
-            getJobsByOrg(currentOrg.id),
-            getProjectsByOrg(currentOrg.id),
-        ]).then(([a, t, j, p]) => {
+        try {
+            const [a, t, j, p] = await Promise.all([
+                getAgentsByOrg(currentOrg.id),
+                getTasksByOrg(currentOrg.id),
+                getJobsByOrg(currentOrg.id),
+                getProjectsByOrg(currentOrg.id),
+            ]);
             setAgents(a);
             setTasks(t);
             setJobs(j);
             setProjects(p);
-            setLoading(false);
-        }).catch(() => setLoading(false));
+        } catch {
+            // handled
+        }
     }, [currentOrg]);
+
+    useEffect(() => {
+        if (!currentOrg) return;
+        setLoading(true);
+        loadData().finally(() => setLoading(false));
+    }, [currentOrg, loadData]);
+
+    // Dispatch handler — creates job, assigns agents, refreshes data
+    const handleDispatch = useCallback(async (payload: DispatchPayload) => {
+        if (!currentOrg) return;
+        const { prompt, priority, reward, agentIds } = payload;
+        const agentNames = agentIds.map(id => agents.find(a => a.id === id)?.name || id);
+
+        try {
+            setDispatching(true);
+
+            const jobId = await createJob({
+                orgId: currentOrg.id,
+                projectId: selectedProject === "all" ? "" : selectedProject,
+                title: prompt.slice(0, 120) + (prompt.length > 120 ? "\u2026" : ""),
+                description: prompt,
+                status: "open",
+                reward: reward || undefined,
+                requiredSkills: [],
+                postedByAddress: account?.address || "unknown",
+                priority,
+                createdAt: new Date(),
+            });
+
+            for (const agentId of agentIds) {
+                await claimJob(jobId, agentId, currentOrg.id, selectedProject === "all" ? "" : selectedProject);
+            }
+
+            try {
+                await addDoc(collection(db, "agentComms"), {
+                    orgId: currentOrg.id,
+                    fromAgentId: "system",
+                    fromAgentName: "Agent Dispatch",
+                    toAgentId: agentIds.join(","),
+                    toAgentName: agentNames.join(", "),
+                    type: "handoff",
+                    content: `🚀 **Job Dispatched**\n\n**Prompt:** ${prompt}\n\n**Assigned Agents:** ${agentNames.map(n => `@${n}`).join(", ")}\n**Priority:** ${priority}${reward ? `\n**Reward:** ${reward} ${currencySymbol}` : ""}\n\nCoordinate as a team to complete this task.`,
+                    metadata: { jobId, priority, reward, agentIds },
+                    createdAt: serverTimestamp(),
+                });
+            } catch { /* comms log is non-critical */ }
+
+            await loadData();
+        } catch (err) {
+            console.error("Dispatch failed:", err);
+        } finally {
+            setDispatching(false);
+        }
+    }, [currentOrg, agents, account, currencySymbol, selectedProject, loadData]);
+
+    // Assign handler — assigns agents to open jobs
+    const handleAssign = useCallback(async (assignments: { jobId: string; agentId: string; jobTitle: string; agentName: string }[]) => {
+        if (!currentOrg) return;
+        try {
+            setDispatching(true);
+            for (const a of assignments) {
+                await claimJob(a.jobId, a.agentId, currentOrg.id, selectedProject === "all" ? "" : selectedProject);
+            }
+            await loadData();
+        } catch (err) {
+            console.error("Assign failed:", err);
+        } finally {
+            setDispatching(false);
+        }
+    }, [currentOrg, selectedProject, loadData]);
 
     if (!currentOrg) {
         return (
             <div className="space-y-6">
-                <BlurText text="Agent Map" className="text-3xl font-bold tracking-tight" delay={80} animateBy="words" />
                 <p className="text-muted-foreground mt-1">No organization selected</p>
             </div>
         );
@@ -71,16 +149,11 @@ export default function AgentMapPage() {
         ? currentOrg.name
         : projects.find(p => p.id === selectedProject)?.name || "Project";
 
+    const parseReward = (r?: string) => { if (!r) return 0; const n = parseFloat(r.replace(/[^0-9.]/g, '')); return isNaN(n) ? 0 : n; };
+
     return (
         <div className="space-y-6">
-            {/* Header */}
-            <div className="flex items-center justify-between">
-                <div>
-                    <BlurText text="Agent Map" className="text-3xl font-bold tracking-tight" delay={80} animateBy="words" />
-                    <p className="text-muted-foreground mt-1">
-                        Visual map of agents, tasks, and jobs
-                    </p>
-                </div>
+            <div className="flex items-center justify-end">
                 <Select value={selectedProject} onValueChange={setSelectedProject}>
                     <SelectTrigger className="w-[220px]">
                         <SelectValue placeholder="All Projects" />
@@ -123,15 +196,13 @@ export default function AgentMapPage() {
                 initial={{ opacity: 0, y: 16 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.5, delay: 0.2 }}
-                className="rounded-xl border bg-card overflow-hidden"
-                style={{ height: "calc(100vh - 320px)", minHeight: 400 }}
             >
                 {loading ? (
-                    <div className="flex items-center justify-center h-full text-muted-foreground">
+                    <div className="flex items-center justify-center rounded-xl border bg-card text-muted-foreground" style={{ height: 400 }}>
                         Loading map...
                     </div>
                 ) : filteredAgents.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
+                    <div className="flex flex-col items-center justify-center rounded-xl border bg-card text-muted-foreground" style={{ height: 400 }}>
                         <span className="text-5xl mb-4">🗺️</span>
                         <p className="text-lg">No agents to display</p>
                         <p className="text-sm mt-1">Add agents to a project to see them on the map</p>
@@ -139,12 +210,19 @@ export default function AgentMapPage() {
                 ) : (
                     <AgentMap
                         projectName={projectName}
-                        agents={filteredAgents.map(a => ({
-                            id: a.id,
-                            name: a.name,
-                            type: a.type,
-                            status: a.status,
-                        }))}
+                        agents={filteredAgents.map(a => {
+                            const activeJob = filteredJobs.find(j => j.takenByAgentId === a.id && j.status === 'in_progress');
+                            const agentJobs = filteredJobs.filter(j => j.takenByAgentId === a.id);
+                            const agentCost = agentJobs.reduce((s, j) => s + parseReward(j.reward), 0);
+                            return {
+                                id: a.id,
+                                name: a.name,
+                                type: a.type,
+                                status: activeJob ? 'busy' : a.status,
+                                activeJobName: activeJob?.title,
+                                assignedCost: agentCost,
+                            };
+                        })}
                         tasks={filteredTasks.map(t => ({
                             id: t.id,
                             status: t.status,
@@ -155,9 +233,13 @@ export default function AgentMapPage() {
                             title: j.title,
                             reward: j.reward,
                             priority: j.priority,
-                            requiredSkills: j.requiredSkills,
+                            requiredSkills: j.requiredSkills ?? [],
                             status: j.status,
                         }))}
+                        onDispatch={handleDispatch}
+                        onAssign={handleAssign}
+                        executing={dispatching}
+                        currencySymbol={currencySymbol}
                     />
                 )}
             </motion.div>
