@@ -13,6 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useOrg } from "@/contexts/OrgContext";
 import { useSwarmData } from "@/hooks/useSwarmData";
+import { useSwarmWrite } from "@/hooks/useSwarmWrite";
 import {
   getAgent,
   getProjectsByOrg,
@@ -59,6 +60,7 @@ export default function AgentDetailPage() {
   const agentId = params.agentId as string;
   const { currentOrg } = useOrg();
   const swarm = useSwarmData();
+  const swarmWrite = useSwarmWrite();
 
   const [agent, setAgent] = useState<Agent | null>(null);
   const [assignedProjects, setAssignedProjects] = useState<Project[]>([]);
@@ -79,6 +81,12 @@ export default function AgentDetailPage() {
   // Delete state
   const [showDelete, setShowDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
+
+  // On-chain registration state
+  const [showRegister, setShowRegister] = useState(false);
+  const [registerName, setRegisterName] = useState('');
+  const [registerSkills, setRegisterSkills] = useState('');
+  const [registerFeeRate, setRegisterFeeRate] = useState('500');
 
   const loadAgentData = async () => {
     if (!currentOrg) return;
@@ -182,6 +190,25 @@ export default function AgentDetailPage() {
       console.error('Failed to delete agent:', err);
       setError(err instanceof Error ? err.message : 'Failed to delete agent');
       setDeleting(false);
+    }
+  };
+
+  const handleRegisterOpen = () => {
+    if (!agent) return;
+    setRegisterName(agent.name);
+    setRegisterSkills((agent.capabilities ?? []).join(', '));
+    setRegisterFeeRate('500');
+    swarmWrite.reset();
+    setShowRegister(true);
+  };
+
+  const handleRegisterSubmit = async () => {
+    if (!registerName.trim()) return;
+    const feeRate = parseInt(registerFeeRate, 10);
+    if (isNaN(feeRate) || feeRate < 0) return;
+    const txHash = await swarmWrite.registerAgent(registerName.trim(), registerSkills.trim(), feeRate);
+    if (txHash) {
+      swarm.refetch();
     }
   };
 
@@ -554,9 +581,15 @@ export default function AgentDetailPage() {
               )}
             </div>
           ) : (
-            <div className="text-center py-4 text-muted-foreground">
-              <p className="text-sm">This agent is not registered on-chain</p>
-              <p className="text-xs mt-1">Use "Register Onchain" from the Agent Fleet page to add this agent to the smart contract registry</p>
+            <div className="text-center py-4">
+              <p className="text-sm text-muted-foreground">This agent is not registered on-chain</p>
+              <p className="text-xs text-muted-foreground mt-1">Register on the smart contract registry to enable on-chain task claiming and rewards</p>
+              <Button
+                onClick={handleRegisterOpen}
+                className="mt-3 bg-amber-600 hover:bg-amber-700 text-black"
+              >
+                ⛓️ Register On-Chain
+              </Button>
             </div>
           )}
         </CardContent>
@@ -768,6 +801,74 @@ export default function AgentDetailPage() {
             <Button onClick={handleDeleteConfirm} disabled={deleting} className="bg-red-600 hover:bg-red-700 text-white">
               {deleting ? 'Removing...' : '🗑️ Remove'}
             </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Register On-Chain Dialog */}
+      <Dialog open={showRegister} onOpenChange={(open) => { setShowRegister(open); if (!open) swarmWrite.reset(); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>⛓️ Register Agent On-Chain</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Register <strong>{agent?.name}</strong> on the Hedera Agent Registry smart contract.
+            </p>
+            <div>
+              <label className="text-sm font-medium mb-1 block">Agent Name *</label>
+              <Input value={registerName} onChange={e => setRegisterName(e.target.value)} disabled={swarmWrite.state.isLoading} />
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-1 block">Skills</label>
+              <Input
+                value={registerSkills}
+                onChange={e => setRegisterSkills(e.target.value)}
+                placeholder="e.g. research, analysis, trading"
+                disabled={swarmWrite.state.isLoading}
+              />
+              <p className="text-[11px] text-muted-foreground mt-1">Comma-separated list of skills stored on-chain</p>
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-1 block">Fee Rate (basis points)</label>
+              <Input
+                type="number"
+                value={registerFeeRate}
+                onChange={e => setRegisterFeeRate(e.target.value)}
+                min={0}
+                max={10000}
+                disabled={swarmWrite.state.isLoading}
+              />
+              <p className="text-[11px] text-muted-foreground mt-1">500 bps = 5% fee on completed tasks</p>
+            </div>
+
+            {swarmWrite.state.error && (
+              <div className="p-3 rounded-md bg-red-50 border border-red-200 text-sm text-red-600 dark:bg-red-950/20 dark:border-red-800 dark:text-red-400">
+                {swarmWrite.state.error}
+              </div>
+            )}
+
+            {swarmWrite.state.txHash && (
+              <div className="p-3 rounded-md bg-emerald-50 border border-emerald-200 text-sm text-emerald-700 dark:bg-emerald-950/20 dark:border-emerald-800 dark:text-emerald-400">
+                <p className="font-medium">Registration successful!</p>
+                <p className="text-xs font-mono mt-1 break-all">TX: {swarmWrite.state.txHash}</p>
+              </div>
+            )}
+
+            <div className="flex gap-2 justify-end">
+              <Button variant="outline" onClick={() => setShowRegister(false)} disabled={swarmWrite.state.isLoading}>
+                {swarmWrite.state.txHash ? 'Close' : 'Cancel'}
+              </Button>
+              {!swarmWrite.state.txHash && (
+                <Button
+                  onClick={handleRegisterSubmit}
+                  disabled={swarmWrite.state.isLoading || !registerName.trim()}
+                  className="bg-amber-600 hover:bg-amber-700 text-black"
+                >
+                  {swarmWrite.state.isLoading ? 'Registering...' : '⛓️ Register'}
+                </Button>
+              )}
+            </div>
           </div>
         </DialogContent>
       </Dialog>

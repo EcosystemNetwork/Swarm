@@ -7,9 +7,10 @@ import { ConnectButton, useActiveAccount } from "thirdweb/react";
 import { createThirdwebClient } from "thirdweb";
 import { WALLET_CHAINS } from "@/lib/chains";
 import { useRouter } from "next/navigation";
-import { useEffect, Suspense, lazy, useRef } from "react";
+import { useState, useEffect, Suspense, lazy, useRef } from "react";
 import Image from "next/image";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Sun, Moon } from "lucide-react";
+import { useTheme } from "next-themes";
 
 const Spline = lazy(() => import('@splinetool/react-spline'));
 
@@ -24,6 +25,9 @@ export default function LandingPage() {
   const account = useActiveAccount();
   const router = useRouter();
   const canvasRefs = useRef<(HTMLCanvasElement | null)[]>([]);
+  const { theme, setTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
 
   useEffect(() => {
     if (account) {
@@ -70,6 +74,15 @@ export default function LandingPage() {
             <span className="text-2xl font-bold text-[#FFD700] tracking-tight">Swarm</span>
           </div>
           <div className="flex items-center gap-4">
+            {mounted && (
+              <button
+                onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+                className="p-2 rounded-md border border-amber-500/20 hover:border-amber-500/40 transition-colors text-amber-400 hover:text-amber-300"
+                title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+              >
+                {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+              </button>
+            )}
             <ConnectButton client={client} chains={WALLET_CHAINS} />
           </div>
         </div>

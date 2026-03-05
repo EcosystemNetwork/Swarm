@@ -19,6 +19,7 @@ import ShinyText from "@/components/reactbits/ShinyText";
 import DecryptedText from "@/components/reactbits/DecryptedText";
 import { VitalsWidget } from "@/components/vitals-widget";
 import { useChainCurrency } from "@/hooks/useChainCurrency";
+import { useActiveAccount } from "thirdweb/react";
 import { GripVertical, RotateCcw, Plus, X, Check } from "lucide-react";
 import {
   getOrgStats,
@@ -26,15 +27,20 @@ import {
   getProjectsByOrg,
   getAgentsByOrg,
   getJobsByOrg,
+  createJob,
+  claimJob,
   type Task,
   type Agent,
   type Job,
 } from "@/lib/firestore";
+import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 import {
   getActivityFeed,
   EVENT_TYPE_CONFIG,
   type ActivityEvent,
 } from "@/lib/activity";
+import type { DispatchPayload } from "@/components/agent-map/agent-map";
 
 const AgentMap = dynamic(
   () => import('@/components/agent-map/agent-map'),
@@ -220,6 +226,7 @@ function formatRelativeTime(date: Date | null): string {
 export default function DashboardPage() {
   const { currentOrg } = useOrg();
   const { symbol: currencySymbol } = useChainCurrency();
+  const account = useActiveAccount();
   const [stats, setStats] = useState<OrgStats | null>(null);
   const [recentTasks, setRecentTasks] = useState<(Task & { agentName?: string; projectName?: string })[]>([]);
   const [recentJobs, setRecentJobs] = useState<Job[]>([]);
@@ -229,6 +236,7 @@ export default function DashboardPage() {
   const [activityFeed, setActivityFeed] = useState<ActivityEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [dispatching, setDispatching] = useState(false);
 
   // Active widget sets (which widgets are visible)
   const [activeStatIds, setActiveStatIds] = useState<string[]>(DEFAULT_ACTIVE_STATS);
@@ -260,81 +268,151 @@ export default function DashboardPage() {
     setWidgetOrder(applySavedOrder(WIDGET_ORDER_KEY, validWidgets));
   }, []);
 
-  // Load dashboard data
-  useEffect(() => {
+  // Load dashboard data — extracted so dispatch can refresh
+  const loadDashboardData = useCallback(async (isInitial = false) => {
     if (!currentOrg) return;
+    try {
+      if (isInitial) { setLoading(true); setError(null); }
 
-    const loadDashboardData = async () => {
+      const orgStats = await getOrgStats(currentOrg.id);
+      setStats(orgStats);
+
+      const [tasks, projects, agentsData, jobs] = await Promise.all([
+        getTasksByOrg(currentOrg.id),
+        getProjectsByOrg(currentOrg.id),
+        getAgentsByOrg(currentOrg.id),
+        getJobsByOrg(currentOrg.id),
+      ]);
+
+      setAgents(agentsData);
+      setAllTasks(tasks);
+      setAllJobs(jobs);
+
+      const projectMap = new Map(projects.map(p => [p.id, p.name]));
+      const agentMap = new Map(agentsData.map(a => [a.id, a.name]));
+
+      const enrichedTasks = tasks
+        .map(task => ({
+          ...task,
+          projectName: projectMap.get(task.projectId) || 'Unknown Project',
+          agentName: task.assigneeAgentId ? agentMap.get(task.assigneeAgentId) || 'Unknown Agent' : 'Unassigned'
+        }))
+        .sort((a, b) => {
+          const aTime = a.createdAt && typeof a.createdAt === 'object' && 'seconds' in a.createdAt
+            ? (a.createdAt as any).seconds * 1000
+            : new Date(a.createdAt as any).getTime();
+          const bTime = b.createdAt && typeof b.createdAt === 'object' && 'seconds' in b.createdAt
+            ? (b.createdAt as any).seconds * 1000
+            : new Date(b.createdAt as any).getTime();
+          return bTime - aTime;
+        })
+        .slice(0, 5);
+
+      setRecentTasks(enrichedTasks);
+
+      const sortedJobs = jobs
+        .sort((a, b) => {
+          const aTime = a.createdAt && typeof a.createdAt === 'object' && 'seconds' in a.createdAt
+            ? (a.createdAt as any).seconds * 1000
+            : new Date(a.createdAt as any).getTime();
+          const bTime = b.createdAt && typeof b.createdAt === 'object' && 'seconds' in b.createdAt
+            ? (b.createdAt as any).seconds * 1000
+            : new Date(b.createdAt as any).getTime();
+          return bTime - aTime;
+        })
+        .slice(0, 5);
+      setRecentJobs(sortedJobs);
+
+      // Load activity feed
       try {
-        setLoading(true);
-        setError(null);
-
-        const orgStats = await getOrgStats(currentOrg.id);
-        setStats(orgStats);
-
-        const [tasks, projects, agentsData, jobs] = await Promise.all([
-          getTasksByOrg(currentOrg.id),
-          getProjectsByOrg(currentOrg.id),
-          getAgentsByOrg(currentOrg.id),
-          getJobsByOrg(currentOrg.id),
-        ]);
-
-        setAgents(agentsData);
-        setAllTasks(tasks);
-        setAllJobs(jobs);
-
-        const projectMap = new Map(projects.map(p => [p.id, p.name]));
-        const agentMap = new Map(agentsData.map(a => [a.id, a.name]));
-
-        const enrichedTasks = tasks
-          .map(task => ({
-            ...task,
-            projectName: projectMap.get(task.projectId) || 'Unknown Project',
-            agentName: task.assigneeAgentId ? agentMap.get(task.assigneeAgentId) || 'Unknown Agent' : 'Unassigned'
-          }))
-          .sort((a, b) => {
-            const aTime = a.createdAt && typeof a.createdAt === 'object' && 'seconds' in a.createdAt
-              ? (a.createdAt as any).seconds * 1000
-              : new Date(a.createdAt as any).getTime();
-            const bTime = b.createdAt && typeof b.createdAt === 'object' && 'seconds' in b.createdAt
-              ? (b.createdAt as any).seconds * 1000
-              : new Date(b.createdAt as any).getTime();
-            return bTime - aTime;
-          })
-          .slice(0, 5);
-
-        setRecentTasks(enrichedTasks);
-
-        const sortedJobs = jobs
-          .sort((a, b) => {
-            const aTime = a.createdAt && typeof a.createdAt === 'object' && 'seconds' in a.createdAt
-              ? (a.createdAt as any).seconds * 1000
-              : new Date(a.createdAt as any).getTime();
-            const bTime = b.createdAt && typeof b.createdAt === 'object' && 'seconds' in b.createdAt
-              ? (b.createdAt as any).seconds * 1000
-              : new Date(b.createdAt as any).getTime();
-            return bTime - aTime;
-          })
-          .slice(0, 5);
-        setRecentJobs(sortedJobs);
-
-        // Load activity feed
-        try {
-          const feed = await getActivityFeed(currentOrg.id, { max: 8 });
-          setActivityFeed(feed);
-        } catch {
-          // Activity feed is non-critical
-        }
-      } catch (err) {
-        console.error('Failed to load dashboard data:', err);
-        setError(err instanceof Error ? err.message : 'Failed to load dashboard data');
-      } finally {
-        setLoading(false);
+        const feed = await getActivityFeed(currentOrg.id, { max: 8 });
+        setActivityFeed(feed);
+      } catch {
+        // Activity feed is non-critical
       }
-    };
-
-    loadDashboardData();
+    } catch (err) {
+      console.error('Failed to load dashboard data:', err);
+      setError(err instanceof Error ? err.message : 'Failed to load dashboard data');
+    } finally {
+      if (isInitial) setLoading(false);
+    }
   }, [currentOrg]);
+
+  useEffect(() => {
+    loadDashboardData(true);
+  }, [loadDashboardData]);
+
+  // ── Dispatch handler — creates job, assigns agents, refreshes data ──
+  const handleDispatch = useCallback(async (payload: DispatchPayload) => {
+    if (!currentOrg) return;
+    const { prompt, priority, reward, agentIds } = payload;
+    const agentNames = agentIds.map(id => agents.find(a => a.id === id)?.name || id);
+
+    try {
+      setDispatching(true);
+      setError(null);
+
+      // 1. Create the job (org-wide, no single project)
+      const jobId = await createJob({
+        orgId: currentOrg.id,
+        projectId: "",
+        title: prompt.slice(0, 120) + (prompt.length > 120 ? "\u2026" : ""),
+        description: prompt,
+        status: "open",
+        reward: reward || undefined,
+        requiredSkills: [],
+        postedByAddress: account?.address || "unknown",
+        priority,
+        createdAt: new Date(),
+      });
+
+      // 2. Assign each selected agent
+      for (const agentId of agentIds) {
+        await claimJob(jobId, agentId, currentOrg.id, "");
+      }
+
+      // 3. Log to agentComms
+      try {
+        await addDoc(collection(db, "agentComms"), {
+          orgId: currentOrg.id,
+          fromAgentId: "system",
+          fromAgentName: "Agent Dispatch",
+          toAgentId: agentIds.join(","),
+          toAgentName: agentNames.join(", "),
+          type: "handoff",
+          content: `🚀 **Job Dispatched**\n\n**Prompt:** ${prompt}\n\n**Assigned Agents:** ${agentNames.map(n => `@${n}`).join(", ")}\n**Priority:** ${priority}${reward ? `\n**Reward:** ${reward} ${currencySymbol}` : ""}\n\nCoordinate as a team to complete this task.`,
+          metadata: { jobId, priority, reward, agentIds },
+          createdAt: serverTimestamp(),
+        });
+      } catch { /* comms log is non-critical */ }
+
+      // 4. Refresh dashboard data so the new job appears on the map
+      await loadDashboardData();
+    } catch (err) {
+      console.error("Dispatch failed:", err);
+      setError(err instanceof Error ? err.message : "Failed to dispatch job");
+    } finally {
+      setDispatching(false);
+    }
+  }, [currentOrg, agents, account, currencySymbol, loadDashboardData]);
+
+  // ── Assign handler — assigns agents to open jobs via drag connections ──
+  const handleAssign = useCallback(async (assignments: { jobId: string; agentId: string; jobTitle: string; agentName: string }[]) => {
+    if (!currentOrg) return;
+    try {
+      setDispatching(true);
+      setError(null);
+      for (const a of assignments) {
+        await claimJob(a.jobId, a.agentId, currentOrg.id, "");
+      }
+      await loadDashboardData();
+    } catch (err) {
+      console.error("Assign failed:", err);
+      setError(err instanceof Error ? err.message : "Failed to assign agents");
+    } finally {
+      setDispatching(false);
+    }
+  }, [currentOrg, loadDashboardData]);
 
   /* ── Stat Card Drag Handlers ── */
 
@@ -1063,6 +1141,9 @@ export default function DashboardPage() {
             })}
             tasks={allTasks.map((t) => ({ id: t.id, status: t.status, assigneeAgentId: t.assigneeAgentId }))}
             jobs={allJobs.map((j) => ({ id: j.id, title: j.title, reward: j.reward, priority: j.priority, requiredSkills: j.requiredSkills ?? [], status: j.status }))}
+            onDispatch={handleDispatch}
+            onAssign={handleAssign}
+            executing={dispatching}
             currencySymbol={currencySymbol}
           />
         </TabsContent>

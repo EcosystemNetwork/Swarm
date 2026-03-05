@@ -6,11 +6,14 @@ import {
   ReactFlow,
   ReactFlowProvider,
   Background,
+  BackgroundVariant,
   Controls,
   MiniMap,
+  Panel,
   addEdge,
   useNodesState,
   useEdgesState,
+  useReactFlow,
   type Node,
   type Edge,
   type Connection,
@@ -20,8 +23,16 @@ import "@xyflow/react/dist/style.css";
 import { MapAgentNode } from "./map-agent-node";
 import { MapHubNode } from "./map-hub-node";
 import { MapJobNode } from "./map-job-node";
+import { createWorkflowNodeType } from "./map-workflow-node";
+import { MapConditionNode, MapSwitchNode, MapMergeNode } from "./map-logic-node";
+import { MapStickyNode } from "./map-sticky-node";
+import { MapCustomEdge } from "./map-custom-edge";
+import { MapContextMenu, buildCanvasMenuActions, buildNodeMenuActions } from "./map-context-menu";
+import { withNodeWrapper } from "./map-node-wrapper";
+import { AgentMapPalette } from "./agent-map-palette";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { PanelRightClose, PanelRightOpen, Maximize, Trash2, Play } from "lucide-react";
 
 interface Agent {
   id: string;
@@ -66,10 +77,62 @@ interface AgentMapProps {
   currencySymbol?: string;
 }
 
-const nodeTypes = { agentNode: MapAgentNode, hubNode: MapHubNode, jobNode: MapJobNode };
+// Wrap workflow nodes with hover toolbar + execution states
+const wrappedWorkflow = (key: string) => withNodeWrapper(createWorkflowNodeType(key));
+
+const nodeTypes = {
+  // Data-driven nodes (protected — no delete/duplicate)
+  agentNode: MapAgentNode,
+  hubNode: MapHubNode,
+  jobNode: MapJobNode,
+  // Triggers
+  mapTriggerManual: wrappedWorkflow("mapTriggerManual"),
+  mapTriggerWebhook: wrappedWorkflow("mapTriggerWebhook"),
+  mapTriggerSchedule: wrappedWorkflow("mapTriggerSchedule"),
+  mapTriggerJobComplete: wrappedWorkflow("mapTriggerJobComplete"),
+  // Logic
+  mapCondition: withNodeWrapper(MapConditionNode),
+  mapSwitch: withNodeWrapper(MapSwitchNode),
+  mapMerge: withNodeWrapper(MapMergeNode),
+  // Actions
+  mapHttpRequest: wrappedWorkflow("mapHttpRequest"),
+  mapCodeScript: wrappedWorkflow("mapCodeScript"),
+  mapDispatchJob: wrappedWorkflow("mapDispatchJob"),
+  mapSendMessage: wrappedWorkflow("mapSendMessage"),
+  // Flow control
+  mapDelay: wrappedWorkflow("mapDelay"),
+  mapLoop: wrappedWorkflow("mapLoop"),
+  mapErrorHandler: wrappedWorkflow("mapErrorHandler"),
+  // AI
+  mapLlmCall: wrappedWorkflow("mapLlmCall"),
+  mapSummarizer: wrappedWorkflow("mapSummarizer"),
+  mapClassifier: wrappedWorkflow("mapClassifier"),
+  // Annotations
+  mapSticky: MapStickyNode,
+};
+
+const edgeTypes = {
+  mapCustomEdge: MapCustomEdge,
+};
+
+let mapNodeId = 0;
+const getMapNodeId = () => `map_wf_${mapNodeId++}`;
 
 function AgentMapInner({ projectName, agents, tasks, jobs = [], onAssign, onDispatch, executing = false, currencySymbol = "$" }: AgentMapProps) {
   const [assignmentEdges, setAssignmentEdges] = useState<Edge[]>([]);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [reactFlowInstance, setReactFlowInstance] = useState<any>(null);
+  const [showPalette, setShowPalette] = useState(true);
+  const [userWorkflowNodes, setUserWorkflowNodes] = useState<Node[]>([]);
+
+  // Context menu state
+  const [contextMenu, setContextMenu] = useState<{
+    x: number;
+    y: number;
+    nodeId?: string;
+  } | null>(null);
+
+  const rfInstance = useReactFlow();
 
   // Quick dispatch state
   const [dispatchOpen, setDispatchOpen] = useState(false);
@@ -208,10 +271,10 @@ function AgentMapInner({ projectName, agents, tasks, jobs = [], onAssign, onDisp
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState([...initialEdges, ...assignmentEdges]);
 
-  // Sync nodes/edges when data changes (useNodesState only reads initial value on mount)
+  // Sync nodes/edges when data changes — preserve user-dropped workflow nodes
   useEffect(() => {
-    setNodes(initialNodes);
-  }, [initialNodes, setNodes]);
+    setNodes([...initialNodes, ...userWorkflowNodes]);
+  }, [initialNodes, userWorkflowNodes, setNodes]);
 
   useEffect(() => {
     setEdges([...initialEdges, ...assignmentEdges]);
@@ -282,6 +345,155 @@ function AgentMapInner({ projectName, agents, tasks, jobs = [], onAssign, onDisp
     }
   };
 
+  // ─── Drag-and-drop from palette ───
+  const onDragOver = useCallback((event: React.DragEvent) => {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "move";
+  }, []);
+
+  const onDrop = useCallback(
+    (event: React.DragEvent) => {
+      event.preventDefault();
+      const type = event.dataTransfer.getData("application/reactflow-type");
+      const rawData = event.dataTransfer.getData("application/reactflow-data");
+      if (!type || !reactFlowInstance) return;
+
+      const position = reactFlowInstance.screenToFlowPosition({
+        x: event.clientX,
+        y: event.clientY,
+      });
+
+      let data: Record<string, unknown> = {};
+      try {
+        data = JSON.parse(rawData);
+      } catch {
+        data = { label: type };
+      }
+
+      const newNode: Node = {
+        id: getMapNodeId(),
+        type,
+        position,
+        data,
+      };
+
+      setUserWorkflowNodes((prev) => [...prev, newNode]);
+    },
+    [reactFlowInstance]
+  );
+
+  // ─── Context menu handlers ───
+  const isUserNode = useCallback((nodeId: string) => nodeId.startsWith("map_wf_"), []);
+
+  const onPaneContextMenu = useCallback((event: MouseEvent | React.MouseEvent) => {
+    event.preventDefault();
+    setContextMenu({ x: event.clientX, y: event.clientY });
+  }, []);
+
+  const onNodeContextMenu = useCallback((event: React.MouseEvent, node: Node) => {
+    event.preventDefault();
+    setContextMenu({ x: event.clientX, y: event.clientY, nodeId: node.id });
+  }, []);
+
+  const closeContextMenu = useCallback(() => setContextMenu(null), []);
+
+  const handleAddSticky = useCallback((screenX: number, screenY: number) => {
+    if (!reactFlowInstance) return;
+    const position = reactFlowInstance.screenToFlowPosition({ x: screenX, y: screenY });
+    const newNode: Node = {
+      id: getMapNodeId(),
+      type: "mapSticky",
+      position,
+      data: { label: "Note", content: "", color: "yellow", width: 200, height: 120 },
+      style: { width: 200, height: 120 },
+    };
+    setUserWorkflowNodes((prev) => [...prev, newNode]);
+  }, [reactFlowInstance]);
+
+  const handleDeleteNode = useCallback((nodeId: string) => {
+    if (!isUserNode(nodeId)) return;
+    setUserWorkflowNodes((prev) => prev.filter((n) => n.id !== nodeId));
+    setNodes((nds) => nds.filter((n) => n.id !== nodeId));
+  }, [isUserNode, setNodes]);
+
+  const handleDuplicateNode = useCallback((nodeId: string) => {
+    if (!isUserNode(nodeId)) return;
+    const node = nodes.find((n) => n.id === nodeId);
+    if (!node) return;
+    const newNode: Node = {
+      id: getMapNodeId(),
+      type: node.type,
+      position: { x: node.position.x + 40, y: node.position.y + 40 },
+      data: { ...node.data },
+    };
+    setUserWorkflowNodes((prev) => [...prev, newNode]);
+  }, [isUserNode, nodes]);
+
+  const handleToggleDisable = useCallback((nodeId: string) => {
+    setNodes((nds) => nds.map((n) =>
+      n.id === nodeId ? { ...n, data: { ...n.data, disabled: !n.data.disabled } } : n
+    ));
+  }, [setNodes]);
+
+  // ─── Keyboard shortcuts ───
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      if (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable) return;
+
+      // Delete selected user nodes
+      if (e.key === "Delete" || e.key === "Backspace") {
+        const selectedNodes = nodes.filter((n) => n.selected && isUserNode(n.id));
+        if (selectedNodes.length > 0) {
+          e.preventDefault();
+          selectedNodes.forEach((n) => handleDeleteNode(n.id));
+        }
+      }
+
+      // Ctrl+A — select all
+      if (e.key === "a" && (e.ctrlKey || e.metaKey)) {
+        e.preventDefault();
+        setNodes((nds) => nds.map((n) => ({ ...n, selected: true })));
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [nodes, isUserNode, handleDeleteNode, setNodes]);
+
+  // ─── Edge delete event listener ───
+  useEffect(() => {
+    const handleEdgeDelete = (e: Event) => {
+      const { edgeId } = (e as CustomEvent).detail;
+      setEdges((eds) => eds.filter((edge) => edge.id !== edgeId));
+      setAssignmentEdges((prev) => prev.filter((edge) => edge.id !== edgeId));
+    };
+    window.addEventListener("map-edge-delete", handleEdgeDelete);
+    return () => window.removeEventListener("map-edge-delete", handleEdgeDelete);
+  }, [setEdges]);
+
+  // Build context menu actions
+  const contextMenuActions = useMemo(() => {
+    if (!contextMenu) return [];
+    if (contextMenu.nodeId) {
+      return buildNodeMenuActions({
+        onDuplicate: () => handleDuplicateNode(contextMenu.nodeId!),
+        onDelete: () => handleDeleteNode(contextMenu.nodeId!),
+        onToggleDisable: () => handleToggleDisable(contextMenu.nodeId!),
+        onCopy: () => { /* future: clipboard */ },
+        isDisabled: !!nodes.find((n) => n.id === contextMenu.nodeId)?.data?.disabled,
+        isProtected: !isUserNode(contextMenu.nodeId!),
+      });
+    }
+    return buildCanvasMenuActions({
+      onAddSticky: handleAddSticky,
+      onSelectAll: () => setNodes((nds) => nds.map((n) => ({ ...n, selected: true }))),
+      onFitView: () => rfInstance.fitView({ duration: 300 }),
+      menuX: contextMenu.x,
+      menuY: contextMenu.y,
+    });
+  }, [contextMenu, nodes, isUserNode, handleDuplicateNode, handleDeleteNode, handleToggleDisable, handleAddSticky, setNodes, rfInstance]);
+
   const toggleAgent = (id: string) => {
     setSelectedAgentIds((prev) => {
       const next = new Set(prev);
@@ -327,33 +539,107 @@ function AgentMapInner({ projectName, agents, tasks, jobs = [], onAssign, onDisp
 
   return (
     <div className="flex flex-col rounded-lg border border-border overflow-hidden bg-card">
-      <div className="w-full" style={{ height: `${canvasHeight}px` }}>
-        <ReactFlow
-          nodes={nodes}
-          edges={edges}
-          onNodesChange={onNodesChange}
-          onEdgesChange={onEdgesChange}
-          onConnect={onConnect}
-          nodeTypes={nodeTypes}
-          defaultEdgeOptions={{
-            animated: true,
-            style: { stroke: "#10b981", strokeWidth: 3 },
-          }}
-          fitView
-          fitViewOptions={{ maxZoom: 1.5, minZoom: 0.3 }}
-          proOptions={{ hideAttribution: true }}
-          className="bg-muted"
-        >
-          <Background color="#d4d4d4" gap={20} />
-          <Controls />
-          <MiniMap
-            nodeColor={(node) => {
-              if (node.type === "hubNode") return "#f59e0b";
-              if (node.type === "jobNode") return "#10b981";
-              return "#fbbf24";
+      <div className="flex flex-1 min-h-0" style={{ height: `${canvasHeight}px` }}>
+        <div className="flex-1">
+          <ReactFlow
+            nodes={nodes}
+            edges={edges}
+            onNodesChange={onNodesChange}
+            onEdgesChange={onEdgesChange}
+            onConnect={onConnect}
+            onInit={setReactFlowInstance}
+            onDrop={onDrop}
+            onDragOver={onDragOver}
+            onPaneClick={closeContextMenu}
+            onPaneContextMenu={onPaneContextMenu}
+            onNodeContextMenu={onNodeContextMenu}
+            nodeTypes={nodeTypes}
+            edgeTypes={edgeTypes}
+            defaultEdgeOptions={{
+              type: "mapCustomEdge",
+              animated: true,
+              style: { stroke: "#10b981", strokeWidth: 3 },
             }}
-          />
-        </ReactFlow>
+            snapToGrid
+            snapGrid={[20, 20]}
+            fitView
+            fitViewOptions={{ maxZoom: 1.5, minZoom: 0.3 }}
+            proOptions={{ hideAttribution: true }}
+            className="bg-muted"
+          >
+            <Background variant={BackgroundVariant.Dots} color="#d4d4d4" gap={20} size={1.5} />
+            <Controls />
+            <MiniMap
+              nodeColor={(node) => {
+                if (node.type === "hubNode") return "#f59e0b";
+                if (node.type === "jobNode") return "#10b981";
+                if (node.type === "mapSticky") return "#eab308";
+                return "#fbbf24";
+              }}
+            />
+            {/* Canvas toolbar panel */}
+            <Panel position="top-right">
+              <div className="flex items-center gap-1.5 bg-card/90 backdrop-blur border border-border rounded-lg px-2 py-1.5 shadow-sm">
+                <Badge variant="outline" className="text-[10px] font-medium">
+                  {userWorkflowNodes.length} workflow node{userWorkflowNodes.length !== 1 ? "s" : ""}
+                </Badge>
+                <button
+                  onClick={() => rfInstance.fitView({ duration: 300 })}
+                  className="p-1.5 rounded hover:bg-accent transition-colors"
+                  title="Fit View"
+                >
+                  <Maximize className="w-3.5 h-3.5 text-muted-foreground" />
+                </button>
+                {userWorkflowNodes.length > 0 && (
+                  <button
+                    onClick={() => {
+                      setUserWorkflowNodes([]);
+                      setNodes(initialNodes);
+                    }}
+                    className="p-1.5 rounded hover:bg-destructive/10 transition-colors"
+                    title="Clear workflow nodes"
+                  >
+                    <Trash2 className="w-3.5 h-3.5 text-destructive" />
+                  </button>
+                )}
+                <button
+                  onClick={() => {
+                    // Demo: set all workflow nodes to "running" then "success"
+                    userWorkflowNodes.forEach((n) => {
+                      rfInstance.updateNodeData(n.id, { executionState: "running" });
+                    });
+                    setTimeout(() => {
+                      userWorkflowNodes.forEach((n) => {
+                        rfInstance.updateNodeData(n.id, { executionState: "success" });
+                      });
+                      setTimeout(() => {
+                        userWorkflowNodes.forEach((n) => {
+                          rfInstance.updateNodeData(n.id, { executionState: "idle" });
+                        });
+                      }, 2000);
+                    }, 2000);
+                  }}
+                  className="p-1.5 rounded hover:bg-emerald-500/10 transition-colors"
+                  title="Run workflow (demo)"
+                  disabled={userWorkflowNodes.length === 0}
+                >
+                  <Play className="w-3.5 h-3.5 text-emerald-500" />
+                </button>
+              </div>
+            </Panel>
+          </ReactFlow>
+
+          {/* Context menu */}
+          {contextMenu && (
+            <MapContextMenu
+              x={contextMenu.x}
+              y={contextMenu.y}
+              actions={contextMenuActions}
+              onClose={closeContextMenu}
+            />
+          )}
+        </div>
+        {showPalette && <AgentMapPalette agents={agents} />}
       </div>
 
       {/* Assignment Summary Bar */}
@@ -410,6 +696,14 @@ function AgentMapInner({ projectName, agents, tasks, jobs = [], onAssign, onDisp
             {executing
               ? "Executing..."
               : `Execute${assignments.length > 0 ? ` (${assignments.length} jobs)` : ""}`}
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowPalette(!showPalette)}
+            title={showPalette ? "Hide Node Palette" : "Show Node Palette"}
+          >
+            {showPalette ? <PanelRightClose className="w-4 h-4" /> : <PanelRightOpen className="w-4 h-4" />}
           </Button>
         </div>
       </div>
