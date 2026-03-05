@@ -1,7 +1,7 @@
 /** Agent Map Canvas — React Flow graph visualization of agents, hub, and job nodes with connections. */
 "use client";
 
-import { useMemo, useCallback, useState } from "react";
+import { useMemo, useCallback, useState, useEffect } from "react";
 import {
   ReactFlow,
   ReactFlowProvider,
@@ -79,7 +79,7 @@ function AgentMapInner({ projectName, agents, tasks, jobs = [], onAssign, onDisp
   const [selectedAgentIds, setSelectedAgentIds] = useState<Set<string>>(new Set());
   const [dispatching, setDispatching] = useState(false);
 
-  const openJobs = jobs.filter((j) => j.status === "open");
+  const openJobs = useMemo(() => jobs.filter((j) => j.status === "open"), [jobs]);
 
   const { initialNodes, initialEdges } = useMemo(() => {
     const activeTasks = tasks.filter((t) => t.status === "in_progress");
@@ -205,8 +205,17 @@ function AgentMapInner({ projectName, agents, tasks, jobs = [], onAssign, onDisp
     };
   }, [projectName, agents, tasks, openJobs, currencySymbol]);
 
-  const [nodes, , onNodesChange] = useNodesState(initialNodes);
+  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState([...initialEdges, ...assignmentEdges]);
+
+  // Sync nodes/edges when data changes (useNodesState only reads initial value on mount)
+  useEffect(() => {
+    setNodes(initialNodes);
+  }, [initialNodes, setNodes]);
+
+  useEffect(() => {
+    setEdges([...initialEdges, ...assignmentEdges]);
+  }, [initialEdges, setEdges, assignmentEdges]);
 
   // Handle new connections (agent → job assignments)
   const onConnect = useCallback(

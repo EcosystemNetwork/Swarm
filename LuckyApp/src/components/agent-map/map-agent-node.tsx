@@ -67,7 +67,6 @@ export function MapAgentNode({ data }: { data: MapAgentNodeData }) {
       )}
       {/* Right handle for connecting to jobs */}
       <Handle type="source" position={Position.Right} className="!bg-emerald-500 !w-3 !h-3" id="job-source" />
-      <Handle type="source" position={Position.Bottom} className="!bg-amber-600" />
     </div>
   );
 }
