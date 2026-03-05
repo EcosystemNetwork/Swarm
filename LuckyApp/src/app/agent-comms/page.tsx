@@ -4,7 +4,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useOrg } from "@/contexts/OrgContext";
 import { motion } from "motion/react";
-import BlurText from "@/components/reactbits/BlurText";
 import SpotlightCard from "@/components/reactbits/SpotlightCard";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -181,7 +180,6 @@ export default function AgentCommsPage() {
     if (!currentOrg) {
         return (
             <div className="space-y-6">
-                <BlurText text="Agent Comms" className="text-3xl font-bold tracking-tight" delay={80} animateBy="words" />
                 <p className="text-muted-foreground mt-1">No organization selected</p>
             </div>
         );
@@ -189,14 +187,6 @@ export default function AgentCommsPage() {
 
     return (
         <div className="space-y-6">
-            {/* Header */}
-            <div>
-                <BlurText text="Agent Comms" className="text-3xl font-bold tracking-tight" delay={80} animateBy="words" />
-                <p className="text-muted-foreground mt-1">
-                    Live feed of all agent and team communications across channels
-                </p>
-            </div>
-
             {/* Filters */}
             <motion.div
                 initial={{ opacity: 0, y: 12 }}

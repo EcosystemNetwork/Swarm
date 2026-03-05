@@ -39,7 +39,6 @@ import {
 } from "@/lib/swarm-contracts";
 import { ethers } from "ethers";
 import { cn } from "@/lib/utils";
-import BlurText from "@/components/reactbits/BlurText";
 import SpotlightCard from "@/components/reactbits/SpotlightCard";
 import CountUp from "@/components/reactbits/CountUp";
 
@@ -275,54 +274,42 @@ export default function JobBoardPage() {
   if (!currentOrg) {
     return (
       <div className="space-y-6">
-        <div>
-          <BlurText text="Job Board" className="text-3xl font-bold tracking-tight" delay={80} animateBy="words" />
-          <p className="text-muted-foreground mt-1">No organization selected</p>
-        </div>
+        <p className="text-muted-foreground mt-1">No organization selected</p>
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="min-w-0">
-          <BlurText text="Job Board" className="text-3xl font-bold tracking-tight" delay={80} animateBy="words" />
-          <p className="text-muted-foreground mt-1 text-sm">
-            Post and claim jobs for your agent fleet
-          </p>
-        </div>
-        <div className="flex items-center gap-2 shrink-0">
-          {tab === "onchain" && swarm.lastRefresh && (
-            <span className="text-xs text-muted-foreground hidden sm:inline">
-              {swarm.lastRefresh.toLocaleTimeString()}
-            </span>
-          )}
-          {tab === "onchain" && (
-            <>
-              <Button size="sm" variant="outline" onClick={swarm.refetch}>
-                Refresh
-              </Button>
-              <Button
-                size="sm"
-                onClick={() => setOnchainPostOpen(true)}
-                className="bg-emerald-600 hover:bg-emerald-700 text-white"
-              >
-                + Post Onchain Task
-              </Button>
-            </>
-          )}
-          {tab === "org" && (
+      <div className="flex items-center justify-end gap-2">
+        {tab === "onchain" && swarm.lastRefresh && (
+          <span className="text-xs text-muted-foreground hidden sm:inline">
+            {swarm.lastRefresh.toLocaleTimeString()}
+          </span>
+        )}
+        {tab === "onchain" && (
+          <>
+            <Button size="sm" variant="outline" onClick={swarm.refetch}>
+              Refresh
+            </Button>
             <Button
               size="sm"
-              onClick={() => setCreateOpen(true)}
-              className="bg-amber-600 hover:bg-amber-700 text-black"
+              onClick={() => setOnchainPostOpen(true)}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white"
             >
-              + Post Job
+              + Post Onchain Task
             </Button>
-          )}
-        </div>
+          </>
+        )}
+        {tab === "org" && (
+          <Button
+            size="sm"
+            onClick={() => setCreateOpen(true)}
+            className="bg-amber-600 hover:bg-amber-700 text-black"
+          >
+            + Post Job
+          </Button>
+        )}
       </div>
 
       {/* Source Tabs */}

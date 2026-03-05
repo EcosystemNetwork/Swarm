@@ -57,6 +57,7 @@ const CATEGORY_LABELS: Record<string, string> = {
 /* ── Detail field definitions per node type ── */
 
 const NODE_DETAIL_FIELDS: Record<string, Array<{ key: string; label: string }>> = {
+  mapPrompt: [{ key: "prompt", label: "Prompt" }],
   mapTriggerManual: [],
   mapTriggerWebhook: [{ key: "url", label: "Endpoint URL" }],
   mapTriggerSchedule: [{ key: "cron", label: "Cron Expression" }],

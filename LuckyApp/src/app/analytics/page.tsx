@@ -11,7 +11,6 @@ import { useSwarmData } from "@/hooks/useSwarmData";
 import { useChainCurrency } from "@/hooks/useChainCurrency";
 import { TaskStatus } from "@/lib/swarm-contracts";
 import { cn } from "@/lib/utils";
-import BlurText from "@/components/reactbits/BlurText";
 import SpotlightCard from "@/components/reactbits/SpotlightCard";
 
 // ─── Types (previously from mock-data) ───────────────────
@@ -261,17 +260,13 @@ export default function AnalyticsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <BlurText text="Analytics" className="text-3xl font-bold tracking-tight" delay={80} animateBy="words" />
-        <div className="flex items-center gap-2 mt-1">
-          <p className="text-muted-foreground">Live performance from Hedera Testnet</p>
-          {swarm.lastRefresh && (
-            <span className="text-[10px] text-muted-foreground">
-              Updated {swarm.lastRefresh.toLocaleTimeString()}
-            </span>
-          )}
+      {swarm.lastRefresh && (
+        <div className="flex items-center justify-end">
+          <span className="text-[10px] text-muted-foreground">
+            Updated {swarm.lastRefresh.toLocaleTimeString()}
+          </span>
         </div>
-      </div>
+      )}
 
       {/* Loading / Error */}
       {swarm.isLoading ? (

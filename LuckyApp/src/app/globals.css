@@ -136,6 +136,22 @@ body {
   stroke-dasharray: 5 5;
 }
 
+/* Hide default React Flow controls (using custom zoom panel) */
+.react-flow__controls {
+  display: none !important;
+}
+
+/* Ensure all React Flow nodes have an opaque background (not see-through on dot grid) */
+.react-flow__node {
+  background: hsl(var(--card));
+  border-radius: 0.5rem;
+}
+
+/* MiniMap dark mode support */
+.dark .react-flow__minimap {
+  --xy-minimap-background: hsl(var(--card)) !important;
+}
+
 /* ═══════════════════════════════════════════
    N8N-STYLE NODE EXECUTION STATES
    ═══════════════════════════════════════════ */

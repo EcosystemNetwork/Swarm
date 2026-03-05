@@ -4,7 +4,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { useOrg } from "@/contexts/OrgContext";
 import { motion } from "motion/react";
-import BlurText from "@/components/reactbits/BlurText";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import SpotlightCard from "@/components/reactbits/SpotlightCard";
@@ -173,7 +172,6 @@ export default function CalendarPage() {
     if (!currentOrg) {
         return (
             <div className="space-y-6">
-                <BlurText text="Calendar" className="text-3xl font-bold tracking-tight" delay={80} animateBy="words" />
                 <p className="text-muted-foreground mt-1">No organization selected</p>
             </div>
         );
@@ -181,20 +179,13 @@ export default function CalendarPage() {
 
     return (
         <div className="space-y-6">
-            {/* Header */}
-            <div className="flex items-center justify-between">
-                <div>
-                    <BlurText text="Calendar" className="text-3xl font-bold tracking-tight" delay={80} animateBy="words" />
-                    <p className="text-muted-foreground mt-1">Task and job timeline</p>
-                </div>
-                <div className="flex items-center gap-2">
-                    <Button variant="outline" size="sm" onClick={prevMonth}>←</Button>
-                    <span className="text-sm font-semibold min-w-[140px] text-center">
-                        {MONTH_NAMES[viewMonth]} {viewYear}
-                    </span>
-                    <Button variant="outline" size="sm" onClick={nextMonth}>→</Button>
-                    <Button variant="outline" size="sm" onClick={goToday}>Today</Button>
-                </div>
+            <div className="flex items-center justify-end gap-2">
+                <Button variant="outline" size="sm" onClick={prevMonth}>←</Button>
+                <span className="text-sm font-semibold min-w-[140px] text-center">
+                    {MONTH_NAMES[viewMonth]} {viewYear}
+                </span>
+                <Button variant="outline" size="sm" onClick={nextMonth}>→</Button>
+                <Button variant="outline" size="sm" onClick={goToday}>Today</Button>
             </div>
 
             {loading ? (

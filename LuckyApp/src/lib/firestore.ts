@@ -35,6 +35,21 @@ export interface Organization {
   telegram?: string;
   members: string[];
   createdAt: unknown;
+  // GitHub App integration
+  githubInstallationId?: number;
+  githubAccountLogin?: string;
+  githubAccountType?: 'Organization' | 'User';
+  githubAccountAvatarUrl?: string;
+  githubConnectedAt?: unknown;
+}
+
+export interface GitHubRepoLink {
+  repoId: number;
+  owner: string;
+  name: string;
+  fullName: string;
+  defaultBranch: string;
+  linkedAt: number;
 }
 
 export interface Project {
@@ -45,6 +60,7 @@ export interface Project {
   status: 'active' | 'paused' | 'completed';
   agentIds: string[];
   createdAt: unknown;
+  githubRepos?: GitHubRepoLink[];
 }
 
 export interface Agent {
@@ -595,4 +611,67 @@ export async function getOrgStats(orgId: string) {
     claimedJobs: jobs.filter(j => j.status === 'claimed').length,
     closedJobs: jobs.filter(j => j.status === 'closed').length,
   };
+}
+
+// ─── GitHub Events ──────────────────────────────────────
+
+export interface GitHubEvent {
+  id: string;
+  orgId: string;
+  projectId?: string;
+  eventType: string;
+  action?: string;
+  repoFullName: string;
+  title: string;
+  actor: string;
+  actorAvatarUrl?: string;
+  payload: Record<string, unknown>;
+  githubUrl?: string;
+  createdAt: unknown;
+}
+
+export async function createGitHubEvent(data: Omit<GitHubEvent, "id">): Promise<string> {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { createdAt: _ca, ...rest } = data;
+  const ref = await addDoc(collection(db, "githubEvents"), {
+    ...rest,
+    createdAt: serverTimestamp(),
+  });
+  return ref.id;
+}
+
+export function onGitHubEventsByOrg(
+  orgId: string,
+  callback: (events: GitHubEvent[]) => void,
+  limitCount = 50
+): Unsubscribe {
+  const q = query(
+    collection(db, "githubEvents"),
+    where("orgId", "==", orgId),
+    orderBy("createdAt", "desc"),
+  );
+  return onSnapshot(q, (snap) => {
+    const events = snap.docs
+      .slice(0, limitCount)
+      .map(d => ({ id: d.id, ...d.data() } as GitHubEvent));
+    callback(events);
+  });
+}
+
+export function onGitHubEventsByProject(
+  projectId: string,
+  callback: (events: GitHubEvent[]) => void,
+  limitCount = 50
+): Unsubscribe {
+  const q = query(
+    collection(db, "githubEvents"),
+    where("projectId", "==", projectId),
+    orderBy("createdAt", "desc"),
+  );
+  return onSnapshot(q, (snap) => {
+    const events = snap.docs
+      .slice(0, limitCount)
+      .map(d => ({ id: d.id, ...d.data() } as GitHubEvent));
+    callback(events);
+  });
 }

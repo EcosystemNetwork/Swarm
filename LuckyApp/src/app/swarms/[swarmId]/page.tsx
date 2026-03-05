@@ -9,6 +9,9 @@ import dynamic from "next/dynamic";
 import Link from "next/link";
 
 const AgentMap = dynamic(() => import("@/components/agent-map/agent-map"), { ssr: false });
+import { GitHubIcon } from "@/components/github/github-icon";
+import { GitHubPanel } from "@/components/github/github-panel";
+import { RepoSelector } from "@/components/github/repo-selector";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -700,6 +703,15 @@ export default function ProjectDetailPage() {
           <TabsTrigger value="map">🗺️ Agent Map</TabsTrigger>
           <TabsTrigger value="comms">📡 Agent Comms</TabsTrigger>
           <TabsTrigger value="channel">💬 Project Channel</TabsTrigger>
+          <TabsTrigger value="github" className="flex items-center gap-1">
+            <GitHubIcon className="w-3.5 h-3.5" />
+            GitHub
+            {project?.githubRepos && project.githubRepos.length > 0 && (
+              <span className="ml-1 text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-400">
+                {project.githubRepos.length}
+              </span>
+            )}
+          </TabsTrigger>
         </TabsList>
 
         {/* Agents Tab */}
@@ -1340,6 +1352,32 @@ export default function ProjectDetailPage() {
               </CardContent>
             </Card>
           </div>
+        </TabsContent>
+
+        {/* GitHub Tab */}
+        <TabsContent value="github" className="space-y-4">
+          {!currentOrg?.githubInstallationId ? (
+            <div className="text-center py-12 text-muted-foreground">
+              <div className="text-4xl mb-3">🔗</div>
+              <p className="mb-2">GitHub not connected</p>
+              <p className="text-sm mb-4">Connect GitHub in Settings to link repos to this project</p>
+              <Button variant="outline" asChild>
+                <Link href="/settings">Go to Settings</Link>
+              </Button>
+            </div>
+          ) : !project?.githubRepos?.length ? (
+            <RepoSelector
+              projectId={projectId}
+              existingRepos={[]}
+              onLinked={loadProjectData}
+            />
+          ) : (
+            <GitHubPanel
+              project={project}
+              orgId={currentOrg.id}
+              onRefresh={loadProjectData}
+            />
+          )}
         </TabsContent>
       </Tabs>
 

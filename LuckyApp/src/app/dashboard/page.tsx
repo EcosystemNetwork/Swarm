@@ -12,8 +12,6 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { StatCard } from "@/components/analytics/stat-card";
 import { useOrg } from "@/contexts/OrgContext";
-import BlurText from "@/components/reactbits/BlurText";
-import GradientText from "@/components/reactbits/GradientText";
 import SpotlightCard from "@/components/reactbits/SpotlightCard";
 import ShinyText from "@/components/reactbits/ShinyText";
 import DecryptedText from "@/components/reactbits/DecryptedText";
@@ -237,6 +235,7 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [dispatching, setDispatching] = useState(false);
+  const [dashTab, setDashTab] = useState("overview");
 
   // Active widget sets (which widgets are visible)
   const [activeStatIds, setActiveStatIds] = useState<string[]>(DEFAULT_ACTIVE_STATS);
@@ -977,22 +976,8 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div className="min-w-0">
-          <BlurText
-            text="Dashboard"
-            className="text-3xl font-bold tracking-tight"
-            delay={80}
-            animateBy="words"
-          />
-          <p className="text-muted-foreground mt-1 truncate">
-            <GradientText colors={['#FFD700', '#FFA500', '#FF8C00']} animationSpeed={6} className="text-base font-medium">
-              {currentOrg.name}
-            </GradientText>
-            <span className="ml-1">operations overview</span>
-          </p>
-        </div>
-        <div className="flex gap-2 shrink-0">
+      {dashTab === "overview" && (
+        <div className="flex items-center justify-end gap-2">
           {isCustomized && (
             <Button variant="ghost" size="sm" onClick={resetLayout} className="text-muted-foreground hover:text-foreground gap-1.5">
               <RotateCcw className="w-3.5 h-3.5" />
@@ -1010,9 +995,9 @@ export default function DashboardPage() {
             <Link href="/agents">Register Agent</Link>
           </Button>
         </div>
-      </div>
+      )}
 
-      <Tabs defaultValue="overview">
+      <Tabs value={dashTab} onValueChange={setDashTab}>
         <TabsList>
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="swarm">Agent Map</TabsTrigger>
