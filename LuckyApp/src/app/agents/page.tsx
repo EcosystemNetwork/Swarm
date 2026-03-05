@@ -12,12 +12,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useOrg } from "@/contexts/OrgContext";
 import { useActiveAccount } from "thirdweb/react";
-import { createAgent, updateAgent, deleteAgent, type Agent } from "@/lib/firestore";
+import { createAgent, updateAgent, deleteAgent, getTasksByOrg, getJobsByOrg, type Agent, type Task, type Job } from "@/lib/firestore";
 import { collection, query, where, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useSwarmWrite } from "@/hooks/useSwarmWrite";
 import { useSwarmData } from "@/hooks/useSwarmData";
 import { shortAddr } from "@/lib/swarm-contracts";
+import { SKILL_REGISTRY, getInstalledSkills } from "@/lib/skills";
 import BlurText from "@/components/reactbits/BlurText";
 import SpotlightCard from "@/components/reactbits/SpotlightCard";
 
@@ -161,6 +162,9 @@ export default function AgentsPage() {
   const [ocAgentSkills, setOcAgentSkills] = useState("");
   const [ocAgentFeeRate, setOcAgentFeeRate] = useState("500");
   const [agents, setAgents] = useState<Agent[]>([]);
+  const [allTasks, setAllTasks] = useState<Task[]>([]);
+  const [allJobs, setAllJobs] = useState<Job[]>([]);
+  const [installedSkillCount, setInstalledSkillCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -307,6 +311,20 @@ export default function AgentsPage() {
     return () => unsubscribe();
   }, [currentOrg]);
 
+  // Load tasks, jobs, and installed skills for card stats
+  useEffect(() => {
+    if (!currentOrg) return;
+    Promise.all([
+      getTasksByOrg(currentOrg.id),
+      getJobsByOrg(currentOrg.id),
+      getInstalledSkills(currentOrg.id),
+    ]).then(([tasks, jobs, skills]) => {
+      setAllTasks(tasks);
+      setAllJobs(jobs);
+      setInstalledSkillCount(skills.filter(s => s.enabled).length);
+    }).catch(() => {});
+  }, [currentOrg]);
+
   const handleRegisterAgent = async () => {
     if (!currentOrg || !agentName.trim()) return;
 
@@ -436,6 +454,30 @@ export default function AgentsPage() {
         </div>
       )}
 
+      {/* Fleet summary */}
+      {!loading && agents.length > 0 && (
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+          {[
+            { label: "Total Agents", value: agents.length, icon: "🤖" },
+            { label: "Online", value: agents.filter(a => a.status === 'online').length, icon: "🟢" },
+            { label: "Busy", value: agents.filter(a => a.status === 'busy').length, icon: "🟡" },
+            { label: "Offline", value: agents.filter(a => a.status === 'offline').length, icon: "🔴" },
+            { label: "Skills", value: installedSkillCount, sub: `of ${SKILL_REGISTRY.length}`, icon: "🧩" },
+          ].map(s => (
+            <Card key={s.label} className="border-border">
+              <CardContent className="p-3">
+                <div className="flex items-center gap-1.5 mb-1">
+                  <span className="text-xs">{s.icon}</span>
+                  <p className="text-[11px] text-muted-foreground">{s.label}</p>
+                </div>
+                <p className="text-lg font-bold">{s.value}</p>
+                {'sub' in s && s.sub && <p className="text-[10px] text-muted-foreground">{s.sub}</p>}
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+
       {loading ? (
         <div className="text-center py-12 text-muted-foreground">
           <p>Loading agents...</p>
@@ -489,18 +531,47 @@ export default function AgentsPage() {
                 </CardHeader>
                 <CardContent>
                   <CardDescription className="mb-3 line-clamp-2">{agent.description}</CardDescription>
-                  <div className="grid grid-cols-2 gap-3 pt-3 border-t border-border">
-                    <div>
-                      <div className="text-xs text-muted-foreground">Projects</div>
-                      <div className="text-lg font-bold text-amber-600 dark:text-amber-400">
-                        {(agent.projectIds ?? []).length}
+                  {/* Capabilities badges */}
+                  {(agent.capabilities ?? []).length > 0 && (
+                    <div className="flex flex-wrap gap-1 mb-3">
+                      {(agent.capabilities ?? []).slice(0, 3).map((cap, i) => (
+                        <Badge key={i} variant="secondary" className="text-[10px] px-1.5 py-0">
+                          {cap.length > 25 ? cap.substring(0, 25) + '…' : cap}
+                        </Badge>
+                      ))}
+                      {(agent.capabilities ?? []).length > 3 && (
+                        <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                          +{(agent.capabilities ?? []).length - 3}
+                        </Badge>
+                      )}
+                    </div>
+                  )}
+                  {(() => {
+                    const agentTaskList = allTasks.filter(t => t.assigneeAgentId === agent.id);
+                    const doneTasks = agentTaskList.filter(t => t.status === 'done').length;
+                    const agentJobList = allJobs.filter(j => j.takenByAgentId === agent.id);
+                    const rate = agentTaskList.length > 0 ? Math.round((doneTasks / agentTaskList.length) * 100) : 0;
+                    return (
+                      <div className="grid grid-cols-4 gap-2 pt-3 border-t border-border text-center">
+                        <div>
+                          <div className="text-sm font-bold text-amber-600 dark:text-amber-400">{(agent.projectIds ?? []).length}</div>
+                          <div className="text-[10px] text-muted-foreground">Projects</div>
+                        </div>
+                        <div>
+                          <div className="text-sm font-bold">{agentTaskList.length}</div>
+                          <div className="text-[10px] text-muted-foreground">Tasks</div>
+                        </div>
+                        <div>
+                          <div className="text-sm font-bold">{agentJobList.length}</div>
+                          <div className="text-[10px] text-muted-foreground">Jobs</div>
+                        </div>
+                        <div>
+                          <div className="text-sm font-bold text-emerald-600 dark:text-emerald-400">{rate}%</div>
+                          <div className="text-[10px] text-muted-foreground">Done</div>
+                        </div>
                       </div>
-                    </div>
-                    <div>
-                      <div className="text-xs text-muted-foreground">Capabilities</div>
-                      <div className="text-lg font-bold text-foreground">{(agent.capabilities ?? []).length}</div>
-                    </div>
-                  </div>
+                    );
+                  })()}
                   <div className="flex flex-wrap gap-2 mt-3">
                     <Button
                       variant="outline"

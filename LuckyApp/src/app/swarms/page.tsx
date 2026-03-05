@@ -22,6 +22,7 @@ import {
   type Task,
   type Job,
 } from "@/lib/firestore";
+import { useChainCurrency } from "@/hooks/useChainCurrency";
 import BlurText from "@/components/reactbits/BlurText";
 import SpotlightCard from "@/components/reactbits/SpotlightCard";
 
@@ -43,6 +44,7 @@ interface ProjectWithStats extends Project {
 export default function ProjectsPage() {
   const [showCreate, setShowCreate] = useState(false);
   const { currentOrg } = useOrg();
+  const { symbol: currencySymbol, fmt: fmtCurrency } = useChainCurrency();
   const [projects, setProjects] = useState<ProjectWithStats[]>([]);
   const [agents, setAgents] = useState<Agent[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -223,7 +225,7 @@ export default function ProjectsPage() {
               { label: "Projects", value: projects.length, icon: "📁" },
               { label: "Total Tasks", value: orgTotals.tasks, sub: `${orgTotals.done} done`, icon: "🎯" },
               { label: "Total Jobs", value: orgTotals.jobs, icon: "💼" },
-              { label: "Total Budget", value: `${orgTotals.budget.toLocaleString(undefined, { maximumFractionDigits: 2 })} HBAR`, icon: "💰" },
+              { label: "Total Budget", value: fmtCurrency(orgTotals.budget, 2), icon: "💰" },
             ].map((s) => (
               <Card key={s.label} className="border-border">
                 <CardContent className="p-3">
@@ -292,7 +294,7 @@ export default function ProjectsPage() {
                       </div>
                       <div>
                         <p className="text-sm font-bold text-amber-600 dark:text-amber-400">{project.totalBudget > 0 ? project.totalBudget.toLocaleString(undefined, { maximumFractionDigits: 0 }) : '—'}</p>
-                        <p className="text-[10px] text-muted-foreground">HBAR</p>
+                        <p className="text-[10px] text-muted-foreground">{currencySymbol}</p>
                       </div>
                     </div>
 

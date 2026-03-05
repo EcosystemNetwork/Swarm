@@ -18,6 +18,7 @@ interface MapJobNodeData {
   status: string;
   requiredSkills: string[];
   assignedAgent?: string;
+  currencySymbol?: string;
   [key: string]: unknown;
 }
 
@@ -27,7 +28,7 @@ export function MapJobNode({ data }: { data: MapJobNodeData }) {
 
   return (
     <div
-      className={`rounded-lg border-2 bg-card px-4 py-3 shadow-lg min-w-[200px] transition-all ${
+      className={`rounded-lg border-2 bg-card px-3 py-2.5 shadow-lg min-w-[180px] transition-all ${
         isAssigned
           ? "border-amber-500 animate-glow-pulse"
           : isOpen
@@ -38,7 +39,7 @@ export function MapJobNode({ data }: { data: MapJobNodeData }) {
       <Handle type="target" position={Position.Left} className="!bg-emerald-500 !w-3 !h-3" />
 
       <div className="flex items-center justify-between mb-1">
-        <span className="text-sm font-semibold text-foreground truncate flex-1">
+        <span className="text-xs font-semibold text-foreground truncate flex-1">
           💼 {data.jobTitle}
         </span>
         <Badge variant="outline" className={`text-[10px] ml-2 shrink-0 ${PRIORITY_COLORS[data.priority] || ""}`}>
@@ -49,7 +50,7 @@ export function MapJobNode({ data }: { data: MapJobNodeData }) {
       {data.reward && (
         <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-amber-500/10 border border-amber-500/20 w-fit mb-2">
           <span className="text-sm font-bold text-amber-500">{data.reward}</span>
-          <span className="text-[10px] text-amber-500/70">HBAR</span>
+          <span className="text-[10px] text-amber-500/70">{data.currencySymbol || "$"}</span>
         </div>
       )}
 

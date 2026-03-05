@@ -8,6 +8,7 @@ import { StatCard } from "@/components/analytics/stat-card";
 import { PerformanceTable, PnlDisplay, WinRateBar } from "@/components/analytics/performance-table";
 import { Leaderboard } from "@/components/leaderboard";
 import { useSwarmData } from "@/hooks/useSwarmData";
+import { useChainCurrency } from "@/hooks/useChainCurrency";
 import { TaskStatus } from "@/lib/swarm-contracts";
 import { cn } from "@/lib/utils";
 import BlurText from "@/components/reactbits/BlurText";
@@ -62,6 +63,7 @@ interface OverviewStats {
 
 export default function AnalyticsPage() {
   const swarm = useSwarmData();
+  const { symbol: currencySymbol, fmt: fmtCurrency } = useChainCurrency();
 
   // ── Compute live data from on-chain ──
 
@@ -160,10 +162,10 @@ export default function AnalyticsPage() {
     },
     {
       key: "pnl",
-      label: "HBAR Value",
+      label: `${currencySymbol} Value`,
       sortable: true,
       getValue: (a: AgentPerformance) => a.pnl,
-      render: (a: AgentPerformance) => <PnlDisplay value={a.pnl} currency="HBAR" />,
+      render: (a: AgentPerformance) => <PnlDisplay value={a.pnl} currency={currencySymbol} />,
     },
     {
       key: "tasks",
@@ -193,7 +195,7 @@ export default function AnalyticsPage() {
         );
       },
     },
-  ], []);
+  ], [currencySymbol]);
 
   const swarmColumns = useMemo(() => [
     {
@@ -216,7 +218,7 @@ export default function AnalyticsPage() {
       label: "Total P&L",
       sortable: true,
       getValue: (s: SwarmPerformance) => s.totalPnl,
-      render: (s: SwarmPerformance) => <PnlDisplay value={s.totalPnl} currency="HBAR" />,
+      render: (s: SwarmPerformance) => <PnlDisplay value={s.totalPnl} currency={currencySymbol} />,
     },
     {
       key: "winRate",
@@ -249,11 +251,11 @@ export default function AnalyticsPage() {
         <span className="text-sm">{s.agentCount} 🤖</span>
       ),
     },
-  ], []);
+  ], [currencySymbol]);
 
   // ── Format P&L value ──
 
-  const pnlValue = `${stats.totalPnl.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} HBAR`;
+  const pnlValue = fmtCurrency(stats.totalPnl, 2);
 
   // ── Render ──
 
@@ -288,7 +290,7 @@ export default function AnalyticsPage() {
           {/* Overview Stats */}
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             <StatCard
-              title="Treasury HBAR"
+              title={`Treasury ${currencySymbol}`}
               value={pnlValue}
               icon="💰"
             />
@@ -329,7 +331,7 @@ export default function AnalyticsPage() {
                 </CardContent>
               </SpotlightCard>
             </div>
-            <Leaderboard agents={agentPerfData} currency="HBAR" />
+            <Leaderboard agents={agentPerfData} currency={currencySymbol} />
           </div>
 
           {/* Treasury Performance */}
@@ -383,7 +385,7 @@ export default function AnalyticsPage() {
                         <span className="text-muted-foreground">Balance</span>
                         <span className={cn("font-semibold", m.totalPnl >= 0 ? "text-amber-600 dark:text-amber-400" : "text-red-500")}>
                           {m.totalPnl >= 0 ? "+" : "-"}
-                          {Math.abs(m.totalPnl).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} HBAR
+                          {fmtCurrency(Math.abs(m.totalPnl), 2)}
                         </span>
                       </div>
                       {m.winRate > 0 && (

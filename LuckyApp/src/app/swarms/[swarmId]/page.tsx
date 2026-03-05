@@ -4,6 +4,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useActiveAccount } from "thirdweb/react";
+import { useChainCurrency } from "@/hooks/useChainCurrency";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 
@@ -69,6 +70,7 @@ export default function ProjectDetailPage() {
   const projectId = params.swarmId as string;
   const { currentOrg } = useOrg();
   const account = useActiveAccount();
+  const { symbol: currencySymbol, fmt: fmtCurrency } = useChainCurrency();
 
   const [project, setProject] = useState<Project | null>(null);
   const [assignedAgents, setAssignedAgents] = useState<Agent[]>([]);
@@ -384,9 +386,9 @@ export default function ProjectDetailPage() {
             await sendMessage({
               channelId: channel.id,
               senderId: "system",
-              senderName: "Swarm",
+              senderName: "System",
               senderType: "system" as any,
-              content: `📋 **Swarm Assignment**\nJob: "${jobTitle}"\nAssigned to: @${agentName}\n\nExecuted via Agent Map workflow.`,
+              content: `📋 **Agent Assignment**\nJob: "${jobTitle}"\nAssigned to: @${agentName}\n\nExecuted via Agent Map workflow.`,
               orgId: currentOrg.id,
               createdAt: new Date(),
             });
@@ -436,11 +438,11 @@ export default function ProjectDetailPage() {
         await addDoc(collection(db, "agentComms"), {
           orgId: currentOrg.id,
           fromAgentId: "system",
-          fromAgentName: "Swarm Dispatch",
+          fromAgentName: "Agent Dispatch",
           toAgentId: agentIds.join(","),
           toAgentName: agentNames.join(", "),
           type: "handoff",
-          content: `🚀 **Job Dispatched**\n\n**Prompt:** ${prompt}\n\n**Assigned Agents:** ${agentNames.map(n => `@${n}`).join(", ")}\n**Priority:** ${priority}${reward ? `\n**Reward:** ${reward} HBAR` : ""}\n\nCoordinate as a team to complete this task.`,
+          content: `🚀 **Job Dispatched**\n\n**Prompt:** ${prompt}\n\n**Assigned Agents:** ${agentNames.map(n => `@${n}`).join(", ")}\n**Priority:** ${priority}${reward ? `\n**Reward:** ${reward} ${currencySymbol}` : ""}\n\nCoordinate as a team to complete this task.`,
           metadata: { jobId, projectId, priority, reward, agentIds },
           createdAt: serverTimestamp(),
         });
@@ -452,9 +454,9 @@ export default function ProjectDetailPage() {
           await sendMessage({
             channelId: channel.id,
             senderId: "system",
-            senderName: "Swarm Dispatch",
+            senderName: "Agent Dispatch",
             senderType: "system" as any,
-            content: `🚀 **New Job Dispatched via Agent Map**\n\n${prompt}\n\n**Team:** ${agentNames.map(n => `@${n}`).join(", ")}\n**Priority:** ${priority}${reward ? ` · **Reward:** ${reward} HBAR` : ""}`,
+            content: `🚀 **New Job Dispatched via Agent Map**\n\n${prompt}\n\n**Team:** ${agentNames.map(n => `@${n}`).join(", ")}\n**Priority:** ${priority}${reward ? ` · **Reward:** ${reward} ${currencySymbol}` : ""}`,
             orgId: currentOrg.id,
             createdAt: new Date(),
           });
@@ -672,7 +674,7 @@ export default function ProjectDetailPage() {
                         <p className="text-[11px] text-muted-foreground">{stat.label}</p>
                       </div>
                       <p className={`text-lg font-bold ${stat.color}`}>
-                        {stat.value.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} <span className="text-xs font-normal text-muted-foreground">HBAR</span>
+                        {stat.value.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} <span className="text-xs font-normal text-muted-foreground">{currencySymbol}</span>
                       </p>
                     </CardContent>
                   </Card>
@@ -874,7 +876,7 @@ export default function ProjectDetailPage() {
                     {job.reward && (
                       <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-amber-500/10 border border-amber-500/20 w-fit">
                         <span className="text-sm font-bold text-amber-500">{job.reward}</span>
-                        <span className="text-[10px] text-amber-500/70">HBAR</span>
+                        <span className="text-[10px] text-amber-500/70">{currencySymbol}</span>
                       </div>
                     )}
                     {job.requiredSkills && job.requiredSkills.length > 0 && (
@@ -1019,6 +1021,7 @@ export default function ProjectDetailPage() {
               onAssign={handleBatchAssign}
               onDispatch={handleDispatch}
               executing={batchAssigning}
+              currencySymbol={currencySymbol}
             />
           </div>
         </TabsContent>

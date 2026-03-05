@@ -63,11 +63,12 @@ interface AgentMapProps {
   onAssign?: (assignments: { jobId: string; agentId: string; jobTitle: string; agentName: string }[]) => Promise<void>;
   onDispatch?: (payload: DispatchPayload) => Promise<void>;
   executing?: boolean;
+  currencySymbol?: string;
 }
 
 const nodeTypes = { agentNode: MapAgentNode, hubNode: MapHubNode, jobNode: MapJobNode };
 
-function AgentMapInner({ projectName, agents, tasks, jobs = [], onAssign, onDispatch, executing = false }: AgentMapProps) {
+function AgentMapInner({ projectName, agents, tasks, jobs = [], onAssign, onDispatch, executing = false, currencySymbol = "$" }: AgentMapProps) {
   const [assignmentEdges, setAssignmentEdges] = useState<Edge[]>([]);
 
   // Quick dispatch state
@@ -84,11 +85,15 @@ function AgentMapInner({ projectName, agents, tasks, jobs = [], onAssign, onDisp
     const activeTasks = tasks.filter((t) => t.status === "in_progress");
     const doneTasks = tasks.filter((t) => t.status === "done");
 
-    // Hub node in the center
+    // Dynamic hub position — center vertically based on node count
+    const maxCount = Math.max(agents.length, openJobs.length, 1);
+    const hubX = 400;
+    const hubY = Math.max(250, 80 + maxCount * 50);
+
     const hubNode: Node = {
       id: "hub",
       type: "hubNode",
-      position: { x: 300, y: 200 },
+      position: { x: hubX - 110, y: hubY - 50 },
       data: {
         label: "Hub",
         projectName,
@@ -99,14 +104,29 @@ function AgentMapInner({ projectName, agents, tasks, jobs = [], onAssign, onDisp
       },
     };
 
-    // Agent nodes on the left
+    // Agent nodes — left semi-arc around hub
+    const agentRadius = Math.max(280, agents.length * 45);
     const agentNodes: Node[] = agents.map((agent, i) => {
       const agentTasks = tasks.filter((t) => t.assigneeAgentId === agent.id);
       const agentActive = agentTasks.filter((t) => t.status === "in_progress");
+
+      let posX: number, posY: number;
+      if (agents.length === 1) {
+        posX = hubX - 320;
+        posY = hubY - 50;
+      } else {
+        const angleRange = Math.PI * 0.8;
+        const startAngle = -angleRange / 2;
+        const angleStep = angleRange / (agents.length - 1);
+        const angle = startAngle + i * angleStep;
+        posX = hubX - agentRadius * Math.cos(angle) - 180;
+        posY = hubY + agentRadius * Math.sin(angle) - 50;
+      }
+
       return {
         id: agent.id,
         type: "agentNode",
-        position: { x: 20, y: 20 + i * 160 },
+        position: { x: posX, y: posY },
         data: {
           label: agent.name,
           agentName: agent.name,
@@ -117,35 +137,60 @@ function AgentMapInner({ projectName, agents, tasks, jobs = [], onAssign, onDisp
           costEstimate: `$${(agent.costPerRun ?? 1.5).toFixed(2)}`,
           activeJobName: agent.activeJobName,
           assignedCost: agent.assignedCost ?? 0,
+          currencySymbol,
         },
       };
     });
 
-    // Job nodes on the right
-    const jobNodes: Node[] = openJobs.map((job, i) => ({
-      id: `job-${job.id}`,
-      type: "jobNode",
-      position: { x: 620, y: 20 + i * 140 },
-      data: {
-        label: job.title,
-        jobTitle: job.title,
-        priority: job.priority,
-        reward: job.reward || "",
-        status: job.status,
-        requiredSkills: job.requiredSkills ?? [],
-      },
-    }));
+    // Job nodes — right semi-arc around hub
+    const jobRadius = Math.max(280, openJobs.length * 45);
+    const jobNodes: Node[] = openJobs.map((job, i) => {
+      let posX: number, posY: number;
+      if (openJobs.length === 1) {
+        posX = hubX + 320;
+        posY = hubY - 50;
+      } else {
+        const angleRange = Math.PI * 0.8;
+        const startAngle = -angleRange / 2;
+        const angleStep = angleRange / (openJobs.length - 1);
+        const angle = startAngle + i * angleStep;
+        posX = hubX + jobRadius * Math.cos(angle);
+        posY = hubY + jobRadius * Math.sin(angle) - 50;
+      }
 
-    // Hub → agent edges
+      return {
+        id: `job-${job.id}`,
+        type: "jobNode",
+        position: { x: posX, y: posY },
+        data: {
+          label: job.title,
+          jobTitle: job.title,
+          priority: job.priority,
+          reward: job.reward || "",
+          status: job.status,
+          requiredSkills: job.requiredSkills ?? [],
+          currencySymbol,
+        },
+      };
+    });
+
+    // Hub → agent edges with labels
     const hubEdges: Edge[] = agents.map((agent) => {
       const agentTasks = tasks.filter((t) => t.assigneeAgentId === agent.id);
       const hasActive = agentTasks.some((t) => t.status === "in_progress");
       const allDone = agentTasks.length > 0 && agentTasks.every((t) => t.status === "done");
+      const activeCount = agentTasks.filter((t) => t.status === "in_progress").length;
       return {
         id: `hub-${agent.id}`,
         source: "hub",
+        sourceHandle: "left",
         target: agent.id,
         animated: hasActive,
+        label: activeCount > 0 ? `${activeCount} active` : undefined,
+        labelStyle: { fontSize: 10, fill: "#d97706", fontWeight: 600 },
+        labelBgStyle: { fill: "rgba(0,0,0,0.6)", fillOpacity: 0.8 },
+        labelBgPadding: [4, 2] as [number, number],
+        labelBgBorderRadius: 4,
         style: {
           stroke: "#d97706",
           strokeWidth: 2,
@@ -158,7 +203,7 @@ function AgentMapInner({ projectName, agents, tasks, jobs = [], onAssign, onDisp
       initialNodes: [hubNode, ...agentNodes, ...jobNodes],
       initialEdges: hubEdges,
     };
-  }, [projectName, agents, tasks, openJobs]);
+  }, [projectName, agents, tasks, openJobs, currencySymbol]);
 
   const [nodes, , onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState([...initialEdges, ...assignmentEdges]);
@@ -268,9 +313,12 @@ function AgentMapInner({ projectName, agents, tasks, jobs = [], onAssign, onDisp
     }
   };
 
+  const maxNodes = Math.max(agents.length, openJobs.length);
+  const canvasHeight = Math.max(500, Math.min(900, 300 + maxNodes * 80));
+
   return (
     <div className="flex flex-col rounded-lg border border-border overflow-hidden bg-card">
-      <div className="h-[500px] w-full">
+      <div className="w-full" style={{ height: `${canvasHeight}px` }}>
         <ReactFlow
           nodes={nodes}
           edges={edges}
@@ -283,6 +331,7 @@ function AgentMapInner({ projectName, agents, tasks, jobs = [], onAssign, onDisp
             style: { stroke: "#10b981", strokeWidth: 3 },
           }}
           fitView
+          fitViewOptions={{ maxZoom: 1.5, minZoom: 0.3 }}
           proOptions={{ hideAttribution: true }}
           className="bg-muted"
         >
@@ -309,7 +358,7 @@ function AgentMapInner({ projectName, agents, tasks, jobs = [], onAssign, onDisp
             <div className="text-sm">
               <span className="text-muted-foreground">Total Cost: </span>
               <span className="font-bold text-amber-600 dark:text-amber-400">
-                {totalCost.toLocaleString()} HBAR
+                {totalCost.toLocaleString()} {currencySymbol}
               </span>
             </div>
           )}
@@ -351,7 +400,7 @@ function AgentMapInner({ projectName, agents, tasks, jobs = [], onAssign, onDisp
           >
             {executing
               ? "Executing..."
-              : `Execute Swarm${assignments.length > 0 ? ` (${assignments.length} jobs)` : ""}`}
+              : `Execute${assignments.length > 0 ? ` (${assignments.length} jobs)` : ""}`}
           </Button>
         </div>
       </div>
@@ -412,7 +461,7 @@ function AgentMapInner({ projectName, agents, tasks, jobs = [], onAssign, onDisp
               </div>
 
               <div className="w-40">
-                <label className="text-xs font-medium text-muted-foreground mb-1 block">Reward (HBAR)</label>
+                <label className="text-xs font-medium text-muted-foreground mb-1 block">Reward ({currencySymbol})</label>
                 <input
                   type="text"
                   value={dispatchReward}

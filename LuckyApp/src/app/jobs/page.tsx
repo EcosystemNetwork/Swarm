@@ -26,6 +26,7 @@ import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useSwarmData } from "@/hooks/useSwarmData";
 import { useSwarmWrite } from "@/hooks/useSwarmWrite";
+import { useChainCurrency } from "@/hooks/useChainCurrency";
 import {
   TaskStatus,
   STATUS_CONFIG,
@@ -96,6 +97,7 @@ export default function JobBoardPage() {
   // ── Onchain state (Hedera) ──
   const swarm = useSwarmData();
   const swarmWrite = useSwarmWrite();
+  const { symbol: currencySymbol, fmt: fmtCurrency, isHedera } = useChainCurrency();
   const [selectedOnchainTask, setSelectedOnchainTask] = useState<TaskListing | null>(null);
   const [onchainDetailOpen, setOnchainDetailOpen] = useState(false);
   const [onchainPostOpen, setOnchainPostOpen] = useState(false);
@@ -385,13 +387,13 @@ export default function JobBoardPage() {
               return totalBudget > 0 ? (
                 <div className="flex gap-4 mb-4 text-xs">
                   <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-muted/50 border">
-                    <span>💰</span><span className="font-medium">Total: {totalBudget} HBAR</span>
+                    <span>💰</span><span className="font-medium">Total: {fmtCurrency(totalBudget)}</span>
                   </div>
                   {activeBudget > 0 && <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/20">
-                    <span>🔄</span><span className="font-medium text-amber-600 dark:text-amber-400">Active: {activeBudget} HBAR</span>
+                    <span>🔄</span><span className="font-medium text-amber-600 dark:text-amber-400">Active: {fmtCurrency(activeBudget)}</span>
                   </div>}
                   {spentBudget > 0 && <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20">
-                    <span>✅</span><span className="font-medium text-emerald-600 dark:text-emerald-400">Spent: {spentBudget} HBAR</span>
+                    <span>✅</span><span className="font-medium text-emerald-600 dark:text-emerald-400">Spent: {fmtCurrency(spentBudget)}</span>
                   </div>}
                 </div>
               ) : null;
@@ -411,7 +413,7 @@ export default function JobBoardPage() {
                         <h2 className="font-semibold text-sm">{col.label}</h2>
                       </div>
                       <div className="flex items-center gap-2">
-                        <span className="text-xs text-amber-600 dark:text-amber-400 font-medium">{colCost.toLocaleString()} HBAR</span>
+                        <span className="text-xs text-amber-600 dark:text-amber-400 font-medium">{fmtCurrency(colCost)}</span>
                         <Badge variant="secondary" className="text-xs">{colJobs.length}</Badge>
                       </div>
                     </div>
@@ -457,7 +459,7 @@ export default function JobBoardPage() {
                             {job.reward && (
                               <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-amber-500/10 border border-amber-500/20 w-fit">
                                 <span className="text-sm font-bold text-amber-500">{job.reward}</span>
-                                <span className="text-[10px] text-amber-500/70">HBAR</span>
+                                <span className="text-[10px] text-amber-500/70">{currencySymbol}</span>
                               </div>
                             )}
                             {(job.requiredSkills ?? []).length > 0 && (
@@ -546,7 +548,7 @@ export default function JobBoardPage() {
                   { label: "Open", value: onchainOpen.length, color: "text-emerald-500", isNum: true },
                   { label: "In Progress", value: onchainClaimed.length, color: "text-amber-500", isNum: true },
                   { label: "Completed", value: onchainCompleted.length, color: "text-blue-500", isNum: true },
-                  { label: "Total Budget", value: `${totalBudget.toFixed(2)} HBAR`, color: "text-emerald-400", isNum: false },
+                  { label: "Total Budget", value: fmtCurrency(totalBudget, 2), color: "text-emerald-400", isNum: false },
                 ].map((stat) => (
                   <SpotlightCard key={stat.label} className="p-4" spotlightColor="rgba(16, 185, 129, 0.08)">
                     <p className="text-xs text-muted-foreground mb-1">{stat.label}</p>
@@ -565,7 +567,7 @@ export default function JobBoardPage() {
                     <div className="grid sm:grid-cols-3 gap-3 text-xs text-muted-foreground">
                       <div className="flex gap-2">
                         <span className="font-mono text-emerald-500 font-bold shrink-0">1.</span>
-                        <span>Browse open tasks below. Each has HBAR escrowed in the smart contract.</span>
+                        <span>Browse open tasks below. Each has {currencySymbol} escrowed in the smart contract.</span>
                       </div>
                       <div className="flex gap-2">
                         <span className="font-mono text-emerald-500 font-bold shrink-0">2.</span>
@@ -603,7 +605,7 @@ export default function JobBoardPage() {
                     </div>
                     <div className="space-y-2 min-h-[100px]">
                       {col.tasks.map((task) => (
-                        <OnchainTaskCard key={task.taskId} task={task} onClick={() => { setSelectedOnchainTask(task); setOnchainDetailOpen(true); }} />
+                        <OnchainTaskCard key={task.taskId} task={task} currencySymbol={currencySymbol} onClick={() => { setSelectedOnchainTask(task); setOnchainDetailOpen(true); }} />
                       ))}
                       {col.tasks.length === 0 && (
                         <div className="text-center py-8 text-xs text-muted-foreground border border-dashed border-border rounded-lg">
@@ -665,7 +667,7 @@ export default function JobBoardPage() {
               </p>
               {selectedJob.reward && (
                 <div className="p-3 rounded-md bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800">
-                  <span className="text-sm font-medium text-amber-700 dark:text-amber-400">💰 Budget: {selectedJob.reward} HBAR</span>
+                  <span className="text-sm font-medium text-amber-700 dark:text-amber-400">💰 Budget: {selectedJob.reward} {currencySymbol}</span>
                 </div>
               )}
               {(selectedJob.requiredSkills ?? []).length > 0 && (
@@ -755,7 +757,7 @@ export default function JobBoardPage() {
 
               <div className="p-3 rounded-md bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800">
                 <span className="text-sm font-medium text-emerald-700 dark:text-emerald-400">
-                  💰 Budget: {selectedOnchainTask.budget.toFixed(2)} HBAR
+                  💰 Budget: {fmtCurrency(selectedOnchainTask.budget, 2)}
                 </span>
               </div>
 
@@ -876,8 +878,8 @@ export default function JobBoardPage() {
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-xs font-medium mb-1 block">Budget (HBAR)</label>
-                <Input placeholder="e.g. 100 HBAR" value={jobReward} onChange={(e) => setJobReward(e.target.value)} />
+                <label className="text-xs font-medium mb-1 block">Budget ({currencySymbol})</label>
+                <Input placeholder={`e.g. 100 ${currencySymbol}`} value={jobReward} onChange={(e) => setJobReward(e.target.value)} />
               </div>
               <div>
                 <label className="text-xs font-medium mb-1 block">Priority</label>
@@ -942,7 +944,7 @@ export default function JobBoardPage() {
           </DialogHeader>
           <div className="space-y-4">
             <p className="text-xs text-muted-foreground">
-              This posts a task to the Hedera Testnet SwarmTaskBoard. Budget is escrowed in HBAR.
+              This posts a task to the Hedera Testnet SwarmTaskBoard. Budget is escrowed in {currencySymbol}.
             </p>
             <div>
               <label className="text-xs font-medium mb-1 block">Title <span className="text-red-500">*</span></label>
@@ -958,9 +960,9 @@ export default function JobBoardPage() {
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-xs font-medium mb-1 block">Budget (HBAR) <span className="text-red-500">*</span></label>
-                <Input type="number" placeholder="Min. 100 HBAR" value={ocBudget} onChange={(e) => setOcBudget(e.target.value)} min="100" step="1" />
-                <p className="text-[10px] text-muted-foreground mt-0.5">Minimum 100 HBAR required by contract</p>
+                <label className="text-xs font-medium mb-1 block">Budget ({currencySymbol}) <span className="text-red-500">*</span></label>
+                <Input type="number" placeholder={`Min. 100 ${currencySymbol}`} value={ocBudget} onChange={(e) => setOcBudget(e.target.value)} min="100" step="1" />
+                <p className="text-[10px] text-muted-foreground mt-0.5">Minimum 100 {currencySymbol} required by contract</p>
               </div>
               <div>
                 <label className="text-xs font-medium mb-1 block">Deadline (days)</label>
@@ -993,7 +995,7 @@ export default function JobBoardPage() {
                 disabled={swarmWrite.state.isLoading || !ocTitle.trim() || !ocBudget.trim() || !account}
                 className="bg-emerald-600 hover:bg-emerald-700 text-white"
               >
-                {swarmWrite.state.isLoading ? "Posting..." : `Post Task (${ocBudget || "0"} HBAR)`}
+                {swarmWrite.state.isLoading ? "Posting..." : `Post Task (${ocBudget || "0"} ${currencySymbol})`}
               </Button>
             </div>
             {!account && <p className="text-[10px] text-muted-foreground text-center">Connect your wallet to post onchain tasks</p>}
@@ -1006,7 +1008,7 @@ export default function JobBoardPage() {
 
 // ─── Onchain Card Components ─────────────────────────────
 
-function OnchainTaskCard({ task, onClick }: { task: TaskListing; onClick: () => void }) {
+function OnchainTaskCard({ task, onClick, currencySymbol = "HBAR" }: { task: TaskListing; onClick: () => void; currencySymbol?: string }) {
   const status = STATUS_CONFIG[task.status] ?? STATUS_CONFIG[TaskStatus.Open];
   const skills = (task.requiredSkills || "").split(",").map((s) => s.trim()).filter(Boolean);
   const isOpen = task.status === TaskStatus.Open;
@@ -1040,7 +1042,7 @@ function OnchainTaskCard({ task, onClick }: { task: TaskListing; onClick: () => 
           </div>
           <div className="text-right shrink-0">
             <p className="text-base font-bold text-emerald-500">{task.budget.toFixed(2)}</p>
-            <p className="text-[10px] text-muted-foreground">HBAR</p>
+            <p className="text-[10px] text-muted-foreground">{currencySymbol}</p>
           </div>
         </div>
 
