@@ -391,3 +391,76 @@ export async function installBundle(
         }
     }
 }
+
+// ═══════════════════════════════════════════════════════════════
+// Community Submissions
+// ═══════════════════════════════════════════════════════════════
+
+const COMMUNITY_COLLECTION = "communityMarketItems";
+
+export interface CommunityMarketItem {
+    id: string;
+    name: string;
+    description: string;
+    type: MarketItemType;
+    category: string;
+    icon: string;
+    version: string;
+    tags: string[];
+    requiredKeys?: string[];
+    submittedBy: string;
+    submittedByName?: string;
+    submittedAt: Date | null;
+    status: "pending" | "approved" | "rejected";
+}
+
+/** Submit a new community market item */
+export async function submitMarketItem(
+    data: Omit<CommunityMarketItem, "id" | "submittedAt" | "status">,
+): Promise<string> {
+    const ref = await addDoc(collection(db, COMMUNITY_COLLECTION), {
+        ...data,
+        status: "pending",
+        submittedAt: serverTimestamp(),
+    });
+    return ref.id;
+}
+
+/** Get all approved community items */
+export async function getCommunityItems(): Promise<CommunityMarketItem[]> {
+    const q = query(
+        collection(db, COMMUNITY_COLLECTION),
+        where("status", "==", "approved"),
+    );
+    const snap = await getDocs(q);
+    return snap.docs.map((d) => {
+        const data = d.data();
+        return {
+            id: d.id,
+            ...data,
+            submittedAt: data.submittedAt instanceof Timestamp ? data.submittedAt.toDate() : null,
+        } as CommunityMarketItem;
+    });
+}
+
+/** Get submissions by a specific user */
+export async function getUserSubmissions(walletAddress: string): Promise<CommunityMarketItem[]> {
+    const q = query(
+        collection(db, COMMUNITY_COLLECTION),
+        where("submittedBy", "==", walletAddress),
+    );
+    const snap = await getDocs(q);
+    return snap.docs.map((d) => {
+        const data = d.data();
+        return {
+            id: d.id,
+            ...data,
+            submittedAt: data.submittedAt instanceof Timestamp ? data.submittedAt.toDate() : null,
+        } as CommunityMarketItem;
+    });
+}
+
+/** Delete a community submission */
+export async function deleteCommunityItem(docId: string): Promise<void> {
+    await deleteDoc(doc(db, COMMUNITY_COLLECTION, docId));
+}

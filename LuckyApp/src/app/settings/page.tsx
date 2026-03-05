@@ -28,6 +28,8 @@ export default function SettingsPage() {
   const [telegram, setTelegram] = useState('');
 
   const [disconnectingGH, setDisconnectingGH] = useState(false);
+  const [ghSlugInput, setGhSlugInput] = useState('');
+  const [ghMessage, setGhMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
@@ -335,9 +337,9 @@ export default function SettingsPage() {
                           body: JSON.stringify({ orgId: currentOrg.id }),
                         });
                         await refreshOrgs();
-                        setMessage({ type: 'success', text: 'GitHub disconnected' });
+                        setGhMessage({ type: 'success', text: 'GitHub disconnected' });
                       } catch {
-                        setMessage({ type: 'error', text: 'Failed to disconnect GitHub' });
+                        setGhMessage({ type: 'error', text: 'Failed to disconnect GitHub' });
                       } finally {
                         setDisconnectingGH(false);
                       }
@@ -346,26 +348,70 @@ export default function SettingsPage() {
                     {disconnectingGH ? 'Disconnecting...' : 'Disconnect'}
                   </Button>
                 </div>
+                {ghMessage && (
+                  <div className={`text-sm rounded-md p-3 ${
+                    ghMessage.type === 'success'
+                      ? 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800'
+                      : 'bg-red-50 dark:bg-red-950/30 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800'
+                  }`}>
+                    {ghMessage.text}
+                  </div>
+                )}
               </div>
             ) : (
               <div className="space-y-3">
                 <p className="text-sm text-muted-foreground">
                   Install the GitHub App to connect repositories, view PRs, commits, and issues directly in your projects.
                 </p>
-                <Button
-                  className="bg-[#24292f] hover:bg-[#32383f] text-white"
-                  onClick={() => {
-                    const slug = process.env.NEXT_PUBLIC_GITHUB_APP_SLUG;
-                    if (slug) {
-                      window.location.href = `https://github.com/apps/${slug}/installations/new?state=${currentOrg.id}`;
-                    } else {
-                      setMessage({ type: 'error', text: 'GitHub App not configured. Set NEXT_PUBLIC_GITHUB_APP_SLUG.' });
-                    }
-                  }}
-                >
-                  <GitHubIcon className="w-4 h-4 mr-2" />
-                  Install GitHub App
-                </Button>
+                {process.env.NEXT_PUBLIC_GITHUB_APP_SLUG ? (
+                  <Button
+                    className="bg-[#24292f] hover:bg-[#32383f] text-white"
+                    onClick={() => {
+                      window.location.href = `https://github.com/apps/${process.env.NEXT_PUBLIC_GITHUB_APP_SLUG}/installations/new?state=${currentOrg.id}`;
+                    }}
+                  >
+                    <GitHubIcon className="w-4 h-4 mr-2" />
+                    Install GitHub App
+                  </Button>
+                ) : (
+                  <div className="space-y-3">
+                    <div className="p-3 rounded-md bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800">
+                      <p className="text-xs text-amber-700 dark:text-amber-400 mb-2">
+                        No GitHub App configured. Enter your GitHub App slug below, or set <code className="font-mono bg-amber-100 dark:bg-amber-900/50 px-1 rounded">NEXT_PUBLIC_GITHUB_APP_SLUG</code> in your environment.
+                      </p>
+                    </div>
+                    <div className="flex gap-2">
+                      <Input
+                        placeholder="your-github-app-slug"
+                        value={ghSlugInput}
+                        onChange={(e) => setGhSlugInput(e.target.value)}
+                        className="flex-1"
+                      />
+                      <Button
+                        className="bg-[#24292f] hover:bg-[#32383f] text-white shrink-0"
+                        disabled={!ghSlugInput.trim()}
+                        onClick={() => {
+                          const slug = ghSlugInput.trim();
+                          if (slug) {
+                            window.location.href = `https://github.com/apps/${slug}/installations/new?state=${currentOrg.id}`;
+                          }
+                        }}
+                      >
+                        <GitHubIcon className="w-4 h-4 mr-2" />
+                        Install
+                      </Button>
+                    </div>
+                  </div>
+                )}
+                {ghMessage && (
+                  <div className={`text-sm rounded-md p-3 ${
+                    ghMessage.type === 'success'
+                      ? 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800'
+                      : 'bg-red-50 dark:bg-red-950/30 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800'
+                  }`}>
+                    {ghMessage.text}
+                  </div>
+                )}
               </div>
             )}
           </CardContent>

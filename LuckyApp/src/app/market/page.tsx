@@ -5,7 +5,7 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import {
     Search, Download, Trash2, Check, Loader2,
     Puzzle, Star, Shield, ShieldCheck, Wrench, Plug, Store,
-    Layers, Users,
+    Layers, Users, Plus, Clock, CheckCircle2, XCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -14,17 +14,19 @@ import { Input } from "@/components/ui/input";
 import { useOrg } from "@/contexts/OrgContext";
 import { useActiveAccount } from "thirdweb/react";
 import {
-    type Skill, type InstalledSkill, type MarketItemType,
+    type Skill, type InstalledSkill, type MarketItemType, type CommunityMarketItem,
     SKILL_REGISTRY, SKILL_BUNDLES,
     MOD_CATEGORIES, PLUGIN_CATEGORIES, SKILL_ONLY_CATEGORIES,
     installSkill, uninstallSkill, toggleSkill, getInstalledSkills, installBundle,
+    getCommunityItems, getUserSubmissions, deleteCommunityItem,
 } from "@/lib/skills";
+import { SubmitMarketItemDialog } from "@/components/market/submit-dialog";
 
 // ═══════════════════════════════════════════════════════════════
 // Tab Config
 // ═══════════════════════════════════════════════════════════════
 
-type Tab = "mods" | "plugins" | "skills" | "bundles" | "installed";
+type Tab = "mods" | "plugins" | "skills" | "bundles" | "installed" | "submit";
 
 const TABS: { key: Tab; label: string; icon: typeof Wrench; type?: MarketItemType }[] = [
     { key: "mods", label: "Mods", icon: Wrench, type: "mod" },
@@ -32,6 +34,7 @@ const TABS: { key: Tab; label: string; icon: typeof Wrench; type?: MarketItemTyp
     { key: "skills", label: "Skills", icon: Puzzle, type: "skill" },
     { key: "bundles", label: "Bundles", icon: Layers },
     { key: "installed", label: "Installed", icon: Check },
+    { key: "submit", label: "Submit", icon: Plus },
 ];
 
 const CATEGORIES_BY_TYPE: Record<MarketItemType, string[]> = {
@@ -133,12 +136,16 @@ export default function MarketPage() {
     const { currentOrg } = useOrg();
     const account = useActiveAccount();
     const [installed, setInstalled] = useState<InstalledSkill[]>([]);
+    const [communityItems, setCommunityItems] = useState<CommunityMarketItem[]>([]);
+    const [userSubmissions, setUserSubmissions] = useState<CommunityMarketItem[]>([]);
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState("");
     const [category, setCategory] = useState("All");
     const [sourceFilter, setSourceFilter] = useState<"all" | "verified" | "community">("all");
     const [busyId, setBusyId] = useState<string | null>(null);
     const [tab, setTab] = useState<Tab>("mods");
+    const [submitOpen, setSubmitOpen] = useState(false);
+    const [deletingId, setDeletingId] = useState<string | null>(null);
 
     const loadInstalled = useCallback(async () => {
         if (!currentOrg) return;
@@ -153,7 +160,57 @@ export default function MarketPage() {
         }
     }, [currentOrg]);
 
+    const loadCommunityItems = useCallback(async () => {
+        try {
+            const items = await getCommunityItems();
+            setCommunityItems(items);
+        } catch (err) {
+            console.error("Failed to load community items:", err);
+        }
+    }, []);
+
+    const loadUserSubmissions = useCallback(async () => {
+        if (!account) return;
+        try {
+            const subs = await getUserSubmissions(account.address);
+            setUserSubmissions(subs);
+        } catch (err) {
+            console.error("Failed to load submissions:", err);
+        }
+    }, [account]);
+
     useEffect(() => { loadInstalled(); }, [loadInstalled]);
+    useEffect(() => { loadCommunityItems(); }, [loadCommunityItems]);
+    useEffect(() => { loadUserSubmissions(); }, [loadUserSubmissions]);
+
+    // Merge community items with registry
+    const allItems: Skill[] = useMemo(() => {
+        const communitySkills: Skill[] = communityItems.map((c) => ({
+            id: `community-${c.id}`,
+            name: c.name,
+            description: c.description,
+            type: c.type,
+            source: "community" as const,
+            category: c.category,
+            icon: c.icon,
+            version: c.version,
+            author: c.submittedByName || c.submittedBy.slice(0, 8) + "...",
+            requiredKeys: c.requiredKeys,
+            tags: c.tags,
+        }));
+        return [...SKILL_REGISTRY, ...communitySkills];
+    }, [communityItems]);
+
+    const handleDeleteSubmission = async (docId: string) => {
+        setDeletingId(docId);
+        try {
+            await deleteCommunityItem(docId);
+            await loadUserSubmissions();
+            await loadCommunityItems();
+        } finally {
+            setDeletingId(null);
+        }
+    };
 
     // Reset category when switching tabs
     useEffect(() => { setCategory("All"); setSearch(""); }, [tab]);
@@ -205,7 +262,7 @@ export default function MarketPage() {
 
     // Filter items for the active tab
     const filteredItems = useMemo(() => {
-        let items = SKILL_REGISTRY;
+        let items = allItems;
 
         // Filter by type for type-specific tabs
         if (activeType) {
@@ -238,18 +295,27 @@ export default function MarketPage() {
         }
 
         return items;
-    }, [activeType, tab, search, category, sourceFilter, installedMap]);
+    }, [allItems, activeType, tab, search, category, sourceFilter, installedMap]);
 
-    // Categories for active tab
-    const categories = activeType ? CATEGORIES_BY_TYPE[activeType] : ["All"];
+    // Categories for active tab (include community categories dynamically)
+    const categories = useMemo(() => {
+        if (!activeType) return ["All"];
+        const staticCats = CATEGORIES_BY_TYPE[activeType];
+        const communityCats = allItems
+            .filter((s) => s.type === activeType && s.source === "community")
+            .map((s) => s.category);
+        const merged = new Set([...staticCats, ...communityCats]);
+        return ["All", ...Array.from(merged).filter((c) => c !== "All").sort()];
+    }, [activeType, allItems]);
 
     // Counts per tab
-    const modCount = SKILL_REGISTRY.filter((s) => s.type === "mod").length;
-    const pluginCount = SKILL_REGISTRY.filter((s) => s.type === "plugin").length;
-    const skillCount = SKILL_REGISTRY.filter((s) => s.type === "skill").length;
+    const modCount = allItems.filter((s) => s.type === "mod").length;
+    const pluginCount = allItems.filter((s) => s.type === "plugin").length;
+    const skillCount = allItems.filter((s) => s.type === "skill").length;
     const installedCount = installed.length;
     const bundleCount = SKILL_BUNDLES.length;
-    const tabCounts: Record<Tab, number> = { mods: modCount, plugins: pluginCount, skills: skillCount, bundles: bundleCount, installed: installedCount };
+    const submitCount = userSubmissions.length;
+    const tabCounts: Record<Tab, number> = { mods: modCount, plugins: pluginCount, skills: skillCount, bundles: bundleCount, installed: installedCount, submit: submitCount };
 
     if (!account) {
         return (
@@ -300,8 +366,8 @@ export default function MarketPage() {
                 ))}
             </div>
 
-            {/* Search + Filters (hidden on bundles tab) */}
-            {tab !== "bundles" && (
+            {/* Search + Filters (hidden on bundles & submit tabs) */}
+            {tab !== "bundles" && tab !== "submit" && (
                 <>
                     <div className="flex items-center gap-3 mb-4">
                         <div className="relative flex-1">
@@ -386,11 +452,108 @@ export default function MarketPage() {
                 </>
             )}
 
+            {/* Submit Tab */}
+            {tab === "submit" && (
+                <div className="space-y-6">
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <h2 className="text-lg font-semibold">Your Submissions</h2>
+                            <p className="text-sm text-muted-foreground">
+                                Submit mods, plugins, and skills for the community marketplace
+                            </p>
+                        </div>
+                        <Button
+                            onClick={() => setSubmitOpen(true)}
+                            className="bg-amber-600 hover:bg-amber-700 text-black gap-1.5"
+                        >
+                            <Plus className="h-4 w-4" />
+                            Submit to Market
+                        </Button>
+                    </div>
+
+                    {userSubmissions.length > 0 ? (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            {userSubmissions.map((sub) => (
+                                <Card key={sub.id} className="p-4 bg-card border-border">
+                                    <div className="flex items-start gap-3">
+                                        <div className="text-2xl shrink-0 w-10 h-10 flex items-center justify-center rounded-lg bg-muted/50">
+                                            {sub.icon}
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <div className="flex items-center gap-2 mb-0.5">
+                                                <h3 className="font-semibold text-sm truncate">{sub.name}</h3>
+                                                <span className="text-[10px] text-muted-foreground">v{sub.version}</span>
+                                            </div>
+                                            <p className="text-xs text-muted-foreground line-clamp-2 mb-2">{sub.description}</p>
+                                            <div className="flex items-center gap-2 flex-wrap">
+                                                <Badge variant="outline" className="text-[10px]">{sub.category}</Badge>
+                                                <Badge variant="outline" className="text-[10px] capitalize">{sub.type}</Badge>
+                                                {sub.status === "pending" && (
+                                                    <Badge variant="outline" className="text-[10px] border-yellow-500/20 text-yellow-500">
+                                                        <Clock className="h-2.5 w-2.5 mr-0.5" />Pending
+                                                    </Badge>
+                                                )}
+                                                {sub.status === "approved" && (
+                                                    <Badge variant="outline" className="text-[10px] border-emerald-500/20 text-emerald-400">
+                                                        <CheckCircle2 className="h-2.5 w-2.5 mr-0.5" />Approved
+                                                    </Badge>
+                                                )}
+                                                {sub.status === "rejected" && (
+                                                    <Badge variant="outline" className="text-[10px] border-red-500/20 text-red-400">
+                                                        <XCircle className="h-2.5 w-2.5 mr-0.5" />Rejected
+                                                    </Badge>
+                                                )}
+                                            </div>
+                                        </div>
+                                        <button
+                                            onClick={() => handleDeleteSubmission(sub.id)}
+                                            disabled={deletingId === sub.id}
+                                            className="p-1 rounded text-red-400 hover:bg-red-500/10 transition-colors shrink-0"
+                                            title="Delete submission"
+                                        >
+                                            {deletingId === sub.id ? (
+                                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                            ) : (
+                                                <Trash2 className="h-3.5 w-3.5" />
+                                            )}
+                                        </button>
+                                    </div>
+                                </Card>
+                            ))}
+                        </div>
+                    ) : (
+                        <Card className="p-12 text-center bg-card border-border border-dashed">
+                            <Plus className="h-12 w-12 mx-auto text-muted-foreground/30 mb-4" />
+                            <h3 className="text-lg font-semibold mb-2">No submissions yet</h3>
+                            <p className="text-sm text-muted-foreground mb-6">
+                                Share your custom mods, plugins, and skills with the community.
+                            </p>
+                            <Button
+                                onClick={() => setSubmitOpen(true)}
+                                className="bg-amber-600 hover:bg-amber-700 text-black gap-2"
+                            >
+                                <Plus className="h-4 w-4" /> Submit Your First Item
+                            </Button>
+                        </Card>
+                    )}
+
+                    <SubmitMarketItemDialog
+                        open={submitOpen}
+                        onOpenChange={setSubmitOpen}
+                        submitterAddress={account?.address ?? ""}
+                        onSubmitted={() => {
+                            loadUserSubmissions();
+                            loadCommunityItems();
+                        }}
+                    />
+                </div>
+            )}
+
             {/* Bundles Tab */}
             {tab === "bundles" && (
                 <div className="space-y-4">
                     {SKILL_BUNDLES.map((bundle) => {
-                        const bundleSkills = SKILL_REGISTRY.filter((s) => bundle.skillIds.includes(s.id));
+                        const bundleSkills = allItems.filter((s) => bundle.skillIds.includes(s.id));
                         const allInstalled = bundle.skillIds.every((id) => installedMap.has(id));
                         return (
                             <Card key={bundle.id} className="p-5 bg-card border-border">
