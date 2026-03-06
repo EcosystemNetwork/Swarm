@@ -10,6 +10,13 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useActiveAccount } from "thirdweb/react";
+import { useOrg } from "@/contexts/OrgContext";
+import { db } from "@/lib/firebase";
+import { collection, getDocs, query, limit } from "firebase/firestore";
+import { getAgentsByOrg } from "@/lib/firestore";
+import { getGateways } from "@/lib/gateways";
+import { getCronJobs } from "@/lib/cron";
+import { getLatestVitals } from "@/lib/vitals";
 
 // ═══════════════════════════════════════════════════════════════
 // Health Check Types
@@ -35,60 +42,236 @@ const STATUS_CONFIG: Record<CheckStatus, { label: string; color: string; icon: t
 };
 
 // ═══════════════════════════════════════════════════════════════
-// Simulated diagnostics
+// Real Diagnostics
 // ═══════════════════════════════════════════════════════════════
 
-function runDiagnostics(): HealthCheck[] {
-    return [
-        {
-            id: "firebase",
-            category: "Infrastructure",
-            title: "Firebase Connection",
-            detail: "Firestore database is reachable and responding",
-            status: "healthy",
-            icon: Database,
-        },
-        {
-            id: "agents",
-            category: "Agents",
-            title: "Agent Fleet Status",
-            detail: "All registered agents are responsive",
-            status: "healthy",
-            icon: Users,
-        },
-        {
-            id: "gateway",
-            category: "Infrastructure",
-            title: "Gateway Reachability",
-            detail: "Swarm Hub gateway endpoint is accessible",
-            status: "healthy",
-            icon: Wifi,
-        },
-        {
-            id: "websocket",
-            category: "Infrastructure",
-            title: "WebSocket Health",
-            detail: "Real-time connection channels are stable",
-            status: "healthy",
-            icon: Server,
-        },
-        {
-            id: "auth",
-            category: "Security",
-            title: "Authentication",
-            detail: "Wallet signature verification is functional",
-            status: "healthy",
-            icon: Shield,
-        },
-        {
-            id: "cron",
-            category: "Operations",
-            title: "Scheduled Jobs",
-            detail: "Cron scheduler is running with no stale jobs",
-            status: "healthy",
-            icon: Clock,
-        },
-    ];
+async function checkFirebase(): Promise<HealthCheck> {
+    const base: HealthCheck = {
+        id: "firebase", category: "Infrastructure", title: "Firebase Connection",
+        detail: "", status: "unchecked", icon: Database,
+    };
+    try {
+        const q = query(collection(db, "organizations"), limit(1));
+        const snap = await getDocs(q);
+        base.status = "healthy";
+        base.detail = `Firestore reachable — test query returned ${snap.size} doc(s)`;
+    } catch (err: unknown) {
+        base.status = "critical";
+        base.detail = `Firestore unreachable: ${err instanceof Error ? err.message : "Unknown error"}`;
+        base.fixAction = "Check Firebase config and network connectivity";
+    }
+    return base;
+}
+
+async function checkAgents(orgId: string | null): Promise<HealthCheck> {
+    const base: HealthCheck = {
+        id: "agents", category: "Agents", title: "Agent Fleet Status",
+        detail: "", status: "unchecked", icon: Users,
+    };
+    if (!orgId) {
+        base.status = "warning";
+        base.detail = "No organization selected — cannot check agents";
+        return base;
+    }
+    try {
+        const agents = await getAgentsByOrg(orgId);
+        const total = agents.length;
+        if (total === 0) {
+            base.status = "warning";
+            base.detail = "No agents registered for this organization";
+            return base;
+        }
+        const online = agents.filter(a => a.status === "online").length;
+        const busy = agents.filter(a => a.status === "busy").length;
+        const offline = agents.filter(a => a.status === "offline").length;
+        if (online + busy === total) {
+            base.status = "healthy";
+            base.detail = `All ${total} agent(s) active (${online} online, ${busy} busy)`;
+        } else if (offline === total) {
+            base.status = "critical";
+            base.detail = `All ${total} agent(s) are offline`;
+            base.fixAction = "Check agent processes and network connectivity";
+        } else {
+            base.status = "warning";
+            base.detail = `${online + busy}/${total} agents active (${offline} offline)`;
+        }
+    } catch (err: unknown) {
+        base.status = "critical";
+        base.detail = `Failed to query agents: ${err instanceof Error ? err.message : "Unknown error"}`;
+    }
+    return base;
+}
+
+async function checkGatewayHealth(orgId: string | null): Promise<HealthCheck> {
+    const base: HealthCheck = {
+        id: "gateway", category: "Infrastructure", title: "Gateway Reachability",
+        detail: "", status: "unchecked", icon: Wifi,
+    };
+    if (!orgId) {
+        base.status = "warning";
+        base.detail = "No organization selected — cannot check gateways";
+        return base;
+    }
+    try {
+        const gateways = await getGateways(orgId);
+        if (gateways.length === 0) {
+            base.status = "healthy";
+            base.detail = "No gateways configured (none required)";
+            return base;
+        }
+        const STALE_MS = 5 * 60 * 1000;
+        const now = Date.now();
+        const connected = gateways.filter(g => g.status === "connected").length;
+        const errored = gateways.filter(g => g.status === "error").length;
+        const stale = gateways.filter(g => !g.lastPing || (now - g.lastPing.getTime()) > STALE_MS).length;
+        if (connected === gateways.length && stale === 0) {
+            base.status = "healthy";
+            base.detail = `All ${gateways.length} gateway(s) connected with recent pings`;
+        } else if (errored === gateways.length) {
+            base.status = "critical";
+            base.detail = `All ${gateways.length} gateway(s) in error state`;
+            base.fixAction = "Check gateway endpoints and API keys";
+        } else {
+            base.status = "warning";
+            const parts: string[] = [];
+            if (connected > 0) parts.push(`${connected} connected`);
+            if (errored > 0) parts.push(`${errored} errored`);
+            if (stale > 0) parts.push(`${stale} stale ping`);
+            base.detail = `${gateways.length} gateway(s): ${parts.join(", ")}`;
+        }
+    } catch (err: unknown) {
+        base.status = "critical";
+        base.detail = `Failed to query gateways: ${err instanceof Error ? err.message : "Unknown error"}`;
+    }
+    return base;
+}
+
+async function checkVitals(orgId: string | null): Promise<HealthCheck> {
+    const base: HealthCheck = {
+        id: "vitals", category: "Infrastructure", title: "System Vitals",
+        detail: "", status: "unchecked", icon: Server,
+    };
+    if (!orgId) {
+        base.status = "warning";
+        base.detail = "No organization selected — cannot check vitals";
+        return base;
+    }
+    try {
+        const vitals = await getLatestVitals(orgId);
+        if (!vitals) {
+            base.status = "warning";
+            base.detail = "No vitals data reported yet";
+            return base;
+        }
+        const STALE_MS = 10 * 60 * 1000;
+        const isStale = !vitals.timestamp || (Date.now() - vitals.timestamp.getTime()) > STALE_MS;
+        const cpu = vitals.cpu.usage;
+        const mem = vitals.memory.percent;
+        const disk = vitals.disk.percent;
+        const detailStr = `CPU ${cpu.toFixed(0)}%, Memory ${mem.toFixed(0)}%, Disk ${disk.toFixed(0)}%`;
+        if (isStale) {
+            base.status = "warning";
+            base.detail = `Stale data — ${detailStr} (last: ${vitals.timestamp ? vitals.timestamp.toLocaleTimeString() : "unknown"})`;
+        } else if (cpu >= 85 || mem >= 85 || disk >= 85) {
+            base.status = "critical";
+            base.detail = `High resource usage — ${detailStr}`;
+            base.fixAction = "Investigate high resource consumption";
+        } else if (cpu >= 70 || mem >= 70 || disk >= 70) {
+            base.status = "warning";
+            base.detail = `Elevated usage — ${detailStr}`;
+        } else {
+            base.status = "healthy";
+            base.detail = `All within limits — ${detailStr}`;
+        }
+    } catch (err: unknown) {
+        base.status = "critical";
+        base.detail = `Failed to query vitals: ${err instanceof Error ? err.message : "Unknown error"}`;
+    }
+    return base;
+}
+
+async function checkAuth(walletAddress: string | undefined): Promise<HealthCheck> {
+    const base: HealthCheck = {
+        id: "auth", category: "Security", title: "Authentication",
+        detail: "", status: "unchecked", icon: Shield,
+    };
+    if (walletAddress) {
+        base.status = "healthy";
+        base.detail = `Wallet connected: ${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}`;
+    } else {
+        base.status = "critical";
+        base.detail = "No wallet connected — authentication unavailable";
+        base.fixAction = "Connect your wallet to authenticate";
+    }
+    return base;
+}
+
+async function checkCronJobs(orgId: string | null): Promise<HealthCheck> {
+    const base: HealthCheck = {
+        id: "cron", category: "Operations", title: "Scheduled Jobs",
+        detail: "", status: "unchecked", icon: Clock,
+    };
+    if (!orgId) {
+        base.status = "warning";
+        base.detail = "No organization selected — cannot check cron jobs";
+        return base;
+    }
+    try {
+        const jobs = await getCronJobs(orgId);
+        const enabled = jobs.filter(j => j.enabled);
+        if (enabled.length === 0) {
+            base.status = "healthy";
+            base.detail = jobs.length === 0
+                ? "No cron jobs configured"
+                : `${jobs.length} job(s) configured, all disabled`;
+            return base;
+        }
+        const now = new Date();
+        const failed = enabled.filter(j => j.lastRun && !j.lastRun.success);
+        const overdue = enabled.filter(j => j.nextRun && j.nextRun < now);
+        if (failed.length === 0 && overdue.length === 0) {
+            base.status = "healthy";
+            base.detail = `${enabled.length} active job(s) — all passing, none overdue`;
+        } else if (failed.length === enabled.length) {
+            base.status = "critical";
+            base.detail = `All ${enabled.length} active job(s) have failed last runs`;
+            base.fixAction = "Review cron job configurations and agent assignments";
+        } else {
+            base.status = "warning";
+            const parts: string[] = [];
+            if (failed.length > 0) parts.push(`${failed.length} failed last run`);
+            if (overdue.length > 0) parts.push(`${overdue.length} overdue`);
+            base.detail = `${enabled.length} active job(s): ${parts.join(", ")}`;
+        }
+    } catch (err: unknown) {
+        base.status = "critical";
+        base.detail = `Failed to query cron jobs: ${err instanceof Error ? err.message : "Unknown error"}`;
+    }
+    return base;
+}
+
+async function runDiagnostics(orgId: string | null, walletAddress: string | undefined): Promise<HealthCheck[]> {
+    const fallbackIds = ["firebase", "agents", "gateway", "vitals", "auth", "cron"];
+    const fallbackTitles = ["Firebase Connection", "Agent Fleet Status", "Gateway Reachability", "System Vitals", "Authentication", "Scheduled Jobs"];
+    const fallbackCategories = ["Infrastructure", "Agents", "Infrastructure", "Infrastructure", "Security", "Operations"];
+    const fallbackIcons = [Database, Users, Wifi, Server, Shield, Clock];
+
+    const results = await Promise.allSettled([
+        checkFirebase(),
+        checkAgents(orgId),
+        checkGatewayHealth(orgId),
+        checkVitals(orgId),
+        checkAuth(walletAddress),
+        checkCronJobs(orgId),
+    ]);
+
+    return results.map((result, i) => {
+        if (result.status === "fulfilled") return result.value;
+        return {
+            id: fallbackIds[i], category: fallbackCategories[i], title: fallbackTitles[i],
+            detail: `Unexpected error: ${result.reason}`, status: "critical" as CheckStatus, icon: fallbackIcons[i],
+        };
+    });
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -97,18 +280,23 @@ function runDiagnostics(): HealthCheck[] {
 
 export default function DoctorPage() {
     const account = useActiveAccount();
+    const { currentOrg } = useOrg();
     const [checks, setChecks] = useState<HealthCheck[]>([]);
     const [running, setRunning] = useState(false);
     const [lastRun, setLastRun] = useState<Date | null>(null);
 
     const runChecks = useCallback(async () => {
         setRunning(true);
-        // Simulate async diagnostics
-        await new Promise(r => setTimeout(r, 1500));
-        setChecks(runDiagnostics());
-        setLastRun(new Date());
-        setRunning(false);
-    }, []);
+        try {
+            const results = await runDiagnostics(currentOrg?.id ?? null, account?.address);
+            setChecks(results);
+            setLastRun(new Date());
+        } catch {
+            setChecks([]);
+        } finally {
+            setRunning(false);
+        }
+    }, [currentOrg?.id, account?.address]);
 
     const healthy = checks.filter(c => c.status === "healthy").length;
     const warnings = checks.filter(c => c.status === "warning").length;

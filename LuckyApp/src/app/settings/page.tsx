@@ -12,16 +12,18 @@ import { updateOrganization } from '@/lib/firestore';
 import { Badge } from '@/components/ui/badge';
 import { GitHubIcon } from '@/components/github/github-icon';
 import SpotlightCard from "@/components/reactbits/SpotlightCard";
+import { Switch } from '@/components/ui/switch';
 
 export default function SettingsPage() {
   const { currentOrg, refreshOrgs } = useOrg();
   const account = useActiveAccount();
   const address = account?.address;
-  
+
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [saving, setSaving] = useState(false);
   const [savingSocials, setSavingSocials] = useState(false);
+  const [isPrivate, setIsPrivate] = useState(false);
   const [website, setWebsite] = useState('');
   const [twitter, setTwitter] = useState('');
   const [discord, setDiscord] = useState('');
@@ -40,6 +42,7 @@ export default function SettingsPage() {
     if (currentOrg) {
       setName(currentOrg.name);
       setDescription(currentOrg.description || '');
+      setIsPrivate(currentOrg.isPrivate || false);
       setLogoPreview(currentOrg.logoUrl || null);
       setWebsite(currentOrg.website || '');
       setTwitter(currentOrg.twitter || '');
@@ -97,7 +100,7 @@ export default function SettingsPage() {
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!currentOrg) return;
-    
+
     setSaving(true);
     setMessage(null);
 
@@ -109,7 +112,7 @@ export default function SettingsPage() {
 
       // Refresh org data to reflect changes
       await refreshOrgs();
-      
+
       setMessage({ type: 'success', text: 'Organization settings updated successfully!' });
     } catch (err) {
       setMessage({
@@ -123,14 +126,14 @@ export default function SettingsPage() {
 
   const formatDate = (timestamp: unknown) => {
     if (!timestamp) return 'Unknown';
-    
+
     let date: Date;
     if (timestamp && typeof timestamp === 'object' && 'seconds' in timestamp) {
       date = new Date((timestamp as any).seconds * 1000);
     } else {
       date = new Date(timestamp as any);
     }
-    
+
     return date.toLocaleDateString();
   };
 
@@ -226,11 +229,10 @@ export default function SettingsPage() {
               )}
 
               {message && (
-                <div className={`text-sm rounded-md p-3 ${
-                  message.type === 'success'
-                    ? 'bg-emerald-50 text-emerald-600 border border-green-200'
-                    : 'bg-red-50 text-red-600 border border-red-200'
-                }`}>
+                <div className={`text-sm rounded-md p-3 ${message.type === 'success'
+                  ? 'bg-emerald-50 text-emerald-600 border border-green-200'
+                  : 'bg-red-50 text-red-600 border border-red-200'
+                  }`}>
                   {message.text}
                 </div>
               )}
@@ -277,6 +279,33 @@ export default function SettingsPage() {
                 </Button>
               </div>
             </form>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Privacy Settings</CardTitle>
+            <CardDescription>Control the visibility of your organization</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium">Private Organization</p>
+                <p className="text-sm text-muted-foreground">
+                  Hide your organization from the public Organizations directory.
+                </p>
+              </div>
+              <Switch
+                checked={isPrivate}
+                onCheckedChange={async (checked) => {
+                  setIsPrivate(checked);
+                  if (currentOrg) {
+                    await updateOrganization(currentOrg.id, { isPrivate: checked });
+                    await refreshOrgs();
+                  }
+                }}
+              />
+            </div>
           </CardContent>
         </Card>
 
@@ -349,11 +378,10 @@ export default function SettingsPage() {
                   </Button>
                 </div>
                 {ghMessage && (
-                  <div className={`text-sm rounded-md p-3 ${
-                    ghMessage.type === 'success'
-                      ? 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800'
-                      : 'bg-red-50 dark:bg-red-950/30 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800'
-                  }`}>
+                  <div className={`text-sm rounded-md p-3 ${ghMessage.type === 'success'
+                    ? 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800'
+                    : 'bg-red-50 dark:bg-red-950/30 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800'
+                    }`}>
                     {ghMessage.text}
                   </div>
                 )}
@@ -404,11 +432,10 @@ export default function SettingsPage() {
                   </div>
                 )}
                 {ghMessage && (
-                  <div className={`text-sm rounded-md p-3 ${
-                    ghMessage.type === 'success'
-                      ? 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800'
-                      : 'bg-red-50 dark:bg-red-950/30 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800'
-                  }`}>
+                  <div className={`text-sm rounded-md p-3 ${ghMessage.type === 'success'
+                    ? 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800'
+                    : 'bg-red-50 dark:bg-red-950/30 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800'
+                    }`}>
                     {ghMessage.text}
                   </div>
                 )}
@@ -455,7 +482,7 @@ export default function SettingsPage() {
                 ))
               }
             </div>
-            
+
             <div className="mt-4 text-sm text-muted-foreground">
               <p>Total members: {currentOrg.members.length}</p>
             </div>
@@ -503,7 +530,7 @@ export default function SettingsPage() {
           <CardContent>
             <div className="space-y-3">
               <p className="text-sm text-muted-foreground">
-                Once you delete an organization, there is no going back. All projects, agents, 
+                Once you delete an organization, there is no going back. All projects, agents,
                 tasks, and chat history will be permanently removed.
               </p>
               <Button variant="outline" size="sm" className="text-red-600 border-red-200 hover:bg-red-50" disabled>

@@ -34,7 +34,7 @@ const SECTIONS: DocSection[] = [
                 <h4 className="text-sm font-semibold mt-6 mb-2">Core Principles</h4>
                 <ul className="space-y-2 text-sm">
                     <li className="flex items-start gap-2"><span className="text-amber-400 mt-0.5">●</span> <span><strong>Wallet-First Auth</strong> — Connect with any EVM wallet. No passwords, no accounts to manage.</span></li>
-                    <li className="flex items-start gap-2"><span className="text-emerald-400 mt-0.5">●</span> <span><strong>Multi-Chain</strong> — Supports Movement Mainnet, Ethereum, Base, Polygon, Arbitrum, and more.</span></li>
+                    <li className="flex items-start gap-2"><span className="text-emerald-400 mt-0.5">●</span> <span><strong>Chain-Agnostic</strong> — Works with any EVM-compatible wallet. The protocol exists above any single chain.</span></li>
                     <li className="flex items-start gap-2"><span className="text-blue-400 mt-0.5">●</span> <span><strong>Org-Based Isolation</strong> — Each organization is a separate workspace with its own agents, projects, and data.</span></li>
                     <li className="flex items-start gap-2"><span className="text-purple-400 mt-0.5">●</span> <span><strong>Modular Architecture</strong> — Every feature is a standalone module — use what you need.</span></li>
                 </ul>
@@ -72,7 +72,7 @@ const SECTIONS: DocSection[] = [
                 <p className="text-sm">Navigate to <strong>Settings → Organization</strong>. Enter a name and optional description. Your wallet address becomes the admin.</p>
 
                 <h4 className="text-sm font-semibold mt-6 mb-2">3. Create a Project</h4>
-                <p className="text-sm">Go to <strong>Projects</strong> in the sidebar. Click <strong>New Project</strong>, give it a name, select a chain, and optionally add a description and agents.</p>
+                <p className="text-sm">Go to <strong>Projects</strong> in the sidebar. Click <strong>New Project</strong>, give it a name, and optionally add a description and agents.</p>
 
                 <h4 className="text-sm font-semibold mt-6 mb-2">4. Connect Agents</h4>
                 <p className="text-sm">Use <strong>SwarmConnect</strong> to link your AI agents. Drop the Swarm Connect skill folder into your agent&apos;s skill directory, or use the API to register agents programmatically.</p>
@@ -131,7 +131,7 @@ const SECTIONS: DocSection[] = [
                 <h4 className="text-sm font-semibold mt-6 mb-2">Project Structure</h4>
                 <ul className="space-y-1 text-sm">
                     <li>• <strong>Name & Description</strong> — Identify the project</li>
-                    <li>• <strong>Chain</strong> — Which blockchain to use for transactions</li>
+                    <li>• <strong>Status</strong> — Active or archived</li>
                     <li>• <strong>Assigned Agents</strong> — Which agents work on this project</li>
                     <li>• <strong>Tasks</strong> — Work items organized on the Kanban board</li>
                     <li>• <strong>Goals</strong> — OKR-style targets with key results</li>

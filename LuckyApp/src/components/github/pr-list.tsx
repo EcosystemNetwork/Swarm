@@ -29,9 +29,10 @@ interface PRListProps {
   pulls: GitHubPR[];
   loading: boolean;
   error: string | null;
+  onSelectPR?: (pr: GitHubPR) => void;
 }
 
-export function PRList({ pulls, loading, error }: PRListProps) {
+export function PRList({ pulls, loading, error, onSelectPR }: PRListProps) {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-8">
@@ -62,12 +63,10 @@ export function PRList({ pulls, loading, error }: PRListProps) {
         const state = prState(pr);
         const style = STATE_STYLES[state] || STATE_STYLES.open;
         return (
-          <a
+          <button
             key={pr.number}
-            href={pr.html_url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="block p-3 rounded-lg border border-border hover:border-amber-300 dark:hover:border-amber-700 transition-colors"
+            onClick={() => onSelectPR?.(pr)}
+            className="block w-full text-left p-3 rounded-lg border border-border hover:border-amber-300 dark:hover:border-amber-700 transition-colors"
           >
             <div className="flex items-start gap-3">
               <span className="text-sm mt-0.5">{style.icon}</span>
@@ -89,7 +88,7 @@ export function PRList({ pulls, loading, error }: PRListProps) {
                     />
                   )}
                   <span>{pr.user.login}</span>
-                  <span className="mx-1">·</span>
+                  <span className="mx-1">&middot;</span>
                   <span>{timeAgo(pr.updated_at)}</span>
                 </div>
                 <div className="flex items-center gap-2 mt-1.5">
@@ -97,12 +96,12 @@ export function PRList({ pulls, loading, error }: PRListProps) {
                     {state}
                   </Badge>
                   <span className="text-[10px] text-muted-foreground font-mono">
-                    {pr.head.ref} → {pr.base.ref}
+                    {pr.head.ref} &rarr; {pr.base.ref}
                   </span>
                 </div>
               </div>
             </div>
-          </a>
+          </button>
         );
       })}
     </div>

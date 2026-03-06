@@ -34,6 +34,7 @@ export interface Organization {
   discord?: string;
   telegram?: string;
   members: string[];
+  isPrivate?: boolean;
   createdAt: unknown;
   // GitHub App integration
   githubInstallationId?: number;
@@ -63,6 +64,14 @@ export interface Project {
   githubRepos?: GitHubRepoLink[];
 }
 
+/** A skill/plugin self-reported by an agent on connect */
+export interface ReportedSkill {
+  id: string;
+  name: string;
+  type: 'skill' | 'plugin';
+  version?: string;
+}
+
 export interface Agent {
   id: string;
   orgId: string;
@@ -74,6 +83,10 @@ export interface Agent {
   projectIds: string[];
   apiKey?: string;
   avatarUrl?: string;
+  /** Short bio the agent writes about itself on connect */
+  bio?: string;
+  /** Skills/plugins the agent self-reports when connecting */
+  reportedSkills?: ReportedSkill[];
   createdAt: unknown;
 }
 
@@ -158,6 +171,7 @@ export async function createOrganization(data: Omit<Organization, "id">): Promis
   const ref = await addDoc(collection(db, "organizations"), {
     ...data,
     description: data.description || "",
+    isPrivate: false,
     inviteCode,
     createdAt: serverTimestamp(),
   });
@@ -199,6 +213,12 @@ export async function getOrganizationsByWallet(walletAddress: string): Promise<O
   });
 
   return Array.from(orgMap.values());
+}
+
+export async function getPublicOrganizations(): Promise<Organization[]> {
+  const q = query(collection(db, "organizations"), where("isPrivate", "==", false));
+  const snap = await getDocs(q);
+  return snap.docs.map(d => ({ id: d.id, ...d.data() } as Organization));
 }
 
 export async function addMemberToOrganization(orgId: string, walletAddress: string): Promise<void> {
@@ -431,6 +451,27 @@ export async function sendMessage(data: Omit<Message, "id">): Promise<string> {
   return ref.id;
 }
 
+// ─── Reporting ──────────────────────────────────────────
+
+export interface Report {
+  id: string;
+  orgId: string;
+  reportedUserId: string;
+  messageId?: string;
+  channelId?: string;
+  reason: string;
+  reportedBy: string;
+  createdAt: unknown;
+}
+
+export async function createReport(data: Omit<Report, "id" | "createdAt">): Promise<string> {
+  const ref = await addDoc(collection(db, "reports"), {
+    ...data,
+    createdAt: serverTimestamp(),
+  });
+  return ref.id;
+}
+
 export function onMessagesByChannel(
   channelId: string,
   callback: (messages: Message[]) => void
@@ -482,6 +523,12 @@ export async function createJob(data: Omit<Job, "id">): Promise<string> {
     updatedAt: serverTimestamp(),
   });
   return ref.id;
+}
+
+export async function getJob(jobId: string): Promise<Job | null> {
+  const snap = await getDoc(doc(db, "jobs", jobId));
+  if (!snap.exists()) return null;
+  return { id: snap.id, ...snap.data() } as Job;
 }
 
 export async function getJobsByOrg(orgId: string): Promise<Job[]> {
@@ -674,4 +721,162 @@ export function onGitHubEventsByProject(
       .map(d => ({ id: d.id, ...d.data() } as GitHubEvent));
     callback(events);
   });
+}
+
+// ─── Agent Group Chat ───────────────────────────────────
+
+const AGENT_GROUP_CHAT_NAME = "Agent Hub";
+
+/** Ensure the org-wide agent group chat channel exists (deduplicates if race created extras) */
+export async function ensureAgentGroupChat(orgId: string): Promise<Channel> {
+  // Targeted query just for Agent Hub channels to minimize race window
+  const q = query(
+    collection(db, "channels"),
+    where("orgId", "==", orgId),
+    where("name", "==", AGENT_GROUP_CHAT_NAME),
+  );
+  const snap = await getDocs(q);
+
+  if (!snap.empty) {
+    const primary = snap.docs[0];
+    // Clean up any duplicates created by race conditions
+    if (snap.docs.length > 1) {
+      const extras = snap.docs.slice(1);
+      await Promise.all(extras.map(d => deleteDoc(doc(db, "channels", d.id))));
+    }
+    return { id: primary.id, ...primary.data() } as Channel;
+  }
+
+  const id = await createChannel({
+    orgId,
+    name: AGENT_GROUP_CHAT_NAME,
+    createdAt: new Date(),
+  });
+
+  return { id, orgId, name: AGENT_GROUP_CHAT_NAME, createdAt: new Date() };
+}
+
+/** Agent check-in: posts a status message to the agent group chat, stores reported skills/bio, and logs an AgentComm */
+export async function agentCheckIn(
+  agent: Agent,
+  orgId: string,
+  reportedSkills?: ReportedSkill[],
+  bio?: string,
+): Promise<void> {
+  const hub = await ensureAgentGroupChat(orgId);
+
+  // Store reported skills and bio on the agent document if provided
+  const updates: Record<string, unknown> = {};
+  if (reportedSkills && reportedSkills.length > 0) updates.reportedSkills = reportedSkills;
+  if (bio) updates.bio = bio;
+  if (Object.keys(updates).length > 0) {
+    await updateAgent(agent.id, updates as Partial<Agent>);
+  }
+
+  // Build skill summary for the check-in message
+  const skillNames = (reportedSkills ?? agent.reportedSkills ?? []).map(s => s.name);
+  const skillSuffix = skillNames.length > 0
+    ? ` | Skills: ${skillNames.join(", ")}`
+    : "";
+
+  // Post to group chat channel
+  await sendMessage({
+    channelId: hub.id,
+    senderId: agent.id,
+    senderName: agent.name,
+    senderType: "agent",
+    content: `🟢 **${agent.name}** (${agent.type}) is now online and listening.${skillSuffix}`,
+    orgId,
+    createdAt: new Date(),
+  });
+
+  // Also log to agent comms feed
+  await sendAgentComm({
+    orgId,
+    fromAgentId: agent.id,
+    fromAgentName: agent.name,
+    toAgentId: "group",
+    toAgentName: AGENT_GROUP_CHAT_NAME,
+    type: "status",
+    content: `${agent.name} checked in — online and ready`,
+    metadata: {
+      event: "check_in",
+      agentType: agent.type,
+      reportedSkills: reportedSkills ?? agent.reportedSkills ?? [],
+    },
+    createdAt: new Date(),
+  });
+}
+
+/** Agent check-out: posts a disconnect message to the group chat */
+export async function agentCheckOut(
+  agent: Agent,
+  orgId: string,
+): Promise<void> {
+  const hub = await ensureAgentGroupChat(orgId);
+
+  await sendMessage({
+    channelId: hub.id,
+    senderId: agent.id,
+    senderName: agent.name,
+    senderType: "agent",
+    content: `🔴 **${agent.name}** went offline.`,
+    orgId,
+    createdAt: new Date(),
+  });
+}
+
+// ─── Platform Data (full org visibility for agents) ─────
+
+/** Get a complete snapshot of platform data for an org — agents, tasks, jobs, projects, channels */
+export async function getPlatformSnapshot(orgId: string) {
+  const [agents, projects, tasks, jobs, channels] = await Promise.all([
+    getAgentsByOrg(orgId),
+    getProjectsByOrg(orgId),
+    getTasksByOrg(orgId),
+    getJobsByOrg(orgId),
+    getChannelsByOrg(orgId),
+  ]);
+
+  return {
+    agents: agents.map(a => ({
+      id: a.id,
+      name: a.name,
+      type: a.type,
+      status: a.status,
+      capabilities: a.capabilities,
+      projectIds: a.projectIds,
+      reportedSkills: a.reportedSkills ?? [],
+      bio: a.bio ?? "",
+    })),
+    projects: projects.map(p => ({
+      id: p.id,
+      name: p.name,
+      status: p.status,
+      agentIds: p.agentIds,
+    })),
+    tasks: tasks.map(t => ({
+      id: t.id,
+      title: t.title,
+      status: t.status,
+      priority: t.priority,
+      assigneeAgentId: t.assigneeAgentId,
+      projectId: t.projectId,
+    })),
+    jobs: jobs.map(j => ({
+      id: j.id,
+      title: j.title,
+      status: j.status,
+      priority: j.priority,
+      takenByAgentId: j.takenByAgentId,
+      reward: j.reward,
+      requiredSkills: j.requiredSkills,
+    })),
+    channels: channels.map(c => ({
+      id: c.id,
+      name: c.name,
+      projectId: c.projectId,
+    })),
+    timestamp: Date.now(),
+  };
 }

@@ -1,4 +1,4 @@
-/** Analytics — Live on-chain performance analytics from Hedera Testnet. */
+/** Analytics — Live on-chain performance analytics. */
 "use client";
 
 import { useMemo } from "react";

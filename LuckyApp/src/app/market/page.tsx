@@ -6,6 +6,7 @@ import {
     Search, Download, Trash2, Check, Loader2,
     Puzzle, Star, Shield, ShieldCheck, Wrench, Plug, Store,
     Layers, Users, Plus, Clock, CheckCircle2, XCircle,
+    CreditCard, Crown, Infinity, Calendar,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -14,26 +15,34 @@ import { Input } from "@/components/ui/input";
 import { useOrg } from "@/contexts/OrgContext";
 import { useActiveAccount } from "thirdweb/react";
 import {
-    type Skill, type InstalledSkill, type MarketItemType, type CommunityMarketItem,
+    type Skill, type OwnedItem, type MarketItemType, type CommunityMarketItem,
+    type MarketSubscription, type SubscriptionPlan,
     SKILL_REGISTRY, SKILL_BUNDLES,
     MOD_CATEGORIES, PLUGIN_CATEGORIES, SKILL_ONLY_CATEGORIES,
-    installSkill, uninstallSkill, toggleSkill, getInstalledSkills, installBundle,
+    acquireItem, removeFromInventory, toggleInventoryItem, getOwnedItems, acquireBundle,
     getCommunityItems, getUserSubmissions, deleteCommunityItem,
+    getOrgSubscriptions, subscribeToItem, cancelSubscription,
 } from "@/lib/skills";
 import { SubmitMarketItemDialog } from "@/components/market/submit-dialog";
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog";
 
 // ═══════════════════════════════════════════════════════════════
 // Tab Config
 // ═══════════════════════════════════════════════════════════════
 
-type Tab = "mods" | "plugins" | "skills" | "bundles" | "installed" | "submit";
+type Tab = "mods" | "plugins" | "skills" | "bundles" | "inventory" | "submit";
 
 const TABS: { key: Tab; label: string; icon: typeof Wrench; type?: MarketItemType }[] = [
     { key: "mods", label: "Mods", icon: Wrench, type: "mod" },
     { key: "plugins", label: "Plugins", icon: Plug, type: "plugin" },
     { key: "skills", label: "Skills", icon: Puzzle, type: "skill" },
     { key: "bundles", label: "Bundles", icon: Layers },
-    { key: "installed", label: "Installed", icon: Check },
+    { key: "inventory", label: "Inventory", icon: Check },
     { key: "submit", label: "Submit", icon: Plus },
 ];
 
@@ -47,19 +56,42 @@ const CATEGORIES_BY_TYPE: Record<MarketItemType, string[]> = {
 // Market Item Card
 // ═══════════════════════════════════════════════════════════════
 
+/** Helper: format price display */
+function formatPrice(price: number): string {
+    return price % 1 === 0 ? `$${price}` : `$${price.toFixed(2)}`;
+}
+
+/** Helper: get cheapest tier label */
+function getCheapestLabel(item: Skill): string | null {
+    if (item.pricing.model === "free") return null;
+    const tiers = item.pricing.tiers;
+    if (!tiers || tiers.length === 0) return null;
+    const monthly = tiers.find((t) => t.plan === "monthly");
+    if (monthly) return `${formatPrice(monthly.price)}/mo`;
+    const yearly = tiers.find((t) => t.plan === "yearly");
+    if (yearly) return `${formatPrice(yearly.price)}/yr`;
+    const lifetime = tiers.find((t) => t.plan === "lifetime");
+    if (lifetime) return `${formatPrice(lifetime.price)} once`;
+    return null;
+}
+
 function MarketItemCard({
-    item, installed, onInstall, onUninstall, onToggle, busy,
+    item, owned, subscription, onGet, onRemove, onSubscribe, onCancelSub, busy,
 }: {
     item: Skill;
-    installed?: InstalledSkill;
-    onInstall: () => void;
-    onUninstall: () => void;
-    onToggle: () => void;
+    owned?: OwnedItem;
+    subscription?: MarketSubscription;
+    onGet: () => void;
+    onRemove: () => void;
+    onSubscribe: () => void;
+    onCancelSub: () => void;
     busy: boolean;
 }) {
+    const isPaid = item.pricing.model === "subscription";
+    const priceLabel = getCheapestLabel(item);
+
     return (
-        <Card className={`p-4 bg-card border-border transition-all hover:border-amber-500/20 group ${installed && !installed.enabled ? "opacity-60" : ""
-            }`}>
+        <Card className="p-4 bg-card border-border transition-all hover:border-amber-500/20 group">
             <div className="flex items-start gap-3">
                 <div className="text-2xl shrink-0 w-10 h-10 flex items-center justify-center rounded-lg bg-muted/50">
                     {item.icon}
@@ -68,6 +100,13 @@ function MarketItemCard({
                     <div className="flex items-center gap-2 mb-0.5">
                         <h3 className="font-semibold text-sm truncate">{item.name}</h3>
                         <span className="text-[10px] text-muted-foreground">v{item.version}</span>
+                        {isPaid && priceLabel ? (
+                            <Badge className="text-[10px] bg-amber-500/10 text-amber-400 border-amber-500/20">
+                                <CreditCard className="h-2.5 w-2.5 mr-0.5" />{priceLabel}
+                            </Badge>
+                        ) : (
+                            <Badge variant="outline" className="text-[10px] border-emerald-500/20 text-emerald-400">Free</Badge>
+                        )}
                     </div>
                     <p className="text-xs text-muted-foreground line-clamp-2 mb-2">{item.description}</p>
                     <div className="flex items-center gap-2 flex-wrap">
@@ -81,6 +120,12 @@ function MarketItemCard({
                                 <Users className="h-2.5 w-2.5 mr-0.5" />Community
                             </Badge>
                         )}
+                        {subscription && (
+                            <Badge className="text-[10px] bg-purple-500/10 text-purple-400 border-purple-500/20">
+                                <Crown className="h-2.5 w-2.5 mr-0.5" />
+                                {subscription.plan === "lifetime" ? "Lifetime" : subscription.plan === "yearly" ? "Yearly" : "Monthly"}
+                            </Badge>
+                        )}
                         {item.requiredKeys?.map((k) => (
                             <Badge key={k} variant="outline" className="text-[10px] border-amber-500/20 text-amber-500">
                                 <Shield className="h-2.5 w-2.5 mr-0.5" />{k}
@@ -89,38 +134,54 @@ function MarketItemCard({
                     </div>
                 </div>
                 <div className="shrink-0">
-                    {installed ? (
+                    {owned ? (
                         <div className="flex items-center gap-1">
+                            <Badge className="bg-emerald-500/10 text-emerald-400 border-emerald-500/20 text-[10px]">
+                                <Check className="h-2.5 w-2.5 mr-0.5" />Owned
+                            </Badge>
                             <button
-                                onClick={onToggle}
-                                disabled={busy}
-                                className={`px-2 py-1 rounded text-[10px] font-medium transition-all ${installed.enabled
-                                        ? "bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20"
-                                        : "bg-muted text-muted-foreground hover:bg-muted/80"
-                                    }`}
-                            >
-                                {installed.enabled ? "On" : "Off"}
-                            </button>
-                            <button
-                                onClick={onUninstall}
+                                onClick={onRemove}
                                 disabled={busy}
                                 className="p-1 rounded text-red-400 hover:bg-red-500/10 transition-colors"
-                                title="Uninstall"
+                                title="Remove from inventory"
                             >
                                 {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
                             </button>
                         </div>
-                    ) : (
+                    ) : isPaid && !subscription ? (
                         <Button
                             size="sm"
                             variant="outline"
-                            onClick={onInstall}
+                            onClick={onSubscribe}
                             disabled={busy}
-                            className="h-7 text-xs gap-1 border-amber-500/30 text-amber-500 hover:bg-amber-500/10"
+                            className="h-7 text-xs gap-1 border-purple-500/30 text-purple-400 hover:bg-purple-500/10"
                         >
-                            {busy ? <Loader2 className="h-3 w-3 animate-spin" /> : <Download className="h-3 w-3" />}
-                            Install
+                            {busy ? <Loader2 className="h-3 w-3 animate-spin" /> : <Crown className="h-3 w-3" />}
+                            Subscribe
                         </Button>
+                    ) : (
+                        <div className="flex items-center gap-1">
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={onGet}
+                                disabled={busy}
+                                className="h-7 text-xs gap-1 border-amber-500/30 text-amber-500 hover:bg-amber-500/10"
+                            >
+                                {busy ? <Loader2 className="h-3 w-3 animate-spin" /> : <Download className="h-3 w-3" />}
+                                Get
+                            </Button>
+                            {isPaid && subscription && (
+                                <button
+                                    onClick={onCancelSub}
+                                    disabled={busy}
+                                    className="p-1 rounded text-red-400 hover:bg-red-500/10 transition-colors"
+                                    title="Cancel subscription"
+                                >
+                                    <XCircle className="h-3.5 w-3.5" />
+                                </button>
+                            )}
+                        </div>
                     )}
                 </div>
             </div>
@@ -135,7 +196,7 @@ function MarketItemCard({
 export default function MarketPage() {
     const { currentOrg } = useOrg();
     const account = useActiveAccount();
-    const [installed, setInstalled] = useState<InstalledSkill[]>([]);
+    const [inventory, setInventory] = useState<OwnedItem[]>([]);
     const [communityItems, setCommunityItems] = useState<CommunityMarketItem[]>([]);
     const [userSubmissions, setUserSubmissions] = useState<CommunityMarketItem[]>([]);
     const [loading, setLoading] = useState(true);
@@ -144,17 +205,19 @@ export default function MarketPage() {
     const [sourceFilter, setSourceFilter] = useState<"all" | "verified" | "community">("all");
     const [busyId, setBusyId] = useState<string | null>(null);
     const [tab, setTab] = useState<Tab>("mods");
+    const [subscriptions, setSubscriptions] = useState<MarketSubscription[]>([]);
+    const [subscribeTarget, setSubscribeTarget] = useState<Skill | null>(null);
     const [submitOpen, setSubmitOpen] = useState(false);
     const [deletingId, setDeletingId] = useState<string | null>(null);
 
-    const loadInstalled = useCallback(async () => {
+    const loadInventory = useCallback(async () => {
         if (!currentOrg) return;
         try {
             setLoading(true);
-            const data = await getInstalledSkills(currentOrg.id);
-            setInstalled(data);
+            const data = await getOwnedItems(currentOrg.id);
+            setInventory(data);
         } catch (err) {
-            console.error("Failed to load installed items:", err);
+            console.error("Failed to load inventory:", err);
         } finally {
             setLoading(false);
         }
@@ -179,9 +242,20 @@ export default function MarketPage() {
         }
     }, [account]);
 
-    useEffect(() => { loadInstalled(); }, [loadInstalled]);
+    const loadSubscriptions = useCallback(async () => {
+        if (!currentOrg) return;
+        try {
+            const subs = await getOrgSubscriptions(currentOrg.id);
+            setSubscriptions(subs);
+        } catch (err) {
+            console.error("Failed to load subscriptions:", err);
+        }
+    }, [currentOrg]);
+
+    useEffect(() => { loadInventory(); }, [loadInventory]);
     useEffect(() => { loadCommunityItems(); }, [loadCommunityItems]);
     useEffect(() => { loadUserSubmissions(); }, [loadUserSubmissions]);
+    useEffect(() => { loadSubscriptions(); }, [loadSubscriptions]);
 
     // Merge community items with registry
     const allItems: Skill[] = useMemo(() => {
@@ -197,6 +271,7 @@ export default function MarketPage() {
             author: c.submittedByName || c.submittedBy.slice(0, 8) + "...",
             requiredKeys: c.requiredKeys,
             tags: c.tags,
+            pricing: c.pricing,
         }));
         return [...SKILL_REGISTRY, ...communitySkills];
     }, [communityItems]);
@@ -215,44 +290,55 @@ export default function MarketPage() {
     // Reset category when switching tabs
     useEffect(() => { setCategory("All"); setSearch(""); }, [tab]);
 
-    const installedMap = useMemo(() => new Map(installed.map((i) => [i.skillId, i])), [installed]);
+    const inventoryMap = useMemo(() => new Map(inventory.map((i) => [i.skillId, i])), [inventory]);
+    const subscriptionMap = useMemo(() => new Map(subscriptions.map((s) => [s.itemId, s])), [subscriptions]);
 
-    const handleInstall = async (skillId: string) => {
+    const handleGet = async (skillId: string) => {
         if (!currentOrg || !account) return;
         setBusyId(skillId);
         try {
-            await installSkill(currentOrg.id, skillId, account.address);
-            await loadInstalled();
+            await acquireItem(currentOrg.id, skillId, account.address);
+            await loadInventory();
         } finally { setBusyId(null); }
     };
 
-    const handleUninstall = async (inst: InstalledSkill) => {
-        setBusyId(inst.skillId);
+    const handleRemove = async (item: OwnedItem) => {
+        setBusyId(item.skillId);
         try {
-            await uninstallSkill(inst.id);
-            await loadInstalled();
+            await removeFromInventory(item.id);
+            await loadInventory();
         } finally { setBusyId(null); }
     };
 
-    const handleToggle = async (inst: InstalledSkill) => {
-        setBusyId(inst.skillId);
-        try {
-            await toggleSkill(inst.id, !inst.enabled);
-            setInstalled((prev) => prev.map((i) => i.id === inst.id ? { ...i, enabled: !i.enabled } : i));
-        } finally { setBusyId(null); }
-    };
-
-    const handleInstallBundle = async (bundleId: string) => {
+    const handleGetBundle = async (bundleId: string) => {
         if (!currentOrg || !account) return;
         setBusyId(bundleId);
         try {
-            await installBundle(
+            await acquireBundle(
                 currentOrg.id,
                 bundleId,
                 account.address,
-                installed.map((i) => i.skillId),
+                inventory.map((i) => i.skillId),
             );
-            await loadInstalled();
+            await loadInventory();
+        } finally { setBusyId(null); }
+    };
+
+    const handleSubscribe = async (itemId: string, plan: SubscriptionPlan) => {
+        if (!currentOrg || !account) return;
+        setBusyId(itemId);
+        try {
+            await subscribeToItem(currentOrg.id, itemId, plan, account.address);
+            await loadSubscriptions();
+            setSubscribeTarget(null);
+        } finally { setBusyId(null); }
+    };
+
+    const handleCancelSubscription = async (sub: MarketSubscription) => {
+        setBusyId(sub.itemId);
+        try {
+            await cancelSubscription(sub.id);
+            await loadSubscriptions();
         } finally { setBusyId(null); }
     };
 
@@ -269,9 +355,9 @@ export default function MarketPage() {
             items = items.filter((s) => s.type === activeType);
         }
 
-        // For installed tab, only show installed items
-        if (tab === "installed") {
-            items = items.filter((s) => installedMap.has(s.id));
+        // For inventory tab, only show owned items
+        if (tab === "inventory") {
+            items = items.filter((s) => inventoryMap.has(s.id));
         }
 
         // Search
@@ -295,7 +381,7 @@ export default function MarketPage() {
         }
 
         return items;
-    }, [allItems, activeType, tab, search, category, sourceFilter, installedMap]);
+    }, [allItems, activeType, tab, search, category, sourceFilter, inventoryMap]);
 
     // Categories for active tab (include community categories dynamically)
     const categories = useMemo(() => {
@@ -312,10 +398,10 @@ export default function MarketPage() {
     const modCount = allItems.filter((s) => s.type === "mod").length;
     const pluginCount = allItems.filter((s) => s.type === "plugin").length;
     const skillCount = allItems.filter((s) => s.type === "skill").length;
-    const installedCount = installed.length;
+    const inventoryCount = inventory.length;
     const bundleCount = SKILL_BUNDLES.length;
     const submitCount = userSubmissions.length;
-    const tabCounts: Record<Tab, number> = { mods: modCount, plugins: pluginCount, skills: skillCount, bundles: bundleCount, installed: installedCount, submit: submitCount };
+    const tabCounts: Record<Tab, number> = { mods: modCount, plugins: pluginCount, skills: skillCount, bundles: bundleCount, inventory: inventoryCount, submit: submitCount };
 
     if (!account) {
         return (
@@ -338,11 +424,11 @@ export default function MarketPage() {
                         Market
                     </h1>
                     <p className="text-sm text-muted-foreground mt-2">
-                        Browse, install, and manage mods, plugins, and skills for your agents
+                        Browse and acquire mods, plugins, and skills for your swarm
                     </p>
                 </div>
                 <Badge className="bg-amber-500/10 text-amber-500 border-amber-500/20 text-sm">
-                    {installedCount} installed
+                    {inventoryCount} owned
                 </Badge>
             </div>
 
@@ -396,7 +482,7 @@ export default function MarketPage() {
                     </div>
 
                     {/* Category Chips */}
-                    {tab !== "installed" && categories.length > 1 && (
+                    {tab !== "inventory" && categories.length > 1 && (
                         <div className="flex items-center gap-1.5 overflow-x-auto mb-6">
                             {categories.map((cat) => (
                                 <button
@@ -420,24 +506,31 @@ export default function MarketPage() {
                         </div>
                     ) : filteredItems.length > 0 ? (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                            {filteredItems.map((item) => (
-                                <MarketItemCard
-                                    key={item.id}
-                                    item={item}
-                                    installed={installedMap.get(item.id)}
-                                    onInstall={() => handleInstall(item.id)}
-                                    onUninstall={() => { const inst = installedMap.get(item.id); if (inst) handleUninstall(inst); }}
-                                    onToggle={() => { const inst = installedMap.get(item.id); if (inst) handleToggle(inst); }}
-                                    busy={busyId === item.id}
-                                />
-                            ))}
+                            {filteredItems.map((item) => {
+                                // For community items, subscription key is the Firestore doc ID (strip "community-" prefix)
+                                const subKey = item.id.startsWith("community-") ? item.id.slice(10) : item.id;
+                                const sub = subscriptionMap.get(subKey);
+                                return (
+                                    <MarketItemCard
+                                        key={item.id}
+                                        item={item}
+                                        owned={inventoryMap.get(item.id)}
+                                        subscription={sub}
+                                        onGet={() => handleGet(item.id)}
+                                        onRemove={() => { const own = inventoryMap.get(item.id); if (own) handleRemove(own); }}
+                                        onSubscribe={() => setSubscribeTarget(item)}
+                                        onCancelSub={() => { if (sub) handleCancelSubscription(sub); }}
+                                        busy={busyId === item.id}
+                                    />
+                                );
+                            })}
                         </div>
-                    ) : tab === "installed" && installed.length === 0 ? (
+                    ) : tab === "inventory" && inventory.length === 0 ? (
                         <Card className="p-12 text-center bg-card border-border border-dashed">
                             <Store className="h-12 w-12 mx-auto text-muted-foreground/30 mb-4" />
-                            <h3 className="text-lg font-semibold mb-2">Nothing installed yet</h3>
+                            <h3 className="text-lg font-semibold mb-2">Your inventory is empty</h3>
                             <p className="text-sm text-muted-foreground mb-6">
-                                Browse the marketplace to install mods, plugins, and skills for your agents.
+                                Browse the market to get mods, plugins, and skills for your swarm.
                             </p>
                             <Button onClick={() => setTab("skills")} className="bg-amber-500 hover:bg-amber-600 text-black gap-2">
                                 <Puzzle className="h-4 w-4" /> Browse Skills
@@ -488,6 +581,13 @@ export default function MarketPage() {
                                             <div className="flex items-center gap-2 flex-wrap">
                                                 <Badge variant="outline" className="text-[10px]">{sub.category}</Badge>
                                                 <Badge variant="outline" className="text-[10px] capitalize">{sub.type}</Badge>
+                                                {sub.pricing?.model === "subscription" ? (
+                                                    <Badge variant="outline" className="text-[10px] border-purple-500/20 text-purple-400">
+                                                        <CreditCard className="h-2.5 w-2.5 mr-0.5" />Paid
+                                                    </Badge>
+                                                ) : (
+                                                    <Badge variant="outline" className="text-[10px] border-emerald-500/20 text-emerald-400">Free</Badge>
+                                                )}
                                                 {sub.status === "pending" && (
                                                     <Badge variant="outline" className="text-[10px] border-yellow-500/20 text-yellow-500">
                                                         <Clock className="h-2.5 w-2.5 mr-0.5" />Pending
@@ -554,7 +654,7 @@ export default function MarketPage() {
                 <div className="space-y-4">
                     {SKILL_BUNDLES.map((bundle) => {
                         const bundleSkills = allItems.filter((s) => bundle.skillIds.includes(s.id));
-                        const allInstalled = bundle.skillIds.every((id) => installedMap.has(id));
+                        const allOwned = bundle.skillIds.every((id) => inventoryMap.has(id));
                         return (
                             <Card key={bundle.id} className="p-5 bg-card border-border">
                                 <div className="flex items-start gap-4">
@@ -565,9 +665,9 @@ export default function MarketPage() {
                                         <div className="flex items-center gap-2 mb-1">
                                             <h3 className="font-bold text-base">{bundle.name}</h3>
                                             <Badge variant="outline" className="text-[10px]">{bundle.skillIds.length} items</Badge>
-                                            {allInstalled && (
+                                            {allOwned && (
                                                 <Badge className="bg-emerald-500/10 text-emerald-400 border-emerald-500/20 text-[10px]">
-                                                    <Check className="h-2.5 w-2.5 mr-0.5" /> Installed
+                                                    <Check className="h-2.5 w-2.5 mr-0.5" /> Owned
                                                 </Badge>
                                             )}
                                         </div>
@@ -576,26 +676,26 @@ export default function MarketPage() {
                                             {bundleSkills.map((s) => (
                                                 <span
                                                     key={s.id}
-                                                    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs ${installedMap.has(s.id)
+                                                    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs ${inventoryMap.has(s.id)
                                                             ? "bg-emerald-500/10 text-emerald-400"
                                                             : "bg-muted/50 text-muted-foreground"
                                                         }`}
                                                 >
                                                     {s.icon} {s.name}
-                                                    {installedMap.has(s.id) && <Check className="h-3 w-3" />}
+                                                    {inventoryMap.has(s.id) && <Check className="h-3 w-3" />}
                                                 </span>
                                             ))}
                                         </div>
                                     </div>
                                     <div className="shrink-0">
-                                        {allInstalled ? (
+                                        {allOwned ? (
                                             <Badge className="bg-emerald-500/10 text-emerald-400 border-emerald-500/20">
-                                                <Check className="h-3 w-3 mr-1" /> All Installed
+                                                <Check className="h-3 w-3 mr-1" /> All Owned
                                             </Badge>
                                         ) : (
                                             <Button
                                                 size="sm"
-                                                onClick={() => handleInstallBundle(bundle.id)}
+                                                onClick={() => handleGetBundle(bundle.id)}
                                                 disabled={busyId === bundle.id}
                                                 className="bg-amber-500 hover:bg-amber-600 text-black gap-1"
                                             >
@@ -604,7 +704,7 @@ export default function MarketPage() {
                                                 ) : (
                                                     <Download className="h-3 w-3" />
                                                 )}
-                                                Install Bundle
+                                                Get Bundle
                                             </Button>
                                         )}
                                     </div>
@@ -614,6 +714,69 @@ export default function MarketPage() {
                     })}
                 </div>
             )}
+
+            {/* Subscribe Plan Picker Dialog */}
+            <Dialog open={!!subscribeTarget} onOpenChange={(open) => { if (!open) setSubscribeTarget(null); }}>
+                <DialogContent className="max-w-md">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                            <span className="text-xl">{subscribeTarget?.icon}</span>
+                            Subscribe to {subscribeTarget?.name}
+                        </DialogTitle>
+                    </DialogHeader>
+                    {subscribeTarget?.pricing.tiers && subscribeTarget.pricing.tiers.length > 0 ? (
+                        <div className="space-y-3">
+                            <p className="text-sm text-muted-foreground">
+                                Choose a plan to access this {subscribeTarget.type}. The creator controls pricing and access.
+                            </p>
+                            <div className="grid gap-2">
+                                {subscribeTarget.pricing.tiers.map((tier) => (
+                                    <button
+                                        key={tier.plan}
+                                        onClick={() => {
+                                            const subKey = subscribeTarget.id.startsWith("community-") ? subscribeTarget.id.slice(10) : subscribeTarget.id;
+                                            handleSubscribe(subKey, tier.plan);
+                                        }}
+                                        disabled={!!busyId}
+                                        className="flex items-center justify-between p-4 rounded-lg border border-border hover:border-purple-500/30 hover:bg-purple-500/5 transition-all text-left"
+                                    >
+                                        <div className="flex items-center gap-3">
+                                            {tier.plan === "monthly" && <Calendar className="h-5 w-5 text-purple-400" />}
+                                            {tier.plan === "yearly" && <Crown className="h-5 w-5 text-amber-400" />}
+                                            {tier.plan === "lifetime" && <Infinity className="h-5 w-5 text-emerald-400" />}
+                                            <div>
+                                                <div className="font-semibold text-sm capitalize">{tier.plan}</div>
+                                                <div className="text-xs text-muted-foreground">
+                                                    {tier.plan === "monthly" && "Billed monthly, cancel anytime"}
+                                                    {tier.plan === "yearly" && "Billed annually, best value"}
+                                                    {tier.plan === "lifetime" && "One-time payment, forever access"}
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div className="text-right">
+                                            <div className="font-bold text-sm">
+                                                {formatPrice(tier.price)}
+                                            </div>
+                                            <div className="text-[10px] text-muted-foreground">
+                                                {tier.plan === "monthly" && "/month"}
+                                                {tier.plan === "yearly" && "/year"}
+                                                {tier.plan === "lifetime" && "once"}
+                                            </div>
+                                        </div>
+                                    </button>
+                                ))}
+                            </div>
+                            {busyId && (
+                                <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground py-2">
+                                    <Loader2 className="h-4 w-4 animate-spin" /> Processing...
+                                </div>
+                            )}
+                        </div>
+                    ) : (
+                        <p className="text-sm text-muted-foreground">No pricing tiers available for this item.</p>
+                    )}
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

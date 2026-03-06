@@ -2,6 +2,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
+import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -74,8 +75,6 @@ export default function JobBoardPage() {
   const [tab, setTab] = useState<ViewTab>("org");
 
   // ── Firestore state ──
-  const [selectedJob, setSelectedJob] = useState<Job | null>(null);
-  const [detailOpen, setDetailOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [jobs, setJobs] = useState<Job[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
@@ -207,26 +206,10 @@ export default function JobBoardPage() {
         }
       }
 
-      setDetailOpen(false);
-      setSelectedJob(null);
       await loadData();
     } catch (err) {
       console.error("Failed to take job:", err);
       setError(err instanceof Error ? err.message : "Failed to take job");
-    } finally {
-      setUpdating(false);
-    }
-  };
-
-  const handleUpdateJobStatus = async (job: Job, newStatus: Job["status"]) => {
-    try {
-      setUpdating(true);
-      await updateJob(job.id, { status: newStatus });
-      await loadData();
-      setSelectedJob({ ...job, status: newStatus });
-    } catch (err) {
-      console.error("Failed to update job:", err);
-      setError(err instanceof Error ? err.message : "Failed to update job");
     } finally {
       setUpdating(false);
     }
@@ -406,13 +389,12 @@ export default function JobBoardPage() {
                     </div>
                     <div className="space-y-2 min-h-[100px]">
                       {colJobs.map((job) => (
+                        <Link key={job.id} href={`/jobs/${job.id}`}>
                         <Card
-                          key={job.id}
                           className={cn(
                             "cursor-pointer hover:shadow-md transition-all hover:border-amber-300 dark:hover:border-amber-700 relative",
                             job.status === "in_progress" && "border-amber-500/40 animate-glow-pulse"
                           )}
-                          onClick={() => { setSelectedJob(job); setDetailOpen(true); }}
                         >
                           {/* Indeterminate progress bar for in_progress */}
                           {job.status === "in_progress" && (
@@ -464,7 +446,7 @@ export default function JobBoardPage() {
                               </div>
                             )}
                             {job.status === "open" && agents.length > 0 && (
-                              <div className="pt-1" onClick={(e) => e.stopPropagation()}>
+                              <div className="pt-1" onClick={(e) => { e.stopPropagation(); e.preventDefault(); }}>
                                 <Select onValueChange={(agentId) => handleTakeJob(job, agentId)}>
                                   <SelectTrigger className="h-7 text-xs bg-amber-500/10 border-amber-500/30 hover:bg-amber-500/20">
                                     <SelectValue placeholder="▶️ Start — pick agent..." />
@@ -496,6 +478,7 @@ export default function JobBoardPage() {
                             )}
                           </CardContent>
                         </Card>
+                        </Link>
                       ))}
                       {colJobs.length === 0 && (
                         <div className="text-center py-8 text-xs text-muted-foreground border border-dashed border-border rounded-lg">
@@ -558,7 +541,7 @@ export default function JobBoardPage() {
                       </div>
                       <div className="flex gap-2">
                         <span className="font-mono text-emerald-500 font-bold shrink-0">2.</span>
-                        <span>Call <code className="bg-muted px-1 rounded text-[11px]">claimTask(taskId)</code> with a Hedera wallet.</span>
+                        <span>Call <code className="bg-muted px-1 rounded text-[11px]">claimTask(taskId)</code> with your connected wallet.</span>
                       </div>
                       <div className="flex gap-2">
                         <span className="font-mono text-emerald-500 font-bold shrink-0">3.</span>
@@ -566,7 +549,7 @@ export default function JobBoardPage() {
                       </div>
                     </div>
                     <p className="text-[10px] text-muted-foreground mt-3 font-mono truncate">
-                      Contract: {CONTRACTS.TASK_BOARD} &middot; Hedera Testnet (chainId 296)
+                      Contract: {CONTRACTS.TASK_BOARD}
                     </p>
                   </CardContent>
                 </Card>
@@ -635,94 +618,6 @@ export default function JobBoardPage() {
       )}
 
       {/* ═══════════ DIALOGS ═══════════ */}
-
-      {/* Firestore Job Detail */}
-      {selectedJob && (
-        <Dialog open={detailOpen} onOpenChange={setDetailOpen}>
-          <DialogContent className="max-w-lg">
-            <DialogHeader>
-              <DialogTitle className="flex items-start gap-2 leading-snug">
-                <span className="min-w-0 break-words">{selectedJob.title}</span>
-                <Badge className={cn("text-xs shrink-0", priorityColors[selectedJob.priority])}>
-                  {selectedJob.priority}
-                </Badge>
-              </DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4">
-              <p className="text-sm text-muted-foreground">
-                {selectedJob.description || "No description provided"}
-              </p>
-              {selectedJob.reward && (
-                <div className="p-3 rounded-md bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800">
-                  <span className="text-sm font-medium text-amber-700 dark:text-amber-400">💰 Budget: {selectedJob.reward} {currencySymbol}</span>
-                </div>
-              )}
-              {(selectedJob.requiredSkills ?? []).length > 0 && (
-                <div>
-                  <span className="text-xs text-muted-foreground block mb-1.5">Required Skills</span>
-                  <div className="flex flex-wrap gap-1">
-                    {(selectedJob.requiredSkills ?? []).map((skill) => (
-                      <Badge key={skill} variant="outline" className="bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-800 text-xs">{skill}</Badge>
-                    ))}
-                  </div>
-                </div>
-              )}
-              <div className="grid grid-cols-2 gap-3 text-sm">
-                {selectedJob.projectId && (
-                  <div>
-                    <span className="text-xs text-muted-foreground">Project</span>
-                    <p className="font-medium truncate">{getProjectName(selectedJob.projectId)}</p>
-                  </div>
-                )}
-                <div>
-                  <span className="text-xs text-muted-foreground">Status</span>
-                  <p className="font-medium capitalize">{selectedJob.status.replace("_", " ")}</p>
-                </div>
-                <div>
-                  <span className="text-xs text-muted-foreground">Assigned to</span>
-                  <p className="font-medium truncate">{getAgentName(selectedJob.takenByAgentId)}</p>
-                </div>
-                <div>
-                  <span className="text-xs text-muted-foreground">Posted</span>
-                  <p className="font-medium">{formatTime(selectedJob.createdAt)}</p>
-                </div>
-              </div>
-
-              {/* Assign agent */}
-              {selectedJob.status === "open" && agents.length > 0 && (
-                <div className="pt-3 border-t">
-                  <span className="text-xs text-muted-foreground block mb-2">Assign an agent</span>
-                  <div className="flex flex-wrap gap-2">
-                    {agents.map((agent) => (
-                      <Button key={agent.id} size="sm" variant="outline" onClick={() => handleTakeJob(selectedJob, agent.id)} disabled={updating} className="text-xs">
-                        🤖 {agent.name}
-                      </Button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Update status */}
-              <div className="flex items-center gap-2 pt-3 border-t">
-                <span className="text-xs text-muted-foreground">Status:</span>
-                <div className="flex gap-1.5">
-                  {(["open", "in_progress", "completed"] as const).map((status) => (
-                    <Button
-                      key={status} size="sm"
-                      variant={selectedJob.status === status ? "default" : "outline"}
-                      onClick={() => handleUpdateJobStatus(selectedJob, status)}
-                      disabled={updating || selectedJob.status === status}
-                      className={cn("text-xs", selectedJob.status === status && "bg-amber-600 hover:bg-amber-700 text-black")}
-                    >
-                      {status === "in_progress" ? "In Progress" : status === "open" ? "Open" : "Completed"}
-                    </Button>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
-      )}
 
       {/* Onchain Task Detail */}
       {selectedOnchainTask && (

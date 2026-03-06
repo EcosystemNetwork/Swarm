@@ -3,10 +3,10 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useOrg } from "@/contexts/OrgContext";
-import type { GitHubRepo, GitHubPR, GitHubCommit, GitHubIssue, GitHubBranch } from "@/lib/github";
+import type { GitHubRepo, GitHubPR, GitHubCommit, GitHubIssue, GitHubBranch, GitHubComment } from "@/lib/github";
 
 // Re-export types for convenience
-export type { GitHubRepo, GitHubPR, GitHubCommit, GitHubIssue, GitHubBranch };
+export type { GitHubRepo, GitHubPR, GitHubCommit, GitHubIssue, GitHubBranch, GitHubComment };
 
 // ─── Repos ──────────────────────────────────────────────
 
@@ -196,5 +196,91 @@ export function useGitHubActions(owner: string, repo: string) {
     [currentOrg, owner, repo]
   );
 
-  return { createPR, postComment };
+  const createIssue = useCallback(
+    async (title: string, body: string, labels: string[] = []) => {
+      if (!currentOrg) throw new Error("No organization");
+      const res = await fetch(`/api/github/${owner}/${repo}/issues`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orgId: currentOrg.id, title, issueBody: body, labels }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to create issue");
+      return data.issue as GitHubIssue;
+    },
+    [currentOrg, owner, repo]
+  );
+
+  const mergePR = useCallback(
+    async (prNumber: number, mergeMethod: "merge" | "squash" | "rebase" = "merge") => {
+      if (!currentOrg) throw new Error("No organization");
+      const res = await fetch(`/api/github/${owner}/${repo}/pulls`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orgId: currentOrg.id, action: "merge", prNumber, mergeMethod }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to merge PR");
+    },
+    [currentOrg, owner, repo]
+  );
+
+  const closePR = useCallback(
+    async (prNumber: number) => {
+      if (!currentOrg) throw new Error("No organization");
+      const res = await fetch(`/api/github/${owner}/${repo}/pulls`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orgId: currentOrg.id, action: "close", prNumber }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to close PR");
+    },
+    [currentOrg, owner, repo]
+  );
+
+  const reopenPR = useCallback(
+    async (prNumber: number) => {
+      if (!currentOrg) throw new Error("No organization");
+      const res = await fetch(`/api/github/${owner}/${repo}/pulls`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orgId: currentOrg.id, action: "reopen", prNumber }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to reopen PR");
+    },
+    [currentOrg, owner, repo]
+  );
+
+  const reviewPR = useCallback(
+    async (prNumber: number, reviewBody: string, event: "APPROVE" | "REQUEST_CHANGES" | "COMMENT") => {
+      if (!currentOrg) throw new Error("No organization");
+      const res = await fetch(`/api/github/${owner}/${repo}/pulls`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orgId: currentOrg.id, action: "review", prNumber, reviewBody, event }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to submit review");
+    },
+    [currentOrg, owner, repo]
+  );
+
+  const getPRComments = useCallback(
+    async (prNumber: number): Promise<GitHubComment[]> => {
+      if (!currentOrg) throw new Error("No organization");
+      const res = await fetch(`/api/github/${owner}/${repo}/pulls`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orgId: currentOrg.id, action: "comments", prNumber }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to fetch comments");
+      return data.comments as GitHubComment[];
+    },
+    [currentOrg, owner, repo]
+  );
+
+  return { createPR, postComment, createIssue, mergePR, closePR, reopenPR, reviewPR, getPRComments };
 }

@@ -21,17 +21,26 @@ import {
   getJobsByOrg,
   updateAgent,
   deleteAgent,
+  agentCheckIn,
+  agentCheckOut,
   type Agent,
   type Project,
   type Task,
   type Job,
+  type ReportedSkill,
 } from "@/lib/firestore";
 import {
   SKILL_REGISTRY,
-  getInstalledSkills,
-  type InstalledSkill,
+  getOwnedItems,
+  getAgentSkills,
+  installSkillOnAgent,
+  removeSkillFromAgent,
+  type OwnedItem,
+  type AgentSkill,
+  type Skill,
 } from "@/lib/skills";
 import { shortAddress } from "@/lib/chains";
+import { getAgentAvatarUrl } from "@/lib/agent-avatar";
 
 const AGENT_TYPES: Agent['type'][] = ['Research', 'Trading', 'Operations', 'Support', 'Analytics', 'Scout', 'Security', 'Creative', 'Engineering', 'DevOps', 'Marketing', 'Finance', 'Data', 'Coordinator', 'Legal', 'Communication'];
 
@@ -66,8 +75,11 @@ export default function AgentDetailPage() {
   const [assignedProjects, setAssignedProjects] = useState<Project[]>([]);
   const [agentTasks, setAgentTasks] = useState<Task[]>([]);
   const [agentJobs, setAgentJobs] = useState<Job[]>([]);
-  const [installedSkills, setInstalledSkills] = useState<InstalledSkill[]>([]);
+  const [ownedItems, setOwnedItems] = useState<OwnedItem[]>([]);
+  const [agentSkills, setAgentSkills] = useState<AgentSkill[]>([]);
   const [loading, setLoading] = useState(true);
+  const [skillBusy, setSkillBusy] = useState<string | null>(null);
+  const [showSkillPicker, setShowSkillPicker] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [updating, setUpdating] = useState(false);
 
@@ -95,12 +107,13 @@ export default function AgentDetailPage() {
       setLoading(true);
       setError(null);
 
-      const [agentData, allProjects, allTasks, allJobs, orgSkills] = await Promise.all([
+      const [agentData, allProjects, allTasks, allJobs, orgItems, agentSkillData] = await Promise.all([
         getAgent(agentId),
         getProjectsByOrg(currentOrg.id),
         getTasksByOrg(currentOrg.id),
         getJobsByOrg(currentOrg.id),
-        getInstalledSkills(currentOrg.id),
+        getOwnedItems(currentOrg.id),
+        getAgentSkills(agentId),
       ]);
 
       if (!agentData) {
@@ -114,7 +127,8 @@ export default function AgentDetailPage() {
       }
 
       setAgent(agentData);
-      setInstalledSkills(orgSkills);
+      setOwnedItems(orgItems);
+      setAgentSkills(agentSkillData);
 
       const assigned = allProjects.filter(project =>
         agentData.projectIds.includes(project.id)
@@ -144,12 +158,20 @@ export default function AgentDetailPage() {
   }, [agentId, currentOrg]);
 
   const handleStatusToggle = async () => {
-    if (!agent) return;
-    const newStatus = agent.status === 'online' ? 'offline' : 'online';
+    if (!agent || !currentOrg) return;
+    const newStatus: Agent['status'] = agent.status === 'online' ? 'offline' : 'online';
     try {
       setUpdating(true);
       await updateAgent(agentId, { status: newStatus });
-      setAgent({ ...agent, status: newStatus });
+      const updatedAgent = { ...agent, status: newStatus };
+      setAgent(updatedAgent);
+
+      // Auto check-in/check-out to agent group chat
+      if (newStatus === 'online') {
+        await agentCheckIn(updatedAgent, currentOrg.id);
+      } else {
+        await agentCheckOut(updatedAgent, currentOrg.id);
+      }
     } catch (err) {
       console.error('Failed to update agent status:', err);
       setError(err instanceof Error ? err.message : 'Failed to update agent status');
@@ -209,6 +231,33 @@ export default function AgentDetailPage() {
     const txHash = await swarmWrite.registerAgent(registerName.trim(), registerSkills.trim(), feeRate);
     if (txHash) {
       swarm.refetch();
+    }
+  };
+
+  const handleInstallSkill = async (skillId: string) => {
+    if (!currentOrg) return;
+    setSkillBusy(skillId);
+    try {
+      await installSkillOnAgent(agentId, skillId, currentOrg.id, "system");
+      const updated = await getAgentSkills(agentId);
+      setAgentSkills(updated);
+    } catch (err) {
+      console.error("Failed to install skill on agent:", err);
+    } finally {
+      setSkillBusy(null);
+    }
+  };
+
+  const handleRemoveSkill = async (agentSkill: AgentSkill) => {
+    setSkillBusy(agentSkill.skillId);
+    try {
+      await removeSkillFromAgent(agentSkill.id);
+      const updated = await getAgentSkills(agentId);
+      setAgentSkills(updated);
+    } catch (err) {
+      console.error("Failed to remove skill from agent:", err);
+    } finally {
+      setSkillBusy(null);
     }
   };
 
@@ -278,13 +327,14 @@ export default function AgentDetailPage() {
     a => a.name.toLowerCase() === agent.name.toLowerCase()
   );
 
-  // Skills — merge registry with installed
-  const installedSkillIds = installedSkills.filter(s => s.enabled).map(s => s.skillId);
-  const enrichedSkills = SKILL_REGISTRY.map(skill => ({
-    ...skill,
-    installed: installedSkillIds.includes(skill.id),
-  }));
-  const activeSkills = enrichedSkills.filter(s => s.installed);
+  // Skills — agent-level skills (installed on THIS agent)
+  const agentSkillIds = new Set(agentSkills.map(s => s.skillId));
+  const ownedSkillIds = new Set(ownedItems.map(i => i.skillId));
+  const activeSkills = SKILL_REGISTRY.filter(s => agentSkillIds.has(s.id));
+  // Available = in org inventory but not yet on this agent (skills & plugins only — mods are protocol-wide)
+  const availableForAgent = SKILL_REGISTRY.filter(
+    s => ownedSkillIds.has(s.id) && !agentSkillIds.has(s.id) && (s.type === "skill" || s.type === "plugin")
+  );
 
   return (
     <div className="space-y-6">
@@ -295,11 +345,7 @@ export default function AgentDetailPage() {
         </Link>
         <div className="flex items-center gap-4 flex-1">
           <div className="w-16 h-16 rounded-full bg-amber-100 dark:bg-amber-950/40 flex items-center justify-center text-2xl font-bold text-amber-700 dark:text-amber-400 overflow-hidden">
-            {agent.avatarUrl ? (
-              <img src={agent.avatarUrl} alt={agent.name} className="w-full h-full object-cover" />
-            ) : (
-              agent.name.charAt(0)
-            )}
+            <img src={agent.avatarUrl || getAgentAvatarUrl(agent.name, agent.type)} alt={agent.name} className="w-full h-full object-cover" />
           </div>
           <div className="flex-1">
             <div className="flex items-center gap-3 flex-wrap">
@@ -349,6 +395,21 @@ export default function AgentDetailPage() {
         <div className="p-3 rounded-md bg-red-50 border border-red-200 text-sm text-red-600">
           {error}
         </div>
+      )}
+
+      {/* Agent Bio */}
+      {agent.bio && (
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-start gap-3">
+              <span className="text-lg mt-0.5">💬</span>
+              <div>
+                <p className="text-xs font-medium text-muted-foreground mb-1">Agent Bio</p>
+                <p className="text-sm leading-relaxed">{agent.bio}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       {/* KPI Stats */}
@@ -491,39 +552,172 @@ export default function AgentDetailPage() {
       <Card>
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
-            <CardTitle className="text-base">🧩 Installed Skills</CardTitle>
-            <Badge variant="secondary" className="text-xs">{activeSkills.length} / {SKILL_REGISTRY.length}</Badge>
+            <CardTitle className="text-base">🧩 Agent Skills & Plugins</CardTitle>
+            <div className="flex items-center gap-2">
+              <Badge variant="secondary" className="text-xs">{activeSkills.length} installed</Badge>
+              {availableForAgent.length > 0 && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setShowSkillPicker(!showSkillPicker)}
+                  className="h-7 text-xs gap-1 border-amber-500/30 text-amber-500 hover:bg-amber-500/10"
+                >
+                  + Add
+                </Button>
+              )}
+            </div>
           </div>
-          <CardDescription>Organization-wide skills available to this agent</CardDescription>
+          <CardDescription>Skills and plugins installed on this agent. Get items from the Market, then add them here.</CardDescription>
         </CardHeader>
         <CardContent>
+          {/* Available skills picker */}
+          {showSkillPicker && availableForAgent.length > 0 && (
+            <div className="mb-4 p-3 rounded-lg border border-amber-500/20 bg-amber-500/5">
+              <p className="text-xs font-medium text-amber-500 mb-2">Available from Inventory</p>
+              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                {availableForAgent.map((skill) => (
+                  <button
+                    key={skill.id}
+                    onClick={() => handleInstallSkill(skill.id)}
+                    disabled={skillBusy === skill.id}
+                    className="flex items-center gap-3 p-2.5 rounded-lg border border-border bg-card hover:border-amber-500/30 transition-all text-left"
+                  >
+                    <span className="text-lg flex-shrink-0">{skill.icon}</span>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium truncate">{skill.name}</span>
+                        <Badge variant="outline" className="text-[9px] capitalize">{skill.type}</Badge>
+                      </div>
+                      <p className="text-[11px] text-muted-foreground truncate">{skill.description}</p>
+                    </div>
+                    {skillBusy === skill.id ? (
+                      <span className="text-amber-500 text-xs">...</span>
+                    ) : (
+                      <span className="text-amber-500 text-xs font-medium">+ Add</span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Installed skills */}
           {activeSkills.length > 0 ? (
             <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-              {activeSkills.map((skill) => (
-                <div
-                  key={skill.id}
-                  className="flex items-center gap-3 p-2.5 rounded-lg border border-border bg-muted/30"
-                >
-                  <span className="text-lg flex-shrink-0">{skill.icon}</span>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium truncate">{skill.name}</span>
-                      <span className="text-[10px] text-muted-foreground">v{skill.version}</span>
+              {activeSkills.map((skill) => {
+                const agentSkill = agentSkills.find(s => s.skillId === skill.id);
+                return (
+                  <div
+                    key={skill.id}
+                    className="flex items-center gap-3 p-2.5 rounded-lg border border-border bg-muted/30 group"
+                  >
+                    <span className="text-lg flex-shrink-0">{skill.icon}</span>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium truncate">{skill.name}</span>
+                        <span className="text-[10px] text-muted-foreground">v{skill.version}</span>
+                      </div>
+                      <p className="text-[11px] text-muted-foreground truncate">{skill.description}</p>
                     </div>
-                    <p className="text-[11px] text-muted-foreground truncate">{skill.description}</p>
+                    {agentSkill && (
+                      <button
+                        onClick={() => handleRemoveSkill(agentSkill)}
+                        disabled={skillBusy === skill.id}
+                        className="opacity-0 group-hover:opacity-100 p-1 rounded text-red-400 hover:bg-red-500/10 transition-all flex-shrink-0"
+                        title="Remove from agent"
+                      >
+                        {skillBusy === skill.id ? (
+                          <span className="text-xs">...</span>
+                        ) : (
+                          <span className="text-xs">✕</span>
+                        )}
+                      </button>
+                    )}
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           ) : (
             <div className="text-center py-6 text-muted-foreground">
               <div className="text-2xl mb-2">🧩</div>
-              <p className="text-sm">No skills installed yet</p>
-              <p className="text-xs mt-1">Install from the Market</p>
+              <p className="text-sm">No skills installed on this agent</p>
+              <p className="text-xs mt-1">
+                {availableForAgent.length > 0
+                  ? "Click \"+ Add\" above to install from your inventory"
+                  : "Get skills from the Market first, then add them here"}
+              </p>
             </div>
           )}
         </CardContent>
       </Card>
+
+      {/* Self-Reported Skills (from agent on connect) */}
+      {(agent.reportedSkills ?? []).length > 0 && (
+        <Card>
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base">📡 Reported Skills</CardTitle>
+              <Badge variant="secondary" className="text-xs">{(agent.reportedSkills ?? []).length} reported</Badge>
+            </div>
+            <CardDescription>Skills and plugins this agent reported when it connected to the platform</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+              {(agent.reportedSkills ?? []).map((rs: ReportedSkill) => {
+                // Try to match with a registry item for a richer display
+                const registryMatch = SKILL_REGISTRY.find(s => s.id === rs.id);
+                return (
+                  <div
+                    key={rs.id}
+                    className="flex items-center gap-3 p-2.5 rounded-lg border border-border bg-muted/30"
+                  >
+                    <span className="text-lg flex-shrink-0">{registryMatch?.icon ?? (rs.type === "plugin" ? "🔌" : "⚙️")}</span>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium truncate">{rs.name}</span>
+                        {rs.version && <span className="text-[10px] text-muted-foreground">v{rs.version}</span>}
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <Badge variant="outline" className="text-[9px] capitalize">{rs.type}</Badge>
+                        {registryMatch && (
+                          <span className="text-[9px] text-emerald-600 dark:text-emerald-400">verified</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Protocol Mods (org-wide) */}
+      {(() => {
+        const activeMods = SKILL_REGISTRY.filter(s => s.type === "mod" && ownedSkillIds.has(s.id));
+        if (activeMods.length === 0) return null;
+        return (
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">🔧 Active Protocol Mods</CardTitle>
+              <CardDescription>Organization-wide mods applied to all agents</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                {activeMods.map((mod) => (
+                  <div key={mod.id} className="flex items-center gap-3 p-2.5 rounded-lg border border-border bg-muted/30">
+                    <span className="text-lg flex-shrink-0">{mod.icon}</span>
+                    <div className="min-w-0 flex-1">
+                      <span className="text-sm font-medium truncate block">{mod.name}</span>
+                      <p className="text-[11px] text-muted-foreground truncate">{mod.description}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        );
+      })()}
 
       {/* On-Chain Registration */}
       <Card>
@@ -582,8 +776,8 @@ export default function AgentDetailPage() {
             </div>
           ) : (
             <div className="text-center py-4">
-              <p className="text-sm text-muted-foreground">This agent is not registered on-chain</p>
-              <p className="text-xs text-muted-foreground mt-1">Register on the smart contract registry to enable on-chain task claiming and rewards</p>
+              <p className="text-sm text-muted-foreground">This agent is not registered onchain</p>
+              <p className="text-xs text-muted-foreground mt-1">Register on the smart contract registry to enable task claiming and rewards</p>
               <Button
                 onClick={handleRegisterOpen}
                 className="mt-3 bg-amber-600 hover:bg-amber-700 text-black"
@@ -630,8 +824,10 @@ export default function AgentDetailPage() {
               <div className="bg-muted rounded-md p-3 font-mono text-[11px] space-y-1">
                 <p className="text-muted-foreground"># Install the SwarmConnect skill</p>
                 <p>npm install -g @swarmprotocol/agent-skill</p>
-                <p className="text-muted-foreground mt-2"># Register this agent</p>
-                <p>swarm register --hub https://swarm.perkos.xyz --org {currentOrg?.id} --name &quot;{agent.name}&quot; --type &quot;{agent.type}&quot;</p>
+                <p className="text-muted-foreground mt-2"># Register this agent (with skills)</p>
+                <p>swarm register --hub https://swarm.perkos.xyz --org {currentOrg?.id} --name &quot;{agent.name}&quot; --type &quot;{agent.type}&quot; --skills &quot;web-search,code-interpreter&quot;</p>
+                <p className="text-muted-foreground mt-2"># Report skills at any time</p>
+                <p>swarm report-skills --skills &quot;web-search,code-interpreter&quot;</p>
                 <p className="text-muted-foreground mt-2"># Check for messages</p>
                 <p>swarm check</p>
               </div>
@@ -827,7 +1023,7 @@ export default function AgentDetailPage() {
                 placeholder="e.g. research, analysis, trading"
                 disabled={swarmWrite.state.isLoading}
               />
-              <p className="text-[11px] text-muted-foreground mt-1">Comma-separated list of skills stored on-chain</p>
+              <p className="text-[11px] text-muted-foreground mt-1">Comma-separated list of skills stored onchain</p>
             </div>
             <div>
               <label className="text-sm font-medium mb-1 block">Fee Rate (basis points)</label>

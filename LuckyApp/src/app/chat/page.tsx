@@ -16,6 +16,7 @@ import {
   deleteChannel,
   deleteMessagesByChannel,
   getAgentsByOrg,
+  ensureAgentGroupChat,
   type Channel,
   type Message,
   type Agent,
@@ -106,9 +107,18 @@ export default function ChatPage() {
     try {
       setLoading(true);
       setError(null);
+      // Ensure the Agent Hub group chat exists (also deduplicates)
+      await ensureAgentGroupChat(currentOrg.id);
       const all = await getChannelsByOrg(currentOrg.id);
-      const chatChannels = all.filter(c => !c.projectId);
-      const projChannels = all.filter(c => !!c.projectId);
+      // Deduplicate by name — keep first occurrence (prevents duplicate Agent Hub tabs)
+      const seen = new Set<string>();
+      const deduped = all.filter(c => {
+        if (seen.has(c.name)) return false;
+        seen.add(c.name);
+        return true;
+      });
+      const chatChannels = deduped.filter(c => !c.projectId);
+      const projChannels = deduped.filter(c => !!c.projectId);
       setChannels(chatChannels);
       setProjectChannels(projChannels);
 
@@ -333,7 +343,7 @@ export default function ChatPage() {
                               if (renamingId !== ch.id) setActiveChannel(ch);
                             }}
                           >
-                            <span className="text-base shrink-0">💬</span>
+                            <span className="text-base shrink-0">{ch.name === "Agent Hub" ? "🤖" : "💬"}</span>
 
                             {renamingId === ch.id ? (
                               <input

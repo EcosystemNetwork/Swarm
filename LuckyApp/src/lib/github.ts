@@ -99,6 +99,20 @@ export interface CreatePRInput {
   base: string;
 }
 
+export interface CreateIssueInput {
+  title: string;
+  body?: string;
+  labels?: string[];
+}
+
+export interface GitHubComment {
+  id: number;
+  body: string;
+  user: { login: string; avatar_url: string };
+  html_url: string;
+  created_at: string;
+}
+
 // ─── JWT Generation ─────────────────────────────────────
 
 function generateAppJwt(): string {
@@ -353,5 +367,67 @@ export async function createPRReview(
       method: "POST",
       body: JSON.stringify({ body, event }),
     }
+  );
+}
+
+export async function createIssue(
+  installationId: number,
+  owner: string,
+  repo: string,
+  input: CreateIssueInput
+): Promise<GitHubIssue> {
+  return githubApi<GitHubIssue>(
+    installationId,
+    `/repos/${owner}/${repo}/issues`,
+    {
+      method: "POST",
+      body: JSON.stringify(input),
+    }
+  );
+}
+
+export async function mergePullRequest(
+  installationId: number,
+  owner: string,
+  repo: string,
+  prNumber: number,
+  mergeMethod: "merge" | "squash" | "rebase" = "merge"
+): Promise<void> {
+  await githubApi(
+    installationId,
+    `/repos/${owner}/${repo}/pulls/${prNumber}/merge`,
+    {
+      method: "PUT",
+      body: JSON.stringify({ merge_method: mergeMethod }),
+    }
+  );
+}
+
+export async function updatePullRequest(
+  installationId: number,
+  owner: string,
+  repo: string,
+  prNumber: number,
+  state: "open" | "closed"
+): Promise<GitHubPR> {
+  return githubApi<GitHubPR>(
+    installationId,
+    `/repos/${owner}/${repo}/pulls/${prNumber}`,
+    {
+      method: "PATCH",
+      body: JSON.stringify({ state }),
+    }
+  );
+}
+
+export async function listPRComments(
+  installationId: number,
+  owner: string,
+  repo: string,
+  issueNumber: number
+): Promise<GitHubComment[]> {
+  return githubApi<GitHubComment[]>(
+    installationId,
+    `/repos/${owner}/${repo}/issues/${issueNumber}/comments?per_page=50&sort=created&direction=asc`
   );
 }

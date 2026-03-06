@@ -3,11 +3,11 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import {
   useGitHubPRs,
   useGitHubCommits,
   useGitHubIssues,
+  type GitHubPR,
 } from "@/hooks/useGitHub";
 import { updateProject, type Project, type GitHubRepoLink } from "@/lib/firestore";
 import { PRList } from "./pr-list";
@@ -15,6 +15,8 @@ import { CommitList } from "./commit-list";
 import { IssueList } from "./issue-list";
 import { GitHubEventFeed } from "./github-event-feed";
 import { CreatePRDialog } from "./create-pr-dialog";
+import { CreateIssueDialog } from "./create-issue-dialog";
+import { PRDetailDialog } from "./pr-detail-dialog";
 import { RepoSelector } from "./repo-selector";
 import { GitHubIcon } from "./github-icon";
 
@@ -32,7 +34,10 @@ export function GitHubPanel({ project, orgId, onRefresh }: GitHubPanelProps) {
   const [selectedRepo, setSelectedRepo] = useState(0);
   const [showAddRepo, setShowAddRepo] = useState(false);
   const [showCreatePR, setShowCreatePR] = useState(false);
+  const [showCreateIssue, setShowCreateIssue] = useState(false);
+  const [selectedPR, setSelectedPR] = useState<GitHubPR | null>(null);
   const [prState, setPrState] = useState<"open" | "closed" | "all">("open");
+  const [issueState, setIssueState] = useState<"open" | "closed" | "all">("open");
 
   const repo = repos[selectedRepo];
   const owner = repo?.owner || "";
@@ -41,7 +46,7 @@ export function GitHubPanel({ project, orgId, onRefresh }: GitHubPanelProps) {
   // Hooks — only fetch when a view needs them
   const prs = useGitHubPRs(owner, repoName, prState);
   const commits = useGitHubCommits(owner, repoName, repo?.defaultBranch);
-  const issues = useGitHubIssues(owner, repoName);
+  const issues = useGitHubIssues(owner, repoName, issueState);
 
   const handleUnlink = async (repoLink: GitHubRepoLink) => {
     const updated = repos.filter((r) => r.repoId !== repoLink.repoId);
@@ -143,6 +148,26 @@ export function GitHubPanel({ project, orgId, onRefresh }: GitHubPanelProps) {
                   </Button>
                 </>
               )}
+              {view === "issues" && (
+                <>
+                  <select
+                    value={issueState}
+                    onChange={(e) => setIssueState(e.target.value as "open" | "closed" | "all")}
+                    className="text-xs px-2 py-1 rounded border border-border bg-background"
+                  >
+                    <option value="open">Open</option>
+                    <option value="closed">Closed</option>
+                    <option value="all">All</option>
+                  </select>
+                  <Button
+                    size="sm"
+                    className="h-7 text-xs bg-amber-600 hover:bg-amber-700 text-black"
+                    onClick={() => setShowCreateIssue(true)}
+                  >
+                    + New Issue
+                  </Button>
+                </>
+              )}
               <a
                 href={`https://github.com/${repo.fullName}`}
                 target="_blank"
@@ -168,7 +193,12 @@ export function GitHubPanel({ project, orgId, onRefresh }: GitHubPanelProps) {
               <GitHubEventFeed projectId={project.id} />
             )}
             {view === "pulls" && (
-              <PRList pulls={prs.pulls} loading={prs.loading} error={prs.error} />
+              <PRList
+                pulls={prs.pulls}
+                loading={prs.loading}
+                error={prs.error}
+                onSelectPR={setSelectedPR}
+              />
             )}
             {view === "commits" && (
               <CommitList
@@ -186,7 +216,7 @@ export function GitHubPanel({ project, orgId, onRefresh }: GitHubPanelProps) {
             )}
           </div>
 
-          {/* Create PR dialog */}
+          {/* Dialogs */}
           <CreatePRDialog
             open={showCreatePR}
             onOpenChange={setShowCreatePR}
@@ -195,6 +225,23 @@ export function GitHubPanel({ project, orgId, onRefresh }: GitHubPanelProps) {
             defaultBranch={repo.defaultBranch}
             onCreated={() => prs.refetch()}
           />
+          <CreateIssueDialog
+            open={showCreateIssue}
+            onOpenChange={setShowCreateIssue}
+            owner={owner}
+            repo={repoName}
+            onCreated={() => issues.refetch()}
+          />
+          {selectedPR && (
+            <PRDetailDialog
+              open={!!selectedPR}
+              onOpenChange={(open) => { if (!open) setSelectedPR(null); }}
+              pr={selectedPR}
+              owner={owner}
+              repo={repoName}
+              onUpdated={() => prs.refetch()}
+            />
+          )}
         </>
       )}
 

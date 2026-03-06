@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useOrg } from "@/contexts/OrgContext";
 import { useActiveAccount } from "thirdweb/react";
 import { createAgent, updateAgent, deleteAgent, getTasksByOrg, getJobsByOrg, type Agent, type Task, type Job } from "@/lib/firestore";
+import { getAgentAvatarUrl } from "@/lib/agent-avatar";
 import { collection, query, where, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useSwarmWrite } from "@/hooks/useSwarmWrite";
@@ -491,11 +492,7 @@ export default function AgentsPage() {
                   <div className="flex items-start justify-between">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-full bg-amber-100 dark:bg-amber-950/40 flex items-center justify-center text-lg font-bold text-amber-700 dark:text-amber-400 overflow-hidden">
-                        {agent.avatarUrl ? (
-                          <img src={agent.avatarUrl} alt={agent.name} className="w-full h-full object-cover" />
-                        ) : (
-                          agent.name.charAt(0)
-                        )}
+                        <img src={agent.avatarUrl || getAgentAvatarUrl(agent.name, agent.type)} alt={agent.name} className="w-full h-full object-cover" />
                       </div>
                       <div>
                         <CardTitle className="text-lg truncate">{agent.name}</CardTitle>

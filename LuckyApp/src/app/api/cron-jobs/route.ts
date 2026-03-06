@@ -55,12 +55,42 @@ export async function POST(req: Request) {
         }
 
         if (action === 'trigger') {
-            const { prompt } = body;
-            // Note: Because LuckyApp is just a UI layer over OpenClaw, 
-            // we mock triggering by appending an action to an 'INBOX' or sending an IPC message.
-            // For now, it's just a mock log.
-            console.log(`[Swarm] Manually triggered cron action: ${prompt}`);
-            return NextResponse.json({ success: true, message: 'Action triggered asynchronously' });
+            const { prompt, taskId } = body;
+            if (!prompt) {
+                return NextResponse.json({ error: 'prompt is required' }, { status: 400 });
+            }
+
+            // Write to the agent's INBOX.json — OpenClaw agents poll this file for pending actions
+            const inboxFile = path.join(memDir, 'INBOX.json');
+            let inbox: Array<Record<string, unknown>> = [];
+            if (fs.existsSync(inboxFile)) {
+                try {
+                    inbox = JSON.parse(fs.readFileSync(inboxFile, 'utf8'));
+                    if (!Array.isArray(inbox)) inbox = [];
+                } catch {
+                    inbox = [];
+                }
+            }
+
+            inbox.push({
+                id: `trigger_${Date.now()}`,
+                type: 'cron_trigger',
+                taskId: taskId || null,
+                prompt,
+                source: 'dashboard',
+                createdAt: new Date().toISOString(),
+                status: 'pending',
+            });
+
+            fs.writeFileSync(inboxFile, JSON.stringify(inbox, null, 2));
+
+            // Also update lastRun on the cron task if taskId provided
+            if (taskId && config[taskId]) {
+                config[taskId].lastRun = Date.now();
+                fs.writeFileSync(cronFile, JSON.stringify(config, null, 2));
+            }
+
+            return NextResponse.json({ success: true, message: 'Action queued in agent inbox' });
         }
 
         return NextResponse.json({ error: 'Unknown action' }, { status: 400 });

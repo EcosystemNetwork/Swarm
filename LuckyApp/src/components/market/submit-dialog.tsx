@@ -19,7 +19,7 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import { Loader2 } from "lucide-react";
-import { type MarketItemType, submitMarketItem } from "@/lib/skills";
+import { type MarketItemType, type PricingModel, type MarketPricing, submitMarketItem } from "@/lib/skills";
 
 interface SubmitMarketItemDialogProps {
     open: boolean;
@@ -42,6 +42,10 @@ export function SubmitMarketItemDialog({
     const [version, setVersion] = useState("1.0.0");
     const [tagsInput, setTagsInput] = useState("");
     const [requiredKeysInput, setRequiredKeysInput] = useState("");
+    const [pricingModel, setPricingModel] = useState<PricingModel>("free");
+    const [monthlyPrice, setMonthlyPrice] = useState("");
+    const [yearlyPrice, setYearlyPrice] = useState("");
+    const [lifetimePrice, setLifetimePrice] = useState("");
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -54,6 +58,10 @@ export function SubmitMarketItemDialog({
         setVersion("1.0.0");
         setTagsInput("");
         setRequiredKeysInput("");
+        setPricingModel("free");
+        setMonthlyPrice("");
+        setYearlyPrice("");
+        setLifetimePrice("");
         setError(null);
     };
 
@@ -72,6 +80,15 @@ export function SubmitMarketItemDialog({
                 .map((k) => k.trim())
                 .filter(Boolean);
 
+            // Build pricing
+            const pricing: MarketPricing = { model: pricingModel };
+            if (pricingModel === "subscription") {
+                pricing.tiers = [];
+                if (monthlyPrice) pricing.tiers.push({ plan: "monthly", price: parseFloat(monthlyPrice), currency: "USD" });
+                if (yearlyPrice) pricing.tiers.push({ plan: "yearly", price: parseFloat(yearlyPrice), currency: "USD" });
+                if (lifetimePrice) pricing.tiers.push({ plan: "lifetime", price: parseFloat(lifetimePrice), currency: "USD" });
+            }
+
             await submitMarketItem({
                 name: name.trim(),
                 type: type as MarketItemType,
@@ -81,6 +98,7 @@ export function SubmitMarketItemDialog({
                 version: version.trim() || "1.0.0",
                 tags,
                 requiredKeys: requiredKeys.length > 0 ? requiredKeys : undefined,
+                pricing,
                 submittedBy: submitterAddress,
             });
 
@@ -94,7 +112,8 @@ export function SubmitMarketItemDialog({
         }
     };
 
-    const isValid = name.trim() && type && category.trim() && icon.trim() && description.trim();
+    const hasValidPricing = pricingModel === "free" || (monthlyPrice || yearlyPrice || lifetimePrice);
+    const isValid = name.trim() && type && category.trim() && icon.trim() && description.trim() && hasValidPricing;
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
@@ -175,6 +194,68 @@ export function SubmitMarketItemDialog({
                             />
                             <p className="text-[10px] text-muted-foreground mt-0.5">Comma-separated</p>
                         </div>
+                    </div>
+
+                    {/* Pricing Model */}
+                    <div className="space-y-3 p-3 rounded-lg border border-border bg-muted/30">
+                        <div>
+                            <label className="text-sm font-medium mb-1 block">Access Model</label>
+                            <Select value={pricingModel} onValueChange={(v) => setPricingModel(v as PricingModel)}>
+                                <SelectTrigger>
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="free">Free</SelectItem>
+                                    <SelectItem value="subscription">Subscription (Paid)</SelectItem>
+                                </SelectContent>
+                            </Select>
+                            <p className="text-[10px] text-muted-foreground mt-0.5">
+                                {pricingModel === "free" ? "Anyone can install and use this item" : "Users pay to access — you control the pricing tiers"}
+                            </p>
+                        </div>
+                        {pricingModel === "subscription" && (
+                            <div className="grid grid-cols-3 gap-2">
+                                <div>
+                                    <label className="text-[11px] font-medium mb-0.5 block text-muted-foreground">Monthly ($)</label>
+                                    <Input
+                                        type="number"
+                                        min="0"
+                                        step="0.01"
+                                        placeholder="9.99"
+                                        value={monthlyPrice}
+                                        onChange={(e) => setMonthlyPrice(e.target.value)}
+                                        className="h-8 text-sm"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-[11px] font-medium mb-0.5 block text-muted-foreground">Yearly ($)</label>
+                                    <Input
+                                        type="number"
+                                        min="0"
+                                        step="0.01"
+                                        placeholder="99.99"
+                                        value={yearlyPrice}
+                                        onChange={(e) => setYearlyPrice(e.target.value)}
+                                        className="h-8 text-sm"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-[11px] font-medium mb-0.5 block text-muted-foreground">Lifetime ($)</label>
+                                    <Input
+                                        type="number"
+                                        min="0"
+                                        step="0.01"
+                                        placeholder="299.99"
+                                        value={lifetimePrice}
+                                        onChange={(e) => setLifetimePrice(e.target.value)}
+                                        className="h-8 text-sm"
+                                    />
+                                </div>
+                                <p className="col-span-3 text-[10px] text-muted-foreground">
+                                    Set at least one tier. Leave blank to skip a tier.
+                                </p>
+                            </div>
+                        )}
                     </div>
 
                     <div>

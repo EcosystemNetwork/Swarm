@@ -15,7 +15,6 @@ import {
     getDocs,
     query,
     where,
-    orderBy,
     serverTimestamp,
     Timestamp,
 } from "firebase/firestore";
@@ -27,6 +26,19 @@ import { db } from "./firebase";
 
 export type MarketItemType = "mod" | "plugin" | "skill";
 export type MarketItemSource = "verified" | "community";
+export type PricingModel = "free" | "subscription";
+export type SubscriptionPlan = "monthly" | "yearly" | "lifetime";
+
+export interface PricingTier {
+    plan: SubscriptionPlan;
+    price: number;
+    currency: string; // "USD" | "HBAR"
+}
+
+export interface MarketPricing {
+    model: PricingModel;
+    tiers?: PricingTier[];
+}
 
 export interface Skill {
     id: string;
@@ -42,6 +54,8 @@ export interface Skill {
     requiredKeys?: string[];
     /** Tags for search */
     tags: string[];
+    /** Pricing model */
+    pricing: MarketPricing;
     /** Is this installed for the org? */
     installed?: boolean;
     /** Is it enabled? */
@@ -58,12 +72,26 @@ export interface SkillBundle {
     skillIds: string[];
 }
 
-export interface InstalledSkill {
+/** An item the org has acquired/owns in their inventory */
+export interface OwnedItem {
     id: string;             // Firestore doc ID
     orgId: string;
     skillId: string;        // reference to marketplace item
     enabled: boolean;
     config?: Record<string, string>;  // API keys, settings
+    installedAt: Date | null;
+    installedBy: string;
+}
+
+/** @deprecated Use OwnedItem instead */
+export type InstalledSkill = OwnedItem;
+
+/** A skill/plugin installed on a specific agent */
+export interface AgentSkill {
+    id: string;             // Firestore doc ID
+    agentId: string;
+    skillId: string;        // reference to marketplace item
+    orgId: string;
     installedAt: Date | null;
     installedBy: string;
 }
@@ -85,6 +113,7 @@ export const SKILL_REGISTRY: Skill[] = [
         version: "1.0.0",
         author: "Swarm Core",
         tags: ["tone", "professional", "formal", "style"],
+        pricing: { model: "free" },
     },
     {
         id: "safety-guardrails",
@@ -97,6 +126,7 @@ export const SKILL_REGISTRY: Skill[] = [
         version: "1.0.0",
         author: "Swarm Core",
         tags: ["safety", "guardrails", "constraints", "approval"],
+        pricing: { model: "free" },
     },
     {
         id: "concise-mode",
@@ -109,6 +139,7 @@ export const SKILL_REGISTRY: Skill[] = [
         version: "1.0.0",
         author: "Swarm Core",
         tags: ["concise", "brief", "short", "style"],
+        pricing: { model: "free" },
     },
     {
         id: "chain-of-thought",
@@ -121,6 +152,7 @@ export const SKILL_REGISTRY: Skill[] = [
         version: "1.0.0",
         author: "Swarm Core",
         tags: ["reasoning", "cot", "thinking", "transparency"],
+        pricing: { model: "free" },
     },
 
     // ── Plugins ──
@@ -136,6 +168,7 @@ export const SKILL_REGISTRY: Skill[] = [
         author: "Swarm Core",
         requiredKeys: ["GITHUB_TOKEN"],
         tags: ["github", "git", "code", "pr", "issues"],
+        pricing: { model: "free" },
     },
     {
         id: "slack-notify",
@@ -149,6 +182,7 @@ export const SKILL_REGISTRY: Skill[] = [
         author: "Swarm Core",
         requiredKeys: ["SLACK_BOT_TOKEN"],
         tags: ["slack", "notifications", "messaging"],
+        pricing: { model: "free" },
     },
     {
         id: "email-sender",
@@ -162,6 +196,7 @@ export const SKILL_REGISTRY: Skill[] = [
         author: "Swarm Core",
         requiredKeys: ["SENDGRID_API_KEY"],
         tags: ["email", "smtp", "sendgrid", "notifications"],
+        pricing: { model: "free" },
     },
     {
         id: "calendar-sync",
@@ -175,6 +210,7 @@ export const SKILL_REGISTRY: Skill[] = [
         author: "Swarm Core",
         requiredKeys: ["GOOGLE_CALENDAR_KEY"],
         tags: ["calendar", "events", "scheduling"],
+        pricing: { model: "free" },
     },
     {
         id: "blockchain-tools",
@@ -187,6 +223,7 @@ export const SKILL_REGISTRY: Skill[] = [
         version: "1.0.0",
         author: "Swarm Core",
         tags: ["blockchain", "web3", "ethereum", "transactions"],
+        pricing: { model: "free" },
     },
 
     // ── Skills ──
@@ -202,6 +239,7 @@ export const SKILL_REGISTRY: Skill[] = [
         author: "Swarm Core",
         requiredKeys: ["TAVILY_API_KEY"],
         tags: ["search", "research", "web", "news"],
+        pricing: { model: "free" },
     },
     {
         id: "code-interpreter",
@@ -214,6 +252,7 @@ export const SKILL_REGISTRY: Skill[] = [
         version: "2.0.1",
         author: "Swarm Core",
         tags: ["code", "python", "javascript", "analysis"],
+        pricing: { model: "free" },
     },
     {
         id: "file-manager",
@@ -226,6 +265,7 @@ export const SKILL_REGISTRY: Skill[] = [
         version: "1.1.0",
         author: "Swarm Core",
         tags: ["files", "filesystem", "csv", "json"],
+        pricing: { model: "free" },
     },
     {
         id: "image-gen",
@@ -239,6 +279,7 @@ export const SKILL_REGISTRY: Skill[] = [
         author: "Swarm Core",
         requiredKeys: ["OPENAI_API_KEY"],
         tags: ["image", "art", "generation", "dalle"],
+        pricing: { model: "free" },
     },
     {
         id: "pdf-reader",
@@ -251,6 +292,7 @@ export const SKILL_REGISTRY: Skill[] = [
         version: "1.1.0",
         author: "Swarm Core",
         tags: ["pdf", "documents", "text", "extraction"],
+        pricing: { model: "free" },
     },
     {
         id: "data-viz",
@@ -263,6 +305,7 @@ export const SKILL_REGISTRY: Skill[] = [
         version: "1.0.0",
         author: "Swarm Core",
         tags: ["charts", "graphs", "data", "visualization"],
+        pricing: { model: "free" },
     },
     {
         id: "memory-store",
@@ -275,6 +318,7 @@ export const SKILL_REGISTRY: Skill[] = [
         version: "1.0.0",
         author: "Swarm Core",
         tags: ["memory", "storage", "context", "persistence"],
+        pricing: { model: "free" },
     },
 ];
 
@@ -323,42 +367,42 @@ export const PLUGIN_CATEGORIES = categoriesForType("plugin");
 export const SKILL_ONLY_CATEGORIES = categoriesForType("skill");
 
 // ═══════════════════════════════════════════════════════════════
-// Firestore CRUD (installed skills per org)
+// Firestore CRUD — Org Inventory (items the org owns)
 // ═══════════════════════════════════════════════════════════════
 
-const INSTALLED_COLLECTION = "installedSkills";
+const INVENTORY_COLLECTION = "installedSkills"; // keeping collection name for backward compat
 
-/** Install a skill for an org */
-export async function installSkill(
+/** Add an item to the org's inventory */
+export async function acquireItem(
     orgId: string,
     skillId: string,
-    installedBy: string,
+    acquiredBy: string,
 ): Promise<string> {
-    const ref = await addDoc(collection(db, INSTALLED_COLLECTION), {
+    const ref = await addDoc(collection(db, INVENTORY_COLLECTION), {
         orgId,
         skillId,
         enabled: true,
         config: {},
         installedAt: serverTimestamp(),
-        installedBy,
+        installedBy: acquiredBy,
     });
     return ref.id;
 }
 
-/** Uninstall a skill */
-export async function uninstallSkill(docId: string): Promise<void> {
-    await deleteDoc(doc(db, INSTALLED_COLLECTION, docId));
+/** Remove an item from the org's inventory */
+export async function removeFromInventory(docId: string): Promise<void> {
+    await deleteDoc(doc(db, INVENTORY_COLLECTION, docId));
 }
 
-/** Toggle a skill */
-export async function toggleSkill(docId: string, enabled: boolean): Promise<void> {
-    await updateDoc(doc(db, INSTALLED_COLLECTION, docId), { enabled });
+/** Toggle an inventory item on/off */
+export async function toggleInventoryItem(docId: string, enabled: boolean): Promise<void> {
+    await updateDoc(doc(db, INVENTORY_COLLECTION, docId), { enabled });
 }
 
-/** Get installed skills for an org */
-export async function getInstalledSkills(orgId: string): Promise<InstalledSkill[]> {
+/** Get all owned items for an org (inventory) */
+export async function getOwnedItems(orgId: string): Promise<OwnedItem[]> {
     const q = query(
-        collection(db, INSTALLED_COLLECTION),
+        collection(db, INVENTORY_COLLECTION),
         where("orgId", "==", orgId),
     );
     const snap = await getDocs(q);
@@ -376,20 +420,80 @@ export async function getInstalledSkills(orgId: string): Promise<InstalledSkill[
     });
 }
 
-/** Install an entire bundle */
-export async function installBundle(
+/** Acquire an entire bundle into org inventory */
+export async function acquireBundle(
     orgId: string,
     bundleId: string,
-    installedBy: string,
-    alreadyInstalled: string[],
+    acquiredBy: string,
+    alreadyOwned: string[],
 ): Promise<void> {
     const bundle = SKILL_BUNDLES.find((b) => b.id === bundleId);
     if (!bundle) throw new Error("Bundle not found");
     for (const skillId of bundle.skillIds) {
-        if (!alreadyInstalled.includes(skillId)) {
-            await installSkill(orgId, skillId, installedBy);
+        if (!alreadyOwned.includes(skillId)) {
+            await acquireItem(orgId, skillId, acquiredBy);
         }
     }
+}
+
+// Backward-compat aliases
+/** @deprecated Use acquireItem */
+export const installSkill = acquireItem;
+/** @deprecated Use removeFromInventory */
+export const uninstallSkill = removeFromInventory;
+/** @deprecated Use toggleInventoryItem */
+export const toggleSkill = toggleInventoryItem;
+/** @deprecated Use getOwnedItems */
+export const getInstalledSkills = getOwnedItems;
+/** @deprecated Use acquireBundle */
+export const installBundle = acquireBundle;
+
+// ═══════════════════════════════════════════════════════════════
+// Firestore CRUD — Agent-Level Skills (per agent)
+// ═══════════════════════════════════════════════════════════════
+
+const AGENT_SKILLS_COLLECTION = "agentSkills";
+
+/** Install a skill/plugin on a specific agent */
+export async function installSkillOnAgent(
+    agentId: string,
+    skillId: string,
+    orgId: string,
+    installedBy: string,
+): Promise<string> {
+    const ref = await addDoc(collection(db, AGENT_SKILLS_COLLECTION), {
+        agentId,
+        skillId,
+        orgId,
+        installedAt: serverTimestamp(),
+        installedBy,
+    });
+    return ref.id;
+}
+
+/** Remove a skill/plugin from a specific agent */
+export async function removeSkillFromAgent(docId: string): Promise<void> {
+    await deleteDoc(doc(db, AGENT_SKILLS_COLLECTION, docId));
+}
+
+/** Get all skills installed on a specific agent */
+export async function getAgentSkills(agentId: string): Promise<AgentSkill[]> {
+    const q = query(
+        collection(db, AGENT_SKILLS_COLLECTION),
+        where("agentId", "==", agentId),
+    );
+    const snap = await getDocs(q);
+    return snap.docs.map((d) => {
+        const data = d.data();
+        return {
+            id: d.id,
+            agentId: data.agentId,
+            skillId: data.skillId,
+            orgId: data.orgId,
+            installedAt: data.installedAt instanceof Timestamp ? data.installedAt.toDate() : null,
+            installedBy: data.installedBy,
+        };
+    });
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -408,10 +512,89 @@ export interface CommunityMarketItem {
     version: string;
     tags: string[];
     requiredKeys?: string[];
+    pricing: MarketPricing;
     submittedBy: string;
     submittedByName?: string;
     submittedAt: Date | null;
     status: "pending" | "approved" | "rejected";
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Subscriptions
+// ═══════════════════════════════════════════════════════════════
+
+const SUBSCRIPTION_COLLECTION = "marketSubscriptions";
+
+export interface MarketSubscription {
+    id: string;
+    orgId: string;
+    itemId: string;        // community item doc ID
+    plan: SubscriptionPlan;
+    status: "active" | "expired" | "cancelled";
+    subscribedBy: string;  // wallet address
+    startDate: Date | null;
+    endDate: Date | null;   // null = lifetime
+}
+
+/** Subscribe an org to a market item */
+export async function subscribeToItem(
+    orgId: string,
+    itemId: string,
+    plan: SubscriptionPlan,
+    subscribedBy: string,
+): Promise<string> {
+    // Calculate end date based on plan
+    const now = new Date();
+    let endDate: Date | null = null;
+    if (plan === "monthly") {
+        endDate = new Date(now);
+        endDate.setMonth(endDate.getMonth() + 1);
+    } else if (plan === "yearly") {
+        endDate = new Date(now);
+        endDate.setFullYear(endDate.getFullYear() + 1);
+    }
+    // lifetime = null endDate (never expires)
+
+    const ref = await addDoc(collection(db, SUBSCRIPTION_COLLECTION), {
+        orgId,
+        itemId,
+        plan,
+        status: "active",
+        subscribedBy,
+        startDate: serverTimestamp(),
+        endDate: endDate ? Timestamp.fromDate(endDate) : null,
+    });
+    return ref.id;
+}
+
+/** Cancel a subscription */
+export async function cancelSubscription(subscriptionId: string): Promise<void> {
+    await updateDoc(doc(db, SUBSCRIPTION_COLLECTION, subscriptionId), {
+        status: "cancelled",
+    });
+}
+
+/** Get all active subscriptions for an org */
+export async function getOrgSubscriptions(orgId: string): Promise<MarketSubscription[]> {
+    const q = query(
+        collection(db, SUBSCRIPTION_COLLECTION),
+        where("orgId", "==", orgId),
+        where("status", "==", "active"),
+    );
+    const snap = await getDocs(q);
+    return snap.docs.map((d) => {
+        const data = d.data();
+        return {
+            id: d.id,
+            orgId: data.orgId,
+            itemId: data.itemId,
+            plan: data.plan,
+            status: data.status,
+            subscribedBy: data.subscribedBy,
+            startDate: data.startDate instanceof Timestamp ? data.startDate.toDate() : null,
+            endDate: data.endDate instanceof Timestamp ? data.endDate.toDate() : null,
+        };
+    });
 }
 
 /** Submit a new community market item */
@@ -420,6 +603,7 @@ export async function submitMarketItem(
 ): Promise<string> {
     const ref = await addDoc(collection(db, COMMUNITY_COLLECTION), {
         ...data,
+        pricing: data.pricing ?? { model: "free" },
         status: "pending",
         submittedAt: serverTimestamp(),
     });
@@ -438,6 +622,7 @@ export async function getCommunityItems(): Promise<CommunityMarketItem[]> {
         return {
             id: d.id,
             ...data,
+            pricing: data.pricing ?? { model: "free" },
             submittedAt: data.submittedAt instanceof Timestamp ? data.submittedAt.toDate() : null,
         } as CommunityMarketItem;
     });
@@ -455,6 +640,7 @@ export async function getUserSubmissions(walletAddress: string): Promise<Communi
         return {
             id: d.id,
             ...data,
+            pricing: data.pricing ?? { model: "free" },
             submittedAt: data.submittedAt instanceof Timestamp ? data.submittedAt.toDate() : null,
         } as CommunityMarketItem;
     });

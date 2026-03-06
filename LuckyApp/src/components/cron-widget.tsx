@@ -54,12 +54,12 @@ export function CronWidget() {
         }
     };
 
-    const triggerCron = async (prompt: string) => {
+    const triggerCron = async (taskId: string, prompt: string) => {
         try {
             await fetch("/api/cron-jobs", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ action: "trigger", prompt })
+                body: JSON.stringify({ action: "trigger", taskId, prompt })
             });
         } catch (err) { }
     };
@@ -122,7 +122,7 @@ export function CronWidget() {
                                         size="icon"
                                         className="h-6 w-6 text-muted-foreground hover:text-amber-400"
                                         title="Trigger Now"
-                                        onClick={() => triggerCron(task.prompt)}
+                                        onClick={() => triggerCron(id, task.prompt)}
                                     >
                                         <Play className="h-3 w-3" />
                                     </Button>

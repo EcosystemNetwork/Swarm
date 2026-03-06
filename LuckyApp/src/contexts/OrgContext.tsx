@@ -24,8 +24,6 @@ interface OrgContextValue {
   refreshOrgs: () => Promise<void>;
   /** Create a new organization */
   createOrg: (name: string, description?: string) => Promise<void>;
-  /** Get a dummy token (for compatibility) */
-  getToken: () => Promise<string | null>;
 }
 
 const OrgContext = createContext<OrgContextValue>({
@@ -36,7 +34,6 @@ const OrgContext = createContext<OrgContextValue>({
   selectOrg: () => { },
   refreshOrgs: async () => { },
   createOrg: async () => { },
-  getToken: async () => null,
 });
 
 export function useOrg() {
@@ -60,11 +57,6 @@ export function OrgProvider({ children }: { children: ReactNode }) {
 
   // Track the grace-period timer so we can cancel if wallet reconnects
   const disconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const getToken = useCallback(async (): Promise<string | null> => {
-    // For compatibility - return null since we're not using Dynamic.xyz
-    return null;
-  }, []);
 
   const fetchOrgs = useCallback(async (walletAddress: string) => {
     try {
@@ -188,7 +180,6 @@ export function OrgProvider({ children }: { children: ReactNode }) {
       selectOrg,
       refreshOrgs,
       createOrg,
-      getToken,
     }}>
       {children}
     </OrgContext.Provider>
