@@ -299,6 +299,7 @@ export default function MarketPage() {
         try {
             await acquireItem(currentOrg.id, skillId, account.address);
             await loadInventory();
+            window.dispatchEvent(new Event("swarm-inventory-changed"));
         } finally { setBusyId(null); }
     };
 
@@ -307,6 +308,7 @@ export default function MarketPage() {
         try {
             await removeFromInventory(item.id);
             await loadInventory();
+            window.dispatchEvent(new Event("swarm-inventory-changed"));
         } finally { setBusyId(null); }
     };
 
@@ -321,6 +323,7 @@ export default function MarketPage() {
                 inventory.map((i) => i.skillId),
             );
             await loadInventory();
+            window.dispatchEvent(new Event("swarm-inventory-changed"));
         } finally { setBusyId(null); }
     };
 

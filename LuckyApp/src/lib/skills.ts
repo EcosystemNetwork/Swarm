@@ -62,6 +62,13 @@ export interface Skill {
     enabled?: boolean;
     /** Install date */
     installedAt?: Date | null;
+    /** If present, this item adds a sidebar tab when installed */
+    sidebarConfig?: {
+        sectionId: string;
+        label: string;
+        href: string;
+        iconName: string;
+    };
 }
 
 export interface SkillBundle {
@@ -101,6 +108,27 @@ export interface AgentSkill {
 // ═══════════════════════════════════════════════════════════════
 
 export const SKILL_REGISTRY: Skill[] = [
+    // ── Mods ──
+    {
+        id: "chainlink-cre",
+        name: "Chainlink",
+        description: "Developer tools to implement and automate CRE workflows.",
+        type: "mod",
+        source: "verified",
+        category: "Web3",
+        icon: "🔗",
+        version: "1.0.0",
+        author: "Swarm Core",
+        tags: ["chainlink", "oracle", "automation", "cre", "web3"],
+        pricing: { model: "free" },
+        sidebarConfig: {
+            sectionId: "intelligence",
+            label: "Chainlink",
+            href: "/chainlink",
+            iconName: "Link",
+        },
+    },
+
     // ── Plugins ──
     {
         id: "github-tools",
