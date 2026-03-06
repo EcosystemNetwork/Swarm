@@ -1,16 +1,24 @@
 /** Sidebar — 25-link draggable navigation with 4 sections (Core/Operations/Intelligence/System). */
 "use client";
 
-import { useState, useEffect, useCallback, type DragEvent } from "react";
+import { useState, useEffect, useCallback, useRef, type DragEvent } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { useOrg } from "@/contexts/OrgContext";
+import { getOwnedItems, SKILL_REGISTRY } from "@/lib/skills";
 import {
   LayoutDashboard, FolderKanban, Users, Briefcase, MessageSquare,
   LayoutGrid, Shield, Clock, Activity, BarChart3, Settings,
   Map, Calendar, Radio, FileText, ChevronLeft, ChevronRight, GripVertical,
-  Command, Coins, Stethoscope, Brain, UserCog, Network, HardDrive, BookOpen, Store, Building2
+  Command, Coins, Stethoscope, Brain, UserCog, Network, HardDrive, BookOpen, Store, Building2,
+  Link as LinkIcon,
 } from "lucide-react";
+
+/** Map iconName strings from sidebarConfig to lucide components */
+const ICON_MAP: Record<string, typeof LayoutDashboard> = {
+  Link: LinkIcon,
+};
 
 // ═══════════════════════════════════════════════════════════════
 // Navigation Model
@@ -108,10 +116,10 @@ function loadCollapsed(): boolean {
   try { return localStorage.getItem(COLLAPSED_KEY) === "true"; } catch { return false; }
 }
 
-// Build a complete lookup of all items from DEFAULT_SECTIONS by id
-function buildItemLookup(): Record<string, NavItem> {
+// Build a complete lookup of all items from the given sections by id
+function buildItemLookup(base: NavSection[]): Record<string, NavItem> {
   const m: Record<string, NavItem> = {};
-  for (const s of DEFAULT_SECTIONS) for (const i of s.items) m[i.id] = i;
+  for (const s of base) for (const i of s.items) m[i.id] = i;
   return m;
 }
 
@@ -119,12 +127,12 @@ function buildItemLookup(): Record<string, NavItem> {
  * Apply saved section order + item order to produce the final NavSection[].
  * Any new items not in saved order get appended to their default section.
  */
-function applySavedState(): NavSection[] {
+function applySavedState(base: NavSection[] = DEFAULT_SECTIONS): NavSection[] {
   const sectionOrder = loadJSON<string[]>(SECTION_ORDER_KEY);
   const itemOrder = loadJSON<Record<string, string[]>>(ITEM_ORDER_KEY);
 
-  // Start with default, then re-order sections
-  let sections = [...DEFAULT_SECTIONS.map(s => ({ ...s, items: [...s.items] }))];
+  // Start with base, then re-order sections
+  let sections = [...base.map(s => ({ ...s, items: [...s.items] }))];
 
   if (sectionOrder) {
     const lookup: Record<string, NavSection> = {};
@@ -142,7 +150,7 @@ function applySavedState(): NavSection[] {
 
   // Apply saved item order within each section
   if (itemOrder) {
-    const allItems = buildItemLookup();
+    const allItems = buildItemLookup(base);
     for (const section of sections) {
       const savedItemIds = itemOrder[section.id];
       if (!savedItemIds) continue;
@@ -195,15 +203,73 @@ interface DragState {
 
 export function Sidebar() {
   const pathname = usePathname();
+  const { currentOrg } = useOrg();
   const [collapsed, setCollapsed] = useState(false);
   const [sections, setSections] = useState<NavSection[]>(DEFAULT_SECTIONS);
   const [dragging, setDragging] = useState<DragState | null>(null);
   const [dropTarget, setDropTarget] = useState<{ sectionId: string; itemId?: string } | null>(null);
+  const orgIdRef = useRef<string | null>(null);
 
-  useEffect(() => {
-    setSections(applySavedState());
-    setCollapsed(loadCollapsed());
+  // Fetch installed mods and rebuild sidebar sections
+  const refreshModSidebar = useCallback(async (orgId: string) => {
+    try {
+      const owned = await getOwnedItems(orgId);
+      const ownedIds = new Set(owned.filter(o => o.enabled).map(o => o.skillId));
+
+      const dynamicItems: { sectionId: string; item: NavItem }[] = [];
+      for (const skill of SKILL_REGISTRY) {
+        if (skill.sidebarConfig && ownedIds.has(skill.id)) {
+          const icon = ICON_MAP[skill.sidebarConfig.iconName] as typeof LayoutDashboard | undefined;
+          if (icon != null) {
+            dynamicItems.push({
+              sectionId: skill.sidebarConfig.sectionId,
+              item: {
+                id: `mod-${skill.id}`,
+                href: skill.sidebarConfig.href,
+                label: skill.sidebarConfig.label,
+                icon,
+              },
+            });
+          }
+        }
+      }
+
+      const base = DEFAULT_SECTIONS.map(s => ({ ...s, items: [...s.items] }));
+      for (const { sectionId, item } of dynamicItems) {
+        const section = base.find(s => s.id === sectionId);
+        if (section && !section.items.some(i => i.id === item.id)) {
+          section.items.push(item);
+        }
+      }
+
+      setSections(applySavedState(base));
+    } catch {
+      setSections(applySavedState());
+    }
   }, []);
+
+  // Load on org change
+  useEffect(() => {
+    const orgId = currentOrg?.id ?? null;
+    orgIdRef.current = orgId;
+    setCollapsed(loadCollapsed());
+
+    if (!orgId) {
+      setSections(applySavedState());
+      return;
+    }
+
+    refreshModSidebar(orgId);
+  }, [currentOrg, refreshModSidebar]);
+
+  // Re-fetch when marketplace installs/removes items
+  useEffect(() => {
+    const handler = () => {
+      if (orgIdRef.current) refreshModSidebar(orgIdRef.current);
+    };
+    window.addEventListener("swarm-inventory-changed", handler);
+    return () => window.removeEventListener("swarm-inventory-changed", handler);
+  }, [refreshModSidebar]);
 
   const toggleCollapsed = useCallback(() => {
     setCollapsed(prev => {
