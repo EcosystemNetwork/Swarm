@@ -329,9 +329,15 @@ async function cmdCheck() {
     const label = isFirstRun ? "existing" : "new";
     console.log(`${messages.length} ${label} message(s):\n`);
     for (const msg of messages) {
-      const icon = msg.fromType === "agent" ? "[bot]" : "[user]";
-      console.log(`  ${icon} [#${msg.channelName}] ${msg.from}: ${msg.text}`);
-      console.log(`     -> Reply: swarm send ${msg.channelId} "<your reply>"`);
+      const tag = msg.fromType === "agent" ? "agent" : "HUMAN";
+      const atts = msg.attachments?.length ? ` [${msg.attachments.length} attachment(s)]` : "";
+      console.log(`  [${tag}] [#${msg.channelName}] ${msg.from}: ${msg.text}${atts}`);
+      if (msg.attachments?.length) {
+        for (const att of msg.attachments) {
+          console.log(`     📎 ${att.name} (${att.type}, ${att.size} bytes) — ${att.url}`);
+        }
+      }
+      console.log(`     -> channel: ${msg.channelId} | id: ${msg.id} | reply: swarm reply ${msg.id} "<response>"`);
     }
   }
 
@@ -538,8 +544,8 @@ async function cmdDaemon() {
   const config = loadConfig();
   const { privateKey } = ensureKeypair();
 
-  const intervalSec = parseInt(arg("--interval") || "300", 10); // default 5 min
-  const intervalMs = Math.max(60, intervalSec) * 1000; // minimum 60 seconds
+  const intervalSec = parseInt(arg("--interval") || "30", 10); // default 30s — active monitoring
+  const intervalMs = Math.max(10, intervalSec) * 1000; // minimum 10 seconds
 
   console.log(`Swarm Daemon`);
   console.log(`─────────────────────────────`);
@@ -592,10 +598,13 @@ async function daemonTick(config, privateKey) {
       if (messages.length > 0) {
         console.log(`[${now}] ${messages.length} new message(s)`);
         for (const msg of messages) {
-          console.log(`  [#${msg.channelName}] ${msg.from}: ${msg.text}`);
+          const tag = msg.fromType === "agent" ? "agent" : "HUMAN";
+          const atts = msg.attachments?.length ? ` [${msg.attachments.length} attachment(s)]` : "";
+          console.log(`  [${tag}] [#${msg.channelName}] ${msg.from}: ${msg.text}${atts}`);
+          console.log(`     -> channel: ${msg.channelId} | id: ${msg.id} | reply: swarm reply ${msg.id} "<response>"`);
         }
       } else {
-        console.log(`[${now}] heartbeat ok`);
+        console.log(`[${now}] heartbeat ok — no new messages`);
       }
     } else {
       console.error(`[${now}] check failed (${resp.status})`);
@@ -631,7 +640,7 @@ Commands:
   status                            — show agent status + send heartbeat
   discover  [--skill <id>] [--type <type>] [--status <status>]  — find agents
   profile   [--skills <s1,s2>] [--bio <bio>]  — view/update agent profile
-  daemon    [--interval <seconds>]  — auto-checkin loop (default: 300s)
+  daemon    [--interval <seconds>]  — active monitoring loop (default: 30s)
 
 Auth:
   Ed25519 keypair generated on first run.

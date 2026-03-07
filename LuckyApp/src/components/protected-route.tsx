@@ -83,9 +83,22 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
     }
   }, [isConnected, organizations.length, loading, router, pathname, graceOver, isReconnecting]);
 
-  // Show nothing while grace period is active, reconnecting, not connected, or loading orgs
-  if (!graceOver || isReconnecting || !isConnected || loading) {
+  // Show nothing while grace period is active, reconnecting, or not connected
+  if (!graceOver || isReconnecting || !isConnected) {
     return null;
+  }
+
+  // Wallet is connected but orgs are still loading — show a loading indicator
+  // instead of a blank page (which makes users think they need to login again)
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-background">
+        <div className="flex flex-col items-center gap-3">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+          <p className="text-sm text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    );
   }
 
   // If no orgs and not on onboarding page, show nothing (will redirect)

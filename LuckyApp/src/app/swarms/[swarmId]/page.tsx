@@ -1,7 +1,7 @@
 /** Swarm Detail — Individual project view with agents, tasks, activity, and agent comms tabs. */
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useActiveAccount } from "thirdweb/react";
 import { useChainCurrency } from "@/hooks/useChainCurrency";
@@ -55,6 +55,9 @@ import {
 import { db } from "@/lib/firebase";
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 import type { DispatchPayload } from "@/components/agent-map/agent-map";
+import { Paperclip, Mic, Square, X, Download } from "lucide-react";
+import { uploadFiles, uploadVoiceRecording, validateFiles, getFileCategory, formatFileSize } from "@/lib/storage";
+import type { Attachment } from "@/lib/firestore";
 
 const TASK_STATUS_COLORS: Record<string, string> = {
   todo: "bg-muted text-muted-foreground",
@@ -122,6 +125,16 @@ export default function ProjectDetailPage() {
   const [agentThinking, setAgentThinking] = useState(false);
   const lastMsgCountRef = useRef(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Media upload state
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingDuration, setRecordingDuration] = useState(0);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const recordingTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // @ mention autocomplete state
   const [mentionQuery, setMentionQuery] = useState<string | null>(null);
@@ -279,11 +292,78 @@ export default function ProjectDetailPage() {
     lastMsgCountRef.current = messages.length;
   }, [messages]);
 
+  const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+    const error = validateFiles(files);
+    if (error) { alert(error); return; }
+    const total = pendingFiles.length + files.length;
+    if (total > 5) { alert('Maximum 5 files per message'); return; }
+    setPendingFiles(prev => [...prev, ...files]);
+    e.target.value = '';
+  }, [pendingFiles]);
+
+  const removePendingFile = useCallback((index: number) => {
+    setPendingFiles(prev => prev.filter((_, i) => i !== index));
+  }, []);
+
+  const startRecording = useCallback(async () => {
+    if (!channel || !currentOrg) return;
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/mp4';
+      const recorder = new MediaRecorder(stream, { mimeType });
+      audioChunksRef.current = [];
+      recorder.ondataavailable = (e) => { if (e.data.size > 0) audioChunksRef.current.push(e.data); };
+      recorder.onstop = async () => {
+        stream.getTracks().forEach(t => t.stop());
+        if (recordingTimerRef.current) { clearInterval(recordingTimerRef.current); recordingTimerRef.current = null; }
+        setIsRecording(false);
+        setRecordingDuration(0);
+        const blob = new Blob(audioChunksRef.current, { type: mimeType });
+        if (blob.size === 0) return;
+        try {
+          setUploading(true);
+          const att = await uploadVoiceRecording(blob, currentOrg.id, channel.id);
+          const addr = account?.address || 'anonymous';
+          await sendMessage({
+            channelId: channel.id,
+            senderId: addr,
+            senderName: myProfile?.displayName || (addr.slice(0, 6) + '...' + addr.slice(-4)),
+            senderType: 'human',
+            content: '',
+            orgId: currentOrg.id,
+            attachments: [att],
+            createdAt: new Date(),
+          });
+        } catch (err) { console.error('Failed to send voice:', err); }
+        finally { setUploading(false); }
+      };
+      recorder.start();
+      mediaRecorderRef.current = recorder;
+      setIsRecording(true);
+      setRecordingDuration(0);
+      recordingTimerRef.current = setInterval(() => setRecordingDuration(d => d + 1), 1000);
+    } catch (err) { console.error('Microphone access denied:', err); }
+  }, [channel, currentOrg, account, myProfile]);
+
+  const stopRecording = useCallback(() => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      mediaRecorderRef.current.stop();
+    }
+  }, []);
+
   const handleSendChat = async () => {
-    if (!chatInput.trim() || !channel || !currentOrg) return;
+    if ((!chatInput.trim() && pendingFiles.length === 0) || !channel || !currentOrg) return;
     const addr = account?.address || 'anonymous';
     try {
       setSendingChat(true);
+      let attachments: Attachment[] | undefined;
+      if (pendingFiles.length > 0) {
+        setUploading(true);
+        attachments = await uploadFiles(pendingFiles, currentOrg.id, channel.id);
+        setUploading(false);
+      }
       await sendMessage({
         channelId: channel.id,
         senderId: addr,
@@ -291,17 +371,18 @@ export default function ProjectDetailPage() {
         senderType: 'human',
         content: chatInput.trim(),
         orgId: currentOrg.id,
+        ...(attachments ? { attachments } : {}),
         createdAt: new Date(),
       });
       setChatInput('');
-      // Show thinking indicator — agents will respond
+      setPendingFiles([]);
       if (assignedAgents.length > 0) {
         setAgentThinking(true);
-        // Auto-timeout after 30s in case agent doesn't respond
         setTimeout(() => setAgentThinking(false), 30000);
       }
     } catch (err) {
       console.error('Failed to send message:', err);
+      setUploading(false);
     } finally {
       setSendingChat(false);
     }
@@ -1237,7 +1318,29 @@ export default function ProjectDetailPage() {
                                 : 'bg-muted/60 text-foreground'
                               }`}
                           >
-                            {msg.content}
+                            {msg.content && <p className="whitespace-pre-wrap">{msg.content}</p>}
+                            {msg.attachments && msg.attachments.length > 0 && (
+                              <div className={`space-y-2 ${msg.content ? 'mt-2' : ''}`}>
+                                {msg.attachments.map((att, i) => {
+                                  const cat = getFileCategory(att.type);
+                                  if (cat === 'image') return <img key={i} src={att.url} alt={att.name} className="max-w-xs max-h-60 rounded-md cursor-pointer" onClick={() => window.open(att.url, '_blank')} />;
+                                  if (cat === 'video') return <video key={i} src={att.url} controls className="max-w-sm rounded-md" />;
+                                  if (cat === 'audio') return (
+                                    <div key={i} className="flex flex-col gap-1">
+                                      <span className="text-xs text-muted-foreground">{att.name.startsWith('voice_') ? 'Voice message' : att.name}</span>
+                                      <audio src={att.url} controls className="max-w-[250px]" />
+                                    </div>
+                                  );
+                                  return (
+                                    <a key={i} href={att.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 p-2 rounded-md bg-muted/50 hover:bg-muted transition-colors">
+                                      <Download className="w-4 h-4 text-amber-500 shrink-0" />
+                                      <span className="text-xs truncate">{att.name}</span>
+                                      <span className="text-[10px] text-muted-foreground shrink-0">{formatFileSize(att.size)}</span>
+                                    </a>
+                                  );
+                                })}
+                              </div>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -1263,6 +1366,30 @@ export default function ProjectDetailPage() {
                 </div>
                 {/* Input */}
                 <div className="border-t p-3 relative">
+                  {/* Pending files preview */}
+                  {pendingFiles.length > 0 && (
+                    <div className="flex flex-wrap gap-2 mb-2">
+                      {pendingFiles.map((f, i) => (
+                        <div key={i} className="flex items-center gap-1.5 bg-muted/60 rounded-md px-2 py-1 text-xs">
+                          <span className="truncate max-w-[120px]">{f.name}</span>
+                          <span className="text-muted-foreground">{formatFileSize(f.size)}</span>
+                          <button onClick={() => removePendingFile(i)} className="text-muted-foreground hover:text-foreground">
+                            <X className="w-3 h-3" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {/* Voice recording indicator */}
+                  {isRecording && (
+                    <div className="flex items-center gap-2 mb-2 text-sm">
+                      <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+                      <span className="text-red-400">Recording... {recordingDuration}s</span>
+                      <button onClick={stopRecording} className="ml-auto text-muted-foreground hover:text-foreground">
+                        <Square className="w-4 h-4" />
+                      </button>
+                    </div>
+                  )}
                   {/* @ Mention Autocomplete Popup */}
                   {mentionQuery !== null && mentionAgents.length > 0 && (
                     <div
@@ -1283,7 +1410,28 @@ export default function ProjectDetailPage() {
                       ))}
                     </div>
                   )}
+                  <input ref={fileInputRef} type="file" multiple className="hidden" onChange={handleFileSelect} />
                   <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      className="shrink-0 h-9 w-9"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={sendingChat || uploading || isRecording || !channel}
+                    >
+                      <Paperclip className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      className={`shrink-0 h-9 w-9 ${isRecording ? 'border-red-500 text-red-500' : ''}`}
+                      onClick={isRecording ? stopRecording : startRecording}
+                      disabled={sendingChat || uploading || !channel}
+                    >
+                      {isRecording ? <Square className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+                    </Button>
                     <Input
                       ref={chatInputRef}
                       placeholder="Type a message... (@ to mention)"
@@ -1298,15 +1446,15 @@ export default function ProjectDetailPage() {
                         }
                         if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendChat(); }
                       }}
-                      disabled={sendingChat || !channel}
+                      disabled={sendingChat || uploading || isRecording || !channel}
                       className="flex-1"
                     />
                     <Button
                       onClick={handleSendChat}
-                      disabled={sendingChat || !chatInput.trim() || !channel}
+                      disabled={sendingChat || uploading || (!chatInput.trim() && pendingFiles.length === 0) || !channel}
                       className="bg-amber-600 hover:bg-amber-700 text-black"
                     >
-                      Send
+                      {uploading ? 'Uploading...' : 'Send'}
                     </Button>
                   </div>
                 </div>

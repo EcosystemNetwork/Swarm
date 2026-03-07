@@ -515,9 +515,31 @@ export default function AgentsPage() {
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <CardDescription className="mb-3 line-clamp-2">{agent.description}</CardDescription>
-                  {/* Capabilities badges */}
-                  {(agent.capabilities ?? []).length > 0 && (
+                  {/* Agent bio (self-reported) or fallback to user-provided description */}
+                  <CardDescription className="mb-3 line-clamp-2">
+                    {agent.bio || agent.description}
+                  </CardDescription>
+                  {/* Agent bio shown separately if both exist */}
+                  {agent.bio && agent.description && agent.bio !== agent.description && (
+                    <p className="text-[10px] text-muted-foreground/70 mb-2 line-clamp-1 italic">Instructions: {agent.description}</p>
+                  )}
+                  {/* Reported skills (from agent) */}
+                  {(agent.reportedSkills ?? []).length > 0 && (
+                    <div className="flex flex-wrap gap-1 mb-3">
+                      {(agent.reportedSkills ?? []).slice(0, 4).map((skill, i) => (
+                        <Badge key={i} variant="secondary" className="text-[10px] px-1.5 py-0 bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20">
+                          {skill.name}
+                        </Badge>
+                      ))}
+                      {(agent.reportedSkills ?? []).length > 4 && (
+                        <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                          +{(agent.reportedSkills ?? []).length - 4}
+                        </Badge>
+                      )}
+                    </div>
+                  )}
+                  {/* Capabilities badges (fallback if no reported skills) */}
+                  {(agent.reportedSkills ?? []).length === 0 && (agent.capabilities ?? []).length > 0 && (
                     <div className="flex flex-wrap gap-1 mb-3">
                       {(agent.capabilities ?? []).slice(0, 3).map((cap, i) => (
                         <Badge key={i} variant="secondary" className="text-[10px] px-1.5 py-0">
@@ -627,13 +649,14 @@ export default function AgentsPage() {
             </div>
 
             <div>
-              <label className="text-sm font-medium mb-1 block">Description</label>
+              <label className="text-sm font-medium mb-1 block">Instructions</label>
               <Textarea
-                placeholder={`Default: ${TYPE_DESCRIPTIONS[agentType]}`}
+                placeholder="Describe what this agent should do, its responsibilities, and any specific instructions..."
                 value={agentDescription}
                 onChange={e => setAgentDescription(e.target.value)}
                 rows={3}
               />
+              <p className="text-xs text-muted-foreground mt-1">Your instructions for this agent. The agent will also write its own bio when it connects.</p>
             </div>
 
             <div className="flex gap-2 justify-end">
@@ -720,13 +743,42 @@ export default function AgentsPage() {
               </Select>
             </div>
             <div>
-              <label className="text-sm font-medium mb-1 block">Description</label>
+              <label className="text-sm font-medium mb-1 block">Instructions</label>
               <Textarea
                 value={editDescription}
                 onChange={e => setEditDescription(e.target.value)}
+                placeholder="Your instructions for this agent..."
                 rows={3}
               />
+              <p className="text-xs text-muted-foreground mt-1">Your instructions for this agent.</p>
             </div>
+
+            {/* Agent Bio (read-only — written by the agent) */}
+            {editAgent?.bio && (
+              <div>
+                <label className="text-sm font-medium mb-1 block">Agent Bio</label>
+                <div className="rounded-md border border-border bg-muted/30 px-3 py-2 text-sm text-muted-foreground italic">
+                  {editAgent.bio}
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">Written by the agent on connect. Read-only.</p>
+              </div>
+            )}
+
+            {/* Reported Skills (read-only — reported by the agent) */}
+            {(editAgent?.reportedSkills ?? []).length > 0 && (
+              <div>
+                <label className="text-sm font-medium mb-1 block">Reported Skills</label>
+                <div className="flex flex-wrap gap-1.5">
+                  {(editAgent?.reportedSkills ?? []).map((skill, i) => (
+                    <Badge key={i} variant="secondary" className="text-xs px-2 py-0.5 bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20">
+                      {skill.name}
+                    </Badge>
+                  ))}
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">Self-reported by the agent. Read-only.</p>
+              </div>
+            )}
+
             <div className="flex gap-2 justify-end">
               <Button variant="outline" onClick={() => setShowEdit(false)} disabled={saving}>Cancel</Button>
               <Button onClick={handleEditSave} disabled={saving || !editName.trim()} className="bg-amber-600 hover:bg-amber-700 text-black">
