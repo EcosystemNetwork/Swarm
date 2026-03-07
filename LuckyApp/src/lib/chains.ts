@@ -248,17 +248,34 @@ export function shortAddress(addr: string): string {
 // ═══════════════════════════════════════════════════════════════
 
 export const CHAINLINK = {
-    /** Price feed contract addresses per chain */
+    /** Price feed contract addresses per chain (AggregatorV3Interface proxies) */
     priceFeeds: {
+        ethereum: {
+            "ETH/USD": "0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419",
+            "BTC/USD": "0xF4030086522a5bEEa4988F8cA5B36dbC97BeE88c",
+            "LINK/USD": "0x2c1d072e956AFFC0D435Cb7AC38EF18d24d9127c",
+        },
         avalanche: {
             "AVAX/USD": "0x0A77230d17318075983913bC2145DB16C7366156",
+            "ETH/USD": "0x976B3D034E162d8bD72D6b9C989d545b839003b0",
+            "BTC/USD": "0x2779D32d5166BAaa2B2b658333bA7e6Ec0C65743",
+            "LINK/USD": "0x49ccd9ca821EfEab2b98c60dC60F518E765EDe9a",
         },
         base: {
             "ETH/USD": "0x71041dddad3595F9CEd3DcCFBe3D1F4b0a16Bb70",
+            "BTC/USD": "0x64c911996D3c6aC71f9b455B1E8E7266BcbD848F",
+            "LINK/USD": "0x17CAb8FE31E32f08326e5E27412894e49B0f9D65",
         },
         hedera: {},
         filecoin: {},
     } as Record<string, Record<string, string>>,
+
+    /** RPC endpoints keyed by chain name (mirrors CHAINS config) */
+    rpcByNetwork: {
+        ethereum: "https://ethereum-rpc.publicnode.com",
+        avalanche: "https://api.avax.network/ext/bc/C/rpc",
+        base: "https://mainnet.base.org",
+    } as Record<string, string>,
 
     /** CCIP router addresses per chain (for cross-chain messaging) */
     ccipRouters: {

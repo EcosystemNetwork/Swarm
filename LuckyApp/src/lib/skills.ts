@@ -19,6 +19,7 @@ import {
     Timestamp,
 } from "firebase/firestore";
 import { db } from "./firebase";
+import { CHAINLINK_MANIFEST } from "./chainlink";
 
 // ═══════════════════════════════════════════════════════════════
 // Types
@@ -38,6 +39,55 @@ export interface PricingTier {
 export interface MarketPricing {
     model: PricingModel;
     tiers?: PricingTier[];
+}
+
+// ── Mod Manifest types (reusable for all vendor mods) ──
+
+export interface ModTool {
+    id: string;
+    name: string;
+    description: string;
+    icon: string;
+    category: string;
+    status: "active" | "coming_soon";
+    usageExample?: string;
+}
+
+export interface ModWorkflow {
+    id: string;
+    name: string;
+    description: string;
+    icon: string;
+    tags: string[];
+    steps: string[];
+    estimatedTime?: string;
+}
+
+export interface ModExample {
+    id: string;
+    name: string;
+    description: string;
+    icon: string;
+    tags: string[];
+    codeSnippet?: string;
+    language?: string;
+}
+
+export interface ModAgentSkill {
+    id: string;
+    name: string;
+    description: string;
+    type: "skill";
+    invocation: string;
+    exampleInput?: string;
+    exampleOutput?: string;
+}
+
+export interface ModManifest {
+    tools: ModTool[];
+    workflows: ModWorkflow[];
+    examples: ModExample[];
+    agentSkills: ModAgentSkill[];
 }
 
 export interface Skill {
@@ -69,6 +119,8 @@ export interface Skill {
         href: string;
         iconName: string;
     };
+    /** Mod manifest — tools, workflows, examples, agent skills */
+    modManifest?: ModManifest;
 }
 
 export interface SkillBundle {
@@ -127,6 +179,7 @@ export const SKILL_REGISTRY: Skill[] = [
             href: "/chainlink",
             iconName: "Link",
         },
+        modManifest: CHAINLINK_MANIFEST,
     },
 
     // ── Plugins ──
