@@ -7,7 +7,7 @@ import {
     Search, Download, Trash2, Check, Loader2,
     Puzzle, Star, Shield, ShieldCheck, Wrench, Plug, Store,
     Layers, Users, Plus, Clock, CheckCircle2, XCircle,
-    CreditCard, Crown, Infinity, Calendar, ChevronRight,
+    CreditCard, Crown, Infinity, Calendar, ChevronRight, Palette,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -19,7 +19,7 @@ import {
     type Skill, type OwnedItem, type MarketItemType, type CommunityMarketItem,
     type MarketSubscription, type SubscriptionPlan,
     SKILL_REGISTRY, SKILL_BUNDLES, MOD_REGISTRY,
-    MOD_CATEGORIES, PLUGIN_CATEGORIES, SKILL_ONLY_CATEGORIES,
+    MOD_CATEGORIES, PLUGIN_CATEGORIES, SKILL_ONLY_CATEGORIES, SKIN_CATEGORIES,
     acquireItem, removeFromInventory, toggleInventoryItem, getOwnedItems, acquireBundle,
     getCommunityItems, getUserSubmissions, deleteCommunityItem,
     getOrgSubscriptions, subscribeToItem, cancelSubscription,
@@ -36,12 +36,13 @@ import {
 // Tab Config
 // ═══════════════════════════════════════════════════════════════
 
-type Tab = "mods" | "plugins" | "skills" | "bundles" | "inventory" | "submit";
+type Tab = "mods" | "plugins" | "skills" | "skins" | "bundles" | "inventory" | "submit";
 
 const TABS: { key: Tab; label: string; icon: typeof Wrench; type?: MarketItemType }[] = [
     { key: "mods", label: "Mods", icon: Wrench, type: "mod" },
     { key: "plugins", label: "Plugins", icon: Plug, type: "plugin" },
     { key: "skills", label: "Skills", icon: Puzzle, type: "skill" },
+    { key: "skins", label: "Skins", icon: Palette, type: "skin" },
     { key: "bundles", label: "Bundles", icon: Layers },
     { key: "inventory", label: "Inventory", icon: Check },
     { key: "submit", label: "Submit", icon: Plus },
@@ -51,6 +52,7 @@ const CATEGORIES_BY_TYPE: Record<MarketItemType, string[]> = {
     mod: MOD_CATEGORIES,
     plugin: PLUGIN_CATEGORIES,
     skill: SKILL_ONLY_CATEGORIES,
+    skin: SKIN_CATEGORIES,
 };
 
 // ═══════════════════════════════════════════════════════════════
@@ -417,7 +419,8 @@ export default function MarketPage() {
     const inventoryCount = inventory.length;
     const bundleCount = SKILL_BUNDLES.length;
     const submitCount = userSubmissions.length;
-    const tabCounts: Record<Tab, number> = { mods: modCount, plugins: pluginCount, skills: skillCount, bundles: bundleCount, inventory: inventoryCount, submit: submitCount };
+    const skinCount = allItems.filter((s) => s.type === "skin").length;
+    const tabCounts: Record<Tab, number> = { mods: modCount, plugins: pluginCount, skills: skillCount, skins: skinCount, bundles: bundleCount, inventory: inventoryCount, submit: submitCount };
 
     if (!account) {
         return (

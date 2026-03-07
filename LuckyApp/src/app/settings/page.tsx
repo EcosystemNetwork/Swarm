@@ -13,11 +13,15 @@ import { Badge } from '@/components/ui/badge';
 import { GitHubIcon } from '@/components/github/github-icon';
 import SpotlightCard from "@/components/reactbits/SpotlightCard";
 import { Switch } from '@/components/ui/switch';
+import { useSkin } from '@/contexts/SkinContext';
+import { getOwnedItems } from '@/lib/skills';
+import Link from 'next/link';
 
 export default function SettingsPage() {
   const { currentOrg, refreshOrgs } = useOrg();
   const account = useActiveAccount();
   const address = account?.address;
+  const { skin, setSkin, skins, availableSkins, refreshInstalled } = useSkin();
 
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -45,6 +49,17 @@ export default function SettingsPage() {
   const [savingProfile, setSavingProfile] = useState(false);
   const [profileMessage, setProfileMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [profileLoaded, setProfileLoaded] = useState(false);
+
+  // Load installed skins from marketplace inventory
+  useEffect(() => {
+    if (!currentOrg) return;
+    (async () => {
+      try {
+        const owned = await getOwnedItems(currentOrg.id);
+        refreshInstalled(owned.filter(o => o.enabled).map(o => o.skillId));
+      } catch { /* non-fatal */ }
+    })();
+  }, [currentOrg, refreshInstalled]);
 
   // Load user profile
   useEffect(() => {
@@ -216,6 +231,59 @@ export default function SettingsPage() {
   return (
     <div className="space-y-6">
       <div className="max-w-2xl space-y-6">
+
+        {/* ── Appearance ── */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Appearance</CardTitle>
+            <CardDescription>Customize the look and feel of Swarm. Get more skins from the <Link href="/market" className="text-primary underline underline-offset-2 hover:opacity-80">Marketplace</Link>.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 gap-3">
+              {skins.map((s) => {
+                const isActive = skin === s.id;
+                const isAvailable = availableSkins.some((a) => a.id === s.id);
+                return (
+                  <button
+                    key={s.id}
+                    type="button"
+                    onClick={() => isAvailable && setSkin(s.id)}
+                    disabled={!isAvailable}
+                    className={`relative text-left rounded-xl border-2 p-4 transition-all duration-200 ${
+                      isActive
+                        ? 'border-primary bg-primary/5 ring-1 ring-primary/20'
+                        : isAvailable
+                          ? 'border-border hover:border-muted-foreground/30 bg-card'
+                          : 'border-border bg-card/50 opacity-60 cursor-not-allowed'
+                    }`}
+                  >
+                    {isActive && (
+                      <span className="absolute top-2 right-2 text-xs bg-primary text-primary-foreground px-1.5 py-0.5 rounded-full font-medium">
+                        Active
+                      </span>
+                    )}
+                    {!isAvailable && (
+                      <span className="absolute top-2 right-2 text-[10px] bg-muted text-muted-foreground px-1.5 py-0.5 rounded-full font-medium">
+                        Install from Market
+                      </span>
+                    )}
+                    <div className="flex items-center gap-2 mb-2">
+                      {s.colors.map((color, i) => (
+                        <span
+                          key={i}
+                          className="w-4 h-4 rounded-full border border-border/50"
+                          style={{ backgroundColor: color, filter: isAvailable ? 'none' : 'grayscale(0.5)' }}
+                        />
+                      ))}
+                    </div>
+                    <p className="text-sm font-semibold">{s.name}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">{s.description}</p>
+                  </button>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
 
         {/* ── User Profile ── */}
         <Card>

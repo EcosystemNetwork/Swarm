@@ -6,6 +6,7 @@ import { Web3Provider } from "@/lib/dynamic";
 import { OrgProvider } from "@/contexts/OrgContext";
 import SparkleTrail from "@/components/SparkleTrail";
 import { ThemeProvider } from "@/components/theme-provider";
+import { SkinProvider } from "@/contexts/SkinContext";
 import { CommandBar } from "@/components/command-bar";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
@@ -32,6 +33,7 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body className={inter.className} suppressHydrationWarning>
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem>
+          <SkinProvider>
           <Web3Provider>
             <OrgProvider>
               <SparkleTrail>
@@ -40,6 +42,7 @@ export default function RootLayout({
               </SparkleTrail>
             </OrgProvider>
           </Web3Provider>
+          </SkinProvider>
         </ThemeProvider>
       </body>
     </html>

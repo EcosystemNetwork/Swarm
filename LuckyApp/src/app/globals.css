@@ -578,3 +578,647 @@ body::after {
   0% { transform: translate(0%, 0%); opacity: 1; }
   100% { transform: translate(100%, 0%); opacity: 0; }
 }
+
+/* ═══════════════════════════════════════════
+   FUTURISTIC SKIN (Arwes-Inspired)
+   ═══════════════════════════════════════════ */
+
+/* ── 1. Shadcn variable overrides ── */
+.skin-futuristic {
+  --primary: 187 96% 51%;
+  --ring: 187 96% 51%;
+}
+.skin-futuristic.dark {
+  --primary: 187 96% 51%;
+  --ring: 187 96% 51%;
+}
+
+/* ── 2. Body background ── */
+.skin-futuristic body {
+  background-image:
+    radial-gradient(at 0% 0%, hsla(187, 96%, 51%, 0.1) 0px, transparent 50%),
+    radial-gradient(at 100% 0%, hsla(292, 97%, 57%, 0.06) 0px, transparent 50%);
+}
+
+/* ── 3. Ambient floating orbs → cyan/magenta ── */
+.skin-futuristic body::before {
+  background: radial-gradient(circle, rgba(38, 218, 253, 0.05) 0%, transparent 70%);
+}
+.skin-futuristic body::after {
+  background: radial-gradient(circle, rgba(252, 38, 250, 0.03) 0%, transparent 70%);
+}
+
+/* ── 4. Text glow overrides ── */
+.skin-futuristic.dark .text-glow {
+  text-shadow: 0 0 20px hsla(187, 96%, 51%, 0.5);
+}
+.skin-futuristic.dark .text-glow-gold,
+.skin-futuristic .dark .text-glow-gold {
+  text-shadow: 0 0 10px rgba(38, 218, 253, 0.5), 0 0 20px rgba(38, 218, 253, 0.3);
+}
+.skin-futuristic.dark .text-glow-amber,
+.skin-futuristic .dark .text-glow-amber {
+  text-shadow: 0 0 8px rgba(38, 218, 253, 0.4), 0 0 16px rgba(38, 218, 253, 0.2);
+}
+
+/* ── 5. Neon glow overrides ── */
+.skin-futuristic .neon-glow-gold {
+  box-shadow: 0 0 5px rgba(38, 218, 253, 0.2),
+              0 0 15px rgba(38, 218, 253, 0.1),
+              0 0 30px rgba(38, 218, 253, 0.05);
+}
+
+.skin-futuristic .border-glow-gold {
+  border-color: rgba(38, 218, 253, 0.15);
+  box-shadow: inset 0 0 20px rgba(38, 218, 253, 0.03), 0 0 15px rgba(38, 218, 253, 0.05);
+}
+
+/* ── 6. Glass card overrides ── */
+.skin-futuristic .glass-card:hover {
+  border-color: rgba(38, 218, 253, 0.3);
+}
+.skin-futuristic.dark .glass-card:hover,
+.skin-futuristic .dark .glass-card:hover {
+  border-color: rgba(38, 218, 253, 0.2);
+}
+.skin-futuristic .glass-card-enhanced:hover {
+  border-color: rgba(38, 218, 253, 0.3);
+  box-shadow: 0 8px 32px rgba(38, 218, 253, 0.06), 0 0 20px rgba(38, 218, 253, 0.03);
+}
+.skin-futuristic.dark .glass-card-enhanced,
+.skin-futuristic .dark .glass-card-enhanced {
+  border-color: rgba(38, 218, 253, 0.08);
+}
+.skin-futuristic.dark .glass-card-enhanced:hover,
+.skin-futuristic .dark .glass-card-enhanced:hover {
+  border-color: rgba(38, 218, 253, 0.2);
+  box-shadow: 0 8px 32px rgba(38, 218, 253, 0.08), 0 0 20px rgba(38, 218, 253, 0.05);
+}
+
+/* ── 7. Gradient border spin → cyan/magenta ── */
+.skin-futuristic .gradient-border-spin::before {
+  background: conic-gradient(from 0deg, transparent, #26dafd, #fc26fa, transparent);
+}
+
+/* ── 8. Scan line → cyan ── */
+.skin-futuristic .scan-line-overlay {
+  background: linear-gradient(90deg, transparent, rgba(38, 218, 253, 0.3), transparent);
+}
+
+/* ── 9. Button glow → cyan ── */
+.skin-futuristic .btn-glow:hover {
+  box-shadow: 0 0 15px rgba(38, 218, 253, 0.25), inset 0 0 15px rgba(38, 218, 253, 0.05);
+  border-color: rgba(38, 218, 253, 0.4);
+}
+.skin-futuristic .btn-glow::after {
+  background: linear-gradient(90deg, transparent, rgba(38, 218, 253, 0.1), transparent);
+}
+
+/* ── 10. Badge neon amber → cyan ── */
+.skin-futuristic .badge-neon-amber {
+  background: rgba(38, 218, 253, 0.1);
+  color: #0891b2;
+  border-color: rgba(38, 218, 253, 0.3);
+}
+.skin-futuristic.dark .badge-neon-amber,
+.skin-futuristic .dark .badge-neon-amber {
+  background: rgba(38, 218, 253, 0.15);
+  color: #22d3ee;
+  box-shadow: 0 0 8px rgba(38, 218, 253, 0.2);
+}
+
+/* ── 11. Node execution running → cyan ── */
+.skin-futuristic .node-execution-running::before {
+  background: conic-gradient(from var(--node-angle, 0deg), transparent 25%, #22d3ee 50%, transparent 75%);
+}
+
+/* ── 12. React Flow edges → cyan ── */
+.skin-futuristic .react-flow {
+  --xy-edge-stroke-default: #0891b2;
+}
+.skin-futuristic .react-flow__connection-line {
+  stroke: #22d3ee;
+}
+.skin-futuristic .map-edge-path:hover,
+.skin-futuristic .map-edge-path.selected {
+  stroke: #22d3ee;
+  filter: drop-shadow(0 0 6px rgba(34, 211, 238, 0.5));
+}
+
+/* ── 13. Pulse / glow keyframes for futuristic ── */
+@keyframes pulse-glow-cyan {
+  0%, 100% { opacity: 0.6; box-shadow: 0 0 5px rgba(38, 218, 253, 0.2); }
+  50% { opacity: 1; box-shadow: 0 0 20px rgba(38, 218, 253, 0.4); }
+}
+@keyframes icon-pulse-cyan {
+  0%, 100% { transform: scale(1); filter: drop-shadow(0 0 0px transparent); }
+  50% { transform: scale(1.1); filter: drop-shadow(0 0 6px rgba(38, 218, 253, 0.4)); }
+}
+@keyframes glow-pulse-cyan {
+  0%, 100% { box-shadow: 0 0 5px rgba(38, 218, 253, 0.3), 0 0 10px rgba(38, 218, 253, 0.1); }
+  50% { box-shadow: 0 0 15px rgba(38, 218, 253, 0.5), 0 0 30px rgba(38, 218, 253, 0.2); }
+}
+
+.skin-futuristic .animate-pulse-glow {
+  animation: pulse-glow-cyan 3s ease-in-out infinite;
+}
+.skin-futuristic .animate-icon-pulse {
+  animation: icon-pulse-cyan 3s ease-in-out infinite;
+}
+.skin-futuristic .animate-glow-pulse {
+  animation: glow-pulse-cyan 2s ease-in-out infinite;
+}
+
+/* ── 14. New Arwes-inspired utilities ── */
+.neon-glow-cyan {
+  box-shadow: 0 0 5px rgba(38, 218, 253, 0.2),
+              0 0 15px rgba(38, 218, 253, 0.1),
+              0 0 30px rgba(38, 218, 253, 0.05);
+}
+
+.text-glow-cyan {
+  text-shadow: none;
+}
+.dark .text-glow-cyan {
+  text-shadow: 0 0 10px rgba(38, 218, 253, 0.5), 0 0 20px rgba(38, 218, 253, 0.3);
+}
+
+/* Geometric corner frame decorations */
+.frame-corners {
+  position: relative;
+}
+.frame-corners::before,
+.frame-corners::after {
+  content: '';
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  pointer-events: none;
+  z-index: 1;
+}
+.frame-corners::before {
+  top: -1px;
+  left: -1px;
+  border-top: 2px solid rgba(38, 218, 253, 0.6);
+  border-left: 2px solid rgba(38, 218, 253, 0.6);
+}
+.frame-corners::after {
+  bottom: -1px;
+  right: -1px;
+  border-bottom: 2px solid rgba(38, 218, 253, 0.6);
+  border-right: 2px solid rgba(38, 218, 253, 0.6);
+}
+
+/* Border flicker animation */
+@keyframes border-flicker {
+  0%, 100% { border-color: rgba(38, 218, 253, 0.3); }
+  50% { border-color: rgba(38, 218, 253, 0.1); }
+  75% { border-color: rgba(38, 218, 253, 0.4); }
+}
+
+.animate-border-flicker {
+  animation: border-flicker 4s ease-in-out infinite;
+}
+
+/* Dot grid background overlay */
+.arwes-grid-bg {
+  background-image: radial-gradient(circle, rgba(38, 218, 253, 0.15) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+/* ═══════════════════════════════════════════
+   RETRO TERMINAL SKIN (CRT Phosphor)
+   ═══════════════════════════════════════════ */
+
+.skin-retro-terminal {
+  --primary: 25 100% 50%;
+  --ring: 25 100% 50%;
+}
+.skin-retro-terminal.dark {
+  --primary: 25 100% 50%;
+  --ring: 25 100% 50%;
+  --background: 20 10% 4%;
+  --card: 20 10% 7%;
+  --border: 25 50% 12%;
+  --muted: 20 10% 10%;
+}
+
+.skin-retro-terminal body {
+  background-image:
+    radial-gradient(at 0% 0%, hsla(25, 100%, 50%, 0.08) 0px, transparent 50%),
+    radial-gradient(at 100% 100%, hsla(25, 80%, 30%, 0.06) 0px, transparent 50%);
+}
+.skin-retro-terminal body::before {
+  background: radial-gradient(circle, rgba(255, 106, 0, 0.04) 0%, transparent 70%);
+}
+.skin-retro-terminal body::after {
+  background: radial-gradient(circle, rgba(255, 106, 0, 0.02) 0%, transparent 70%);
+}
+
+/* CRT scanlines overlay */
+.skin-retro-terminal::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 0, 0, 0.15) 2px,
+    rgba(0, 0, 0, 0.15) 4px
+  );
+  pointer-events: none;
+  z-index: 9998;
+}
+
+/* CRT vignette */
+.skin-retro-terminal::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: radial-gradient(ellipse at center, transparent 60%, rgba(0, 0, 0, 0.4) 100%);
+  pointer-events: none;
+  z-index: 9997;
+}
+
+.skin-retro-terminal.dark .text-glow {
+  text-shadow: 0 0 8px rgba(255, 106, 0, 0.6), 0 0 20px rgba(255, 106, 0, 0.3);
+}
+.skin-retro-terminal.dark .text-glow-gold,
+.skin-retro-terminal .dark .text-glow-gold {
+  text-shadow: 0 0 8px rgba(255, 106, 0, 0.5), 0 0 16px rgba(255, 106, 0, 0.3);
+}
+.skin-retro-terminal.dark .text-glow-amber,
+.skin-retro-terminal .dark .text-glow-amber {
+  text-shadow: 0 0 6px rgba(255, 106, 0, 0.4), 0 0 12px rgba(255, 106, 0, 0.2);
+}
+.skin-retro-terminal .neon-glow-gold {
+  box-shadow: 0 0 5px rgba(255, 106, 0, 0.3), 0 0 15px rgba(255, 106, 0, 0.15);
+}
+.skin-retro-terminal .glass-card:hover {
+  border-color: rgba(255, 106, 0, 0.3);
+}
+.skin-retro-terminal.dark .glass-card:hover {
+  border-color: rgba(255, 106, 0, 0.2);
+}
+.skin-retro-terminal .glass-card-enhanced:hover {
+  border-color: rgba(255, 106, 0, 0.3);
+  box-shadow: 0 8px 32px rgba(255, 106, 0, 0.06);
+}
+.skin-retro-terminal.dark .glass-card-enhanced {
+  border-color: rgba(255, 106, 0, 0.08);
+}
+.skin-retro-terminal.dark .glass-card-enhanced:hover {
+  border-color: rgba(255, 106, 0, 0.2);
+  box-shadow: 0 8px 32px rgba(255, 106, 0, 0.08);
+}
+.skin-retro-terminal .gradient-border-spin::before {
+  background: conic-gradient(from 0deg, transparent, #ff6a00, #994400, transparent);
+}
+.skin-retro-terminal .scan-line-overlay {
+  background: linear-gradient(90deg, transparent, rgba(255, 106, 0, 0.3), transparent);
+}
+.skin-retro-terminal .btn-glow:hover {
+  box-shadow: 0 0 15px rgba(255, 106, 0, 0.25), inset 0 0 15px rgba(255, 106, 0, 0.05);
+  border-color: rgba(255, 106, 0, 0.4);
+}
+.skin-retro-terminal .btn-glow::after {
+  background: linear-gradient(90deg, transparent, rgba(255, 106, 0, 0.1), transparent);
+}
+.skin-retro-terminal .node-execution-running::before {
+  background: conic-gradient(from var(--node-angle, 0deg), transparent 25%, #ff6a00 50%, transparent 75%);
+}
+.skin-retro-terminal .react-flow {
+  --xy-edge-stroke-default: #994400;
+}
+.skin-retro-terminal .react-flow__connection-line {
+  stroke: #ff6a00;
+}
+.skin-retro-terminal .map-edge-path:hover,
+.skin-retro-terminal .map-edge-path.selected {
+  stroke: #ff6a00;
+  filter: drop-shadow(0 0 6px rgba(255, 106, 0, 0.5));
+}
+.skin-retro-terminal .badge-neon-amber {
+  background: rgba(255, 106, 0, 0.15);
+  color: #ff6a00;
+  border-color: rgba(255, 106, 0, 0.3);
+}
+
+/* ═══════════════════════════════════════════
+   CYBERPUNK SKIN (Neon Pink / Electric Purple)
+   ═══════════════════════════════════════════ */
+
+.skin-cyberpunk {
+  --primary: 328 100% 54%;
+  --ring: 328 100% 54%;
+}
+.skin-cyberpunk.dark {
+  --primary: 328 100% 54%;
+  --ring: 328 100% 54%;
+  --background: 260 60% 5%;
+  --card: 260 40% 9%;
+  --border: 280 30% 16%;
+  --muted: 260 30% 13%;
+}
+
+.skin-cyberpunk body {
+  background-image:
+    radial-gradient(at 0% 0%, hsla(328, 100%, 54%, 0.1) 0px, transparent 50%),
+    radial-gradient(at 100% 0%, hsla(270, 80%, 50%, 0.08) 0px, transparent 50%);
+}
+.skin-cyberpunk body::before {
+  background: radial-gradient(circle, rgba(255, 20, 147, 0.05) 0%, transparent 70%);
+}
+.skin-cyberpunk body::after {
+  background: radial-gradient(circle, rgba(138, 43, 226, 0.03) 0%, transparent 70%);
+}
+
+.skin-cyberpunk.dark .text-glow {
+  text-shadow: 0 0 20px hsla(328, 100%, 54%, 0.5);
+}
+.skin-cyberpunk.dark .text-glow-gold,
+.skin-cyberpunk .dark .text-glow-gold {
+  text-shadow: 0 0 10px rgba(255, 20, 147, 0.5), 0 0 20px rgba(255, 20, 147, 0.3);
+}
+.skin-cyberpunk.dark .text-glow-amber,
+.skin-cyberpunk .dark .text-glow-amber {
+  text-shadow: 0 0 8px rgba(255, 20, 147, 0.4), 0 0 16px rgba(255, 20, 147, 0.2);
+}
+.skin-cyberpunk .neon-glow-gold {
+  box-shadow: 0 0 5px rgba(255, 20, 147, 0.2), 0 0 15px rgba(255, 20, 147, 0.1), 0 0 30px rgba(255, 20, 147, 0.05);
+}
+.skin-cyberpunk .border-glow-gold {
+  border-color: rgba(255, 20, 147, 0.15);
+  box-shadow: inset 0 0 20px rgba(255, 20, 147, 0.03), 0 0 15px rgba(255, 20, 147, 0.05);
+}
+.skin-cyberpunk .glass-card:hover {
+  border-color: rgba(255, 20, 147, 0.3);
+}
+.skin-cyberpunk.dark .glass-card:hover {
+  border-color: rgba(255, 20, 147, 0.2);
+}
+.skin-cyberpunk .glass-card-enhanced:hover {
+  border-color: rgba(255, 20, 147, 0.3);
+  box-shadow: 0 8px 32px rgba(255, 20, 147, 0.06), 0 0 20px rgba(255, 20, 147, 0.03);
+}
+.skin-cyberpunk.dark .glass-card-enhanced {
+  border-color: rgba(255, 20, 147, 0.08);
+}
+.skin-cyberpunk.dark .glass-card-enhanced:hover {
+  border-color: rgba(255, 20, 147, 0.2);
+  box-shadow: 0 8px 32px rgba(255, 20, 147, 0.08), 0 0 20px rgba(255, 20, 147, 0.05);
+}
+.skin-cyberpunk .gradient-border-spin::before {
+  background: conic-gradient(from 0deg, transparent, #ff1493, #8a2be2, transparent);
+}
+.skin-cyberpunk .scan-line-overlay {
+  background: linear-gradient(90deg, transparent, rgba(255, 20, 147, 0.3), transparent);
+}
+.skin-cyberpunk .btn-glow:hover {
+  box-shadow: 0 0 15px rgba(255, 20, 147, 0.25), inset 0 0 15px rgba(255, 20, 147, 0.05);
+  border-color: rgba(255, 20, 147, 0.4);
+}
+.skin-cyberpunk .btn-glow::after {
+  background: linear-gradient(90deg, transparent, rgba(255, 20, 147, 0.1), transparent);
+}
+.skin-cyberpunk .node-execution-running::before {
+  background: conic-gradient(from var(--node-angle, 0deg), transparent 25%, #ff1493 50%, transparent 75%);
+}
+.skin-cyberpunk .react-flow {
+  --xy-edge-stroke-default: #c026d3;
+}
+.skin-cyberpunk .react-flow__connection-line {
+  stroke: #ff1493;
+}
+.skin-cyberpunk .map-edge-path:hover,
+.skin-cyberpunk .map-edge-path.selected {
+  stroke: #ff1493;
+  filter: drop-shadow(0 0 6px rgba(255, 20, 147, 0.5));
+}
+.skin-cyberpunk .badge-neon-amber {
+  background: rgba(255, 20, 147, 0.15);
+  color: #ff1493;
+  border-color: rgba(255, 20, 147, 0.3);
+}
+
+@keyframes pulse-glow-pink {
+  0%, 100% { opacity: 0.6; box-shadow: 0 0 5px rgba(255, 20, 147, 0.2); }
+  50% { opacity: 1; box-shadow: 0 0 20px rgba(255, 20, 147, 0.4); }
+}
+.skin-cyberpunk .animate-pulse-glow {
+  animation: pulse-glow-pink 3s ease-in-out infinite;
+}
+.skin-cyberpunk .animate-glow-pulse {
+  animation: pulse-glow-pink 2s ease-in-out infinite;
+}
+
+/* ═══════════════════════════════════════════
+   MIDNIGHT SKIN (Deep Indigo / Violet)
+   ═══════════════════════════════════════════ */
+
+.skin-midnight {
+  --primary: 250 80% 60%;
+  --ring: 250 80% 60%;
+}
+.skin-midnight.dark {
+  --primary: 250 80% 60%;
+  --ring: 250 80% 60%;
+  --background: 250 50% 5%;
+  --card: 250 35% 9%;
+  --border: 250 25% 16%;
+  --muted: 250 25% 12%;
+}
+
+.skin-midnight body {
+  background-image:
+    radial-gradient(at 0% 0%, hsla(250, 80%, 60%, 0.08) 0px, transparent 50%),
+    radial-gradient(at 100% 100%, hsla(280, 60%, 40%, 0.06) 0px, transparent 50%);
+}
+.skin-midnight body::before {
+  background: radial-gradient(circle, rgba(99, 102, 241, 0.04) 0%, transparent 70%);
+}
+.skin-midnight body::after {
+  background: radial-gradient(circle, rgba(168, 85, 247, 0.03) 0%, transparent 70%);
+}
+
+.skin-midnight.dark .text-glow {
+  text-shadow: 0 0 20px hsla(250, 80%, 60%, 0.4);
+}
+.skin-midnight.dark .text-glow-gold,
+.skin-midnight .dark .text-glow-gold {
+  text-shadow: 0 0 10px rgba(99, 102, 241, 0.4), 0 0 20px rgba(99, 102, 241, 0.2);
+}
+.skin-midnight.dark .text-glow-amber,
+.skin-midnight .dark .text-glow-amber {
+  text-shadow: 0 0 8px rgba(168, 85, 247, 0.3), 0 0 16px rgba(168, 85, 247, 0.15);
+}
+.skin-midnight .neon-glow-gold {
+  box-shadow: 0 0 5px rgba(99, 102, 241, 0.2), 0 0 15px rgba(99, 102, 241, 0.1), 0 0 30px rgba(99, 102, 241, 0.05);
+}
+.skin-midnight .border-glow-gold {
+  border-color: rgba(99, 102, 241, 0.15);
+  box-shadow: inset 0 0 20px rgba(99, 102, 241, 0.03), 0 0 15px rgba(99, 102, 241, 0.05);
+}
+.skin-midnight .glass-card:hover {
+  border-color: rgba(99, 102, 241, 0.3);
+}
+.skin-midnight.dark .glass-card:hover {
+  border-color: rgba(99, 102, 241, 0.2);
+}
+.skin-midnight .glass-card-enhanced:hover {
+  border-color: rgba(99, 102, 241, 0.3);
+  box-shadow: 0 8px 32px rgba(99, 102, 241, 0.06), 0 0 20px rgba(99, 102, 241, 0.03);
+}
+.skin-midnight.dark .glass-card-enhanced {
+  border-color: rgba(99, 102, 241, 0.08);
+}
+.skin-midnight.dark .glass-card-enhanced:hover {
+  border-color: rgba(99, 102, 241, 0.2);
+  box-shadow: 0 8px 32px rgba(99, 102, 241, 0.08), 0 0 20px rgba(99, 102, 241, 0.05);
+}
+.skin-midnight .gradient-border-spin::before {
+  background: conic-gradient(from 0deg, transparent, #6366f1, #a855f7, transparent);
+}
+.skin-midnight .scan-line-overlay {
+  background: linear-gradient(90deg, transparent, rgba(99, 102, 241, 0.2), transparent);
+}
+.skin-midnight .btn-glow:hover {
+  box-shadow: 0 0 15px rgba(99, 102, 241, 0.25), inset 0 0 15px rgba(99, 102, 241, 0.05);
+  border-color: rgba(99, 102, 241, 0.4);
+}
+.skin-midnight .btn-glow::after {
+  background: linear-gradient(90deg, transparent, rgba(99, 102, 241, 0.1), transparent);
+}
+.skin-midnight .node-execution-running::before {
+  background: conic-gradient(from var(--node-angle, 0deg), transparent 25%, #6366f1 50%, transparent 75%);
+}
+.skin-midnight .react-flow {
+  --xy-edge-stroke-default: #6366f1;
+}
+.skin-midnight .react-flow__connection-line {
+  stroke: #818cf8;
+}
+.skin-midnight .map-edge-path:hover,
+.skin-midnight .map-edge-path.selected {
+  stroke: #818cf8;
+  filter: drop-shadow(0 0 6px rgba(129, 140, 248, 0.5));
+}
+.skin-midnight .badge-neon-amber {
+  background: rgba(99, 102, 241, 0.15);
+  color: #818cf8;
+  border-color: rgba(99, 102, 241, 0.3);
+}
+
+/* ═══════════════════════════════════════════
+   HACKER GREEN SKIN (Matrix Terminal)
+   ═══════════════════════════════════════════ */
+
+.skin-hacker {
+  --primary: 142 100% 50%;
+  --ring: 142 100% 50%;
+}
+.skin-hacker.dark {
+  --primary: 142 100% 50%;
+  --ring: 142 100% 50%;
+  --background: 140 20% 3%;
+  --card: 140 15% 7%;
+  --border: 140 20% 13%;
+  --muted: 140 15% 10%;
+}
+
+.skin-hacker body {
+  background-image:
+    radial-gradient(at 0% 0%, hsla(142, 100%, 50%, 0.06) 0px, transparent 50%),
+    radial-gradient(at 100% 100%, hsla(142, 80%, 30%, 0.04) 0px, transparent 50%);
+}
+.skin-hacker body::before {
+  background: radial-gradient(circle, rgba(0, 255, 65, 0.03) 0%, transparent 70%);
+}
+.skin-hacker body::after {
+  background: radial-gradient(circle, rgba(0, 200, 50, 0.02) 0%, transparent 70%);
+}
+
+.skin-hacker.dark .text-glow {
+  text-shadow: 0 0 8px rgba(0, 255, 65, 0.5), 0 0 20px rgba(0, 255, 65, 0.25);
+}
+.skin-hacker.dark .text-glow-gold,
+.skin-hacker .dark .text-glow-gold {
+  text-shadow: 0 0 8px rgba(0, 255, 65, 0.5), 0 0 16px rgba(0, 255, 65, 0.3);
+}
+.skin-hacker.dark .text-glow-amber,
+.skin-hacker .dark .text-glow-amber {
+  text-shadow: 0 0 6px rgba(0, 255, 65, 0.4), 0 0 12px rgba(0, 255, 65, 0.2);
+}
+.skin-hacker .neon-glow-gold {
+  box-shadow: 0 0 5px rgba(0, 255, 65, 0.2), 0 0 15px rgba(0, 255, 65, 0.1), 0 0 30px rgba(0, 255, 65, 0.05);
+}
+.skin-hacker .border-glow-gold {
+  border-color: rgba(0, 255, 65, 0.15);
+  box-shadow: inset 0 0 20px rgba(0, 255, 65, 0.03), 0 0 15px rgba(0, 255, 65, 0.05);
+}
+.skin-hacker .glass-card:hover {
+  border-color: rgba(0, 255, 65, 0.3);
+}
+.skin-hacker.dark .glass-card:hover {
+  border-color: rgba(0, 255, 65, 0.2);
+}
+.skin-hacker .glass-card-enhanced:hover {
+  border-color: rgba(0, 255, 65, 0.3);
+  box-shadow: 0 8px 32px rgba(0, 255, 65, 0.06), 0 0 20px rgba(0, 255, 65, 0.03);
+}
+.skin-hacker.dark .glass-card-enhanced {
+  border-color: rgba(0, 255, 65, 0.08);
+}
+.skin-hacker.dark .glass-card-enhanced:hover {
+  border-color: rgba(0, 255, 65, 0.2);
+  box-shadow: 0 8px 32px rgba(0, 255, 65, 0.08), 0 0 20px rgba(0, 255, 65, 0.05);
+}
+.skin-hacker .gradient-border-spin::before {
+  background: conic-gradient(from 0deg, transparent, #00ff41, #00802b, transparent);
+}
+.skin-hacker .scan-line-overlay {
+  background: linear-gradient(90deg, transparent, rgba(0, 255, 65, 0.3), transparent);
+}
+.skin-hacker .btn-glow:hover {
+  box-shadow: 0 0 15px rgba(0, 255, 65, 0.25), inset 0 0 15px rgba(0, 255, 65, 0.05);
+  border-color: rgba(0, 255, 65, 0.4);
+}
+.skin-hacker .btn-glow::after {
+  background: linear-gradient(90deg, transparent, rgba(0, 255, 65, 0.1), transparent);
+}
+.skin-hacker .node-execution-running::before {
+  background: conic-gradient(from var(--node-angle, 0deg), transparent 25%, #00ff41 50%, transparent 75%);
+}
+.skin-hacker .react-flow {
+  --xy-edge-stroke-default: #00802b;
+}
+.skin-hacker .react-flow__connection-line {
+  stroke: #00ff41;
+}
+.skin-hacker .map-edge-path:hover,
+.skin-hacker .map-edge-path.selected {
+  stroke: #00ff41;
+  filter: drop-shadow(0 0 6px rgba(0, 255, 65, 0.5));
+}
+.skin-hacker .badge-neon-amber {
+  background: rgba(0, 255, 65, 0.15);
+  color: #00ff41;
+  border-color: rgba(0, 255, 65, 0.3);
+}
+
+/* Hacker scanlines (lighter than retro-terminal) */
+.skin-hacker::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 3px,
+    rgba(0, 0, 0, 0.08) 3px,
+    rgba(0, 0, 0, 0.08) 6px
+  );
+  pointer-events: none;
+  z-index: 9998;
+}

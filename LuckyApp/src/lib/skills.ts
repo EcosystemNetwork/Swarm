@@ -26,7 +26,7 @@ import { CHAINLINK_MANIFEST } from "./chainlink";
 // Types
 // ═══════════════════════════════════════════════════════════════
 
-export type MarketItemType = "mod" | "plugin" | "skill";
+export type MarketItemType = "mod" | "plugin" | "skill" | "skin";
 export type MarketItemSource = "verified" | "community";
 export type PricingModel = "free" | "subscription";
 export type SubscriptionPlan = "monthly" | "yearly" | "lifetime";
@@ -429,6 +429,74 @@ export const SKILL_REGISTRY: Skill[] = [
         tags: ["memory", "storage", "context", "persistence"],
         pricing: { model: "free" },
     },
+
+    // ── Skins ──
+
+    {
+        id: "skin-futuristic",
+        name: "Futuristic",
+        description: "Arwes-inspired sci-fi skin with cyan and magenta neon glows, geometric corner frames, and cyberpunk aesthetics. Transforms the entire interface into a futuristic command center.",
+        type: "skin",
+        source: "verified",
+        category: "Themes",
+        icon: "🔮",
+        version: "1.0.0",
+        author: "Swarm Core",
+        tags: ["skin", "theme", "sci-fi", "futuristic", "arwes", "cyan", "neon"],
+        pricing: { model: "free" },
+    },
+    {
+        id: "skin-retro-terminal",
+        name: "Retro Terminal",
+        description: "Cassette futurism CRT terminal skin inspired by 1980s amber phosphor monitors. Features scanlines, phosphor glow text, vignette darkening, and authentic retro computing aesthetics.",
+        type: "skin",
+        source: "verified",
+        category: "Themes",
+        icon: "📺",
+        version: "1.0.0",
+        author: "Swarm Core",
+        tags: ["skin", "theme", "retro", "terminal", "crt", "amber", "vintage", "cassette-futurism"],
+        pricing: { model: "free" },
+    },
+    {
+        id: "skin-cyberpunk",
+        name: "Cyberpunk",
+        description: "High-contrast neon pink and electric purple skin with hot glow effects, sharp edges, and dystopian vibes. For when you want your dashboard to look like a Night City interface.",
+        type: "skin",
+        source: "verified",
+        category: "Themes",
+        icon: "🌆",
+        version: "1.0.0",
+        author: "Swarm Core",
+        tags: ["skin", "theme", "cyberpunk", "neon", "pink", "purple", "dark"],
+        pricing: { model: "free" },
+    },
+    {
+        id: "skin-midnight",
+        name: "Midnight",
+        description: "Deep indigo and violet dark theme with subtle aurora-like gradients. A refined, elegant skin for late-night operations with soft purple accents.",
+        type: "skin",
+        source: "verified",
+        category: "Themes",
+        icon: "🌙",
+        version: "1.0.0",
+        author: "Swarm Core",
+        tags: ["skin", "theme", "midnight", "dark", "purple", "elegant", "minimal"],
+        pricing: { model: "free" },
+    },
+    {
+        id: "skin-hacker",
+        name: "Hacker Green",
+        description: "Classic green-on-black terminal aesthetic inspired by The Matrix. Monochrome green phosphor glow with digital rain vibes and high-contrast readability.",
+        type: "skin",
+        source: "verified",
+        category: "Themes",
+        icon: "🟢",
+        version: "1.0.0",
+        author: "Swarm Core",
+        tags: ["skin", "theme", "hacker", "green", "matrix", "terminal", "monochrome"],
+        pricing: { model: "free" },
+    },
 ];
 
 export const SKILL_BUNDLES: SkillBundle[] = [
@@ -474,6 +542,7 @@ function categoriesForType(type: MarketItemType): string[] {
 export const MOD_CATEGORIES = categoriesForType("mod");
 export const PLUGIN_CATEGORIES = categoriesForType("plugin");
 export const SKILL_ONLY_CATEGORIES = categoriesForType("skill");
+export const SKIN_CATEGORIES = categoriesForType("skin");
 
 // ═══════════════════════════════════════════════════════════════
 // Mod + Capability Registries (derived from SKILL_REGISTRY)

@@ -6,6 +6,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { useOrg } from "@/contexts/OrgContext";
+import { useSkin } from "@/contexts/SkinContext";
 import { getOwnedItems, SKILL_REGISTRY } from "@/lib/skills";
 import {
   LayoutDashboard, FolderKanban, Users, Briefcase, MessageSquare,
@@ -59,6 +60,16 @@ const SECTION_COLORS: Record<string, { activeBg: string; activeText: string; act
     badgeText: "text-cyan-400",
     dropIndicator: "border-cyan-500/50",
     headerText: "text-cyan-400/50",
+  },
+  futuristic: {
+    activeBg: "bg-cyan-400/10",
+    activeText: "text-cyan-300",
+    activeBorder: "border-cyan-400/20",
+    activeBar: "bg-cyan-400",
+    badgeBg: "bg-cyan-400/20",
+    badgeText: "text-cyan-300",
+    dropIndicator: "border-cyan-400/50",
+    headerText: "text-cyan-400/40",
   },
 };
 
@@ -235,6 +246,7 @@ interface DragState {
 export function Sidebar() {
   const pathname = usePathname();
   const { currentOrg } = useOrg();
+  const { skin } = useSkin();
   const [collapsed, setCollapsed] = useState(false);
   const [sections, setSections] = useState<NavSection[]>(DEFAULT_SECTIONS);
   const [dragging, setDragging] = useState<DragState | null>(null);
@@ -435,7 +447,8 @@ export function Sidebar() {
         {sections.map((section) => {
           // Hide empty sections (e.g., Modifications with no installed mods)
           if (section.items.length === 0) return null;
-          const colors = SECTION_COLORS[section.accentColor || "amber"];
+          const colorKey = skin === "futuristic" ? "futuristic" : (section.accentColor || "amber");
+          const colors = SECTION_COLORS[colorKey];
           return (
           <div
             key={section.id}

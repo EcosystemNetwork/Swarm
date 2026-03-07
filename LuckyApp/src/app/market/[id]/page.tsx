@@ -14,6 +14,7 @@ import {
     SKILL_REGISTRY, MOD_REGISTRY, getModCapabilities,
     acquireItem, removeFromInventory, getOwnedItems,
 } from "@/lib/skills";
+import { useSkin, SKINS } from "@/contexts/SkinContext";
 import {
     ArrowLeft, Download, Trash2, Check, Loader2,
     ShieldCheck, Users, Shield, CreditCard,
@@ -35,6 +36,7 @@ export default function MarketItemPage() {
     const [expandedSkill, setExpandedSkill] = useState<string | null>(null);
     const [expandedExample, setExpandedExample] = useState<string | null>(null);
     const [copiedId, setCopiedId] = useState<string | null>(null);
+    const { skin, setSkin, refreshInstalled } = useSkin();
 
     // Find the item from registry
     const item: Skill | undefined = useMemo(
@@ -66,6 +68,11 @@ export default function MarketItemPage() {
             await acquireItem(currentOrg.id, item.id, account.address);
             await loadInventory();
             window.dispatchEvent(new Event("swarm-inventory-changed"));
+            // If this is a skin, refresh installed skins
+            if (item.type === "skin") {
+                const updated = await getOwnedItems(currentOrg.id);
+                refreshInstalled(updated.filter(o => o.enabled).map(o => o.skillId));
+            }
         } finally { setBusyAction(null); }
     };
 
@@ -76,6 +83,11 @@ export default function MarketItemPage() {
             await removeFromInventory(owned.id);
             await loadInventory();
             window.dispatchEvent(new Event("swarm-inventory-changed"));
+            // If this is a skin, refresh installed skins
+            if (item?.type === "skin") {
+                const updated = await getOwnedItems(currentOrg!.id);
+                refreshInstalled(updated.filter(o => o.enabled).map(o => o.skillId));
+            }
         } finally { setBusyAction(null); }
     };
 
@@ -170,6 +182,17 @@ export default function MarketItemPage() {
                             <Badge className="bg-emerald-500/10 text-emerald-400 border-emerald-500/20">
                                 <Check className="h-3 w-3 mr-1" />Installed
                             </Badge>
+                            {item.type === "skin" && (() => {
+                                const skinMeta = SKINS.find((s) => s.marketId === item.id);
+                                const isApplied = skinMeta && skin === skinMeta.id;
+                                return skinMeta && !isApplied ? (
+                                    <Button size="sm" onClick={() => setSkin(skinMeta.id)} className="bg-primary hover:bg-primary/90 text-primary-foreground">
+                                        Apply Skin
+                                    </Button>
+                                ) : isApplied ? (
+                                    <Badge className="bg-primary/10 text-primary border-primary/20">Active</Badge>
+                                ) : null;
+                            })()}
                             <Button
                                 size="sm"
                                 variant="outline"
@@ -184,10 +207,10 @@ export default function MarketItemPage() {
                         <Button
                             onClick={handleGet}
                             disabled={!!busyAction}
-                            className="bg-amber-600 hover:bg-amber-700 text-black gap-2"
+                            className="bg-primary hover:bg-primary/90 text-primary-foreground gap-2"
                         >
                             {busyAction === "get" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-                            Get {item.type === "mod" ? "Mod" : item.type === "plugin" ? "Plugin" : "Skill"}
+                            Get {item.type === "mod" ? "Mod" : item.type === "plugin" ? "Plugin" : item.type === "skin" ? "Skin" : "Skill"}
                         </Button>
                     )}
                 </div>
@@ -274,8 +297,67 @@ export default function MarketItemPage() {
                 );
             })()}
 
+            {/* ═══ Skin Preview ═══ */}
+            {item.type === "skin" && (() => {
+                const skinMeta = SKINS.find((s) => s.marketId === item.id);
+                if (!skinMeta) return null;
+                return (
+                    <section>
+                        <h2 className="text-lg font-bold mb-4">Skin Preview</h2>
+                        <Card className="p-6 bg-card border-border space-y-4">
+                            <div className="flex items-center gap-3">
+                                <div className="flex items-center gap-2">
+                                    {skinMeta.colors.map((color, i) => (
+                                        <span key={i} className="w-8 h-8 rounded-lg border border-border/50" style={{ backgroundColor: color }} />
+                                    ))}
+                                </div>
+                                <div>
+                                    <p className="text-sm font-semibold">{skinMeta.name}</p>
+                                    <p className="text-xs text-muted-foreground">{skinMeta.description}</p>
+                                </div>
+                            </div>
+                            <div className="rounded-lg border border-border p-4 space-y-3" style={{ background: `linear-gradient(135deg, ${skinMeta.colors[0]}08, ${skinMeta.colors[1]}05, ${skinMeta.colors[2]}08)` }}>
+                                <div className="flex items-center gap-3">
+                                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: skinMeta.colors[0], boxShadow: `0 0 8px ${skinMeta.colors[0]}60` }} />
+                                    <div className="h-2 rounded-full w-24" style={{ backgroundColor: `${skinMeta.colors[0]}30` }} />
+                                    <div className="h-2 rounded-full w-16" style={{ backgroundColor: `${skinMeta.colors[1]}20` }} />
+                                </div>
+                                <div className="flex gap-2">
+                                    <div className="rounded-md border p-2 flex-1" style={{ borderColor: `${skinMeta.colors[0]}20`, background: `${skinMeta.colors[0]}05` }}>
+                                        <div className="h-2 rounded w-12 mb-1" style={{ backgroundColor: `${skinMeta.colors[0]}40` }} />
+                                        <div className="h-1.5 rounded w-20" style={{ backgroundColor: `${skinMeta.colors[0]}15` }} />
+                                    </div>
+                                    <div className="rounded-md border p-2 flex-1" style={{ borderColor: `${skinMeta.colors[1]}20`, background: `${skinMeta.colors[1]}05` }}>
+                                        <div className="h-2 rounded w-12 mb-1" style={{ backgroundColor: `${skinMeta.colors[1]}40` }} />
+                                        <div className="h-1.5 rounded w-20" style={{ backgroundColor: `${skinMeta.colors[1]}15` }} />
+                                    </div>
+                                    <div className="rounded-md border p-2 flex-1" style={{ borderColor: `${skinMeta.colors[2]}20`, background: `${skinMeta.colors[2]}05` }}>
+                                        <div className="h-2 rounded w-12 mb-1" style={{ backgroundColor: `${skinMeta.colors[2]}40` }} />
+                                        <div className="h-1.5 rounded w-20" style={{ backgroundColor: `${skinMeta.colors[2]}15` }} />
+                                    </div>
+                                </div>
+                                <div className="flex gap-2">
+                                    <div className="h-6 rounded-md px-3 flex items-center text-[10px] font-medium text-white" style={{ backgroundColor: skinMeta.colors[0] }}>
+                                        Primary Button
+                                    </div>
+                                    <div className="h-6 rounded-md px-3 flex items-center text-[10px] font-medium border" style={{ borderColor: `${skinMeta.colors[0]}40`, color: skinMeta.colors[0] }}>
+                                        Outline
+                                    </div>
+                                </div>
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                                Transforms buttons, glows, gradients, sidebar accents, backgrounds, and all visual effects.
+                                {skinMeta.id === "retro-terminal" && " Includes CRT scanlines and vignette overlay."}
+                                {skinMeta.id === "hacker" && " Includes subtle scanline overlay."}
+                                {skinMeta.id === "futuristic" && " Includes geometric corner frames and border flicker effects."}
+                            </p>
+                        </Card>
+                    </section>
+                );
+            })()}
+
             {/* ═══ No manifest fallback ═══ */}
-            {!hasManifest && (
+            {!hasManifest && item.type !== "skin" && (
                 <Card className="p-8 bg-card border-border text-center">
                     <BookOpen className="h-10 w-10 mx-auto mb-3 text-muted-foreground/30" />
                     <h3 className="text-lg font-semibold mb-1">Simple {item.type}</h3>
