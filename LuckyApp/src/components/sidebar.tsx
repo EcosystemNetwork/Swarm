@@ -1,4 +1,4 @@
-/** Sidebar — 25-link draggable navigation with 4 sections (Core/Operations/Intelligence/System). */
+/** Sidebar — Draggable navigation with sections (Core/Operations/Intelligence/System/Modifications). */
 "use client";
 
 import { useState, useEffect, useCallback, useRef, type DragEvent } from "react";
@@ -12,7 +12,7 @@ import {
   LayoutGrid, Shield, Clock, Activity, BarChart3, Settings,
   Map, Calendar, Radio, FileText, ChevronLeft, ChevronRight, GripVertical,
   Command, Coins, Stethoscope, Brain, UserCog, Network, HardDrive, BookOpen, Store, Building2,
-  Link as LinkIcon,
+  Link as LinkIcon, Zap,
 } from "lucide-react";
 
 /** Map iconName strings from sidebarConfig to lucide components */
@@ -36,7 +36,31 @@ export interface NavSection {
   id: string;
   label: string;
   items: NavItem[];
+  accentColor?: "amber" | "cyan";
 }
+
+const SECTION_COLORS: Record<string, { activeBg: string; activeText: string; activeBorder: string; activeBar: string; badgeBg: string; badgeText: string; dropIndicator: string; headerText: string }> = {
+  amber: {
+    activeBg: "bg-amber-500/10",
+    activeText: "text-amber-400",
+    activeBorder: "border-amber-500/20",
+    activeBar: "bg-amber-500",
+    badgeBg: "bg-amber-500/20",
+    badgeText: "text-amber-400",
+    dropIndicator: "border-amber-500/50",
+    headerText: "text-muted-foreground/40",
+  },
+  cyan: {
+    activeBg: "bg-cyan-500/10",
+    activeText: "text-cyan-400",
+    activeBorder: "border-cyan-500/20",
+    activeBar: "bg-cyan-500",
+    badgeBg: "bg-cyan-500/20",
+    badgeText: "text-cyan-400",
+    dropIndicator: "border-cyan-500/50",
+    headerText: "text-cyan-400/50",
+  },
+};
 
 const DEFAULT_SECTIONS: NavSection[] = [
   {
@@ -81,9 +105,16 @@ const DEFAULT_SECTIONS: NavSection[] = [
       { id: "logs", href: "/logs", label: "Logs", icon: FileText },
       { id: "gateways", href: "/gateways", label: "Gateways", icon: Network },
       { id: "doctor", href: "/doctor", label: "Health", icon: Stethoscope },
+      { id: "swarm", href: "/swarm", label: "Swarm", icon: Zap },
       { id: "docs", href: "/docs", label: "Docs", icon: BookOpen },
       { id: "settings", href: "/settings", label: "Settings", icon: Settings },
     ],
+  },
+  {
+    id: "modifications",
+    label: "Modifications",
+    items: [],
+    accentColor: "cyan",
   },
 ];
 
@@ -401,7 +432,11 @@ export function Sidebar() {
     )}>
       {/* Sections */}
       <nav className="flex-1 overflow-y-auto overflow-x-hidden py-2 scrollbar-thin">
-        {sections.map((section) => (
+        {sections.map((section) => {
+          // Hide empty sections (e.g., Modifications with no installed mods)
+          if (section.items.length === 0) return null;
+          const colors = SECTION_COLORS[section.accentColor || "amber"];
+          return (
           <div
             key={section.id}
             draggable={!collapsed && dragging?.kind !== "item"}
@@ -424,7 +459,7 @@ export function Sidebar() {
             onDragEnd={onDragEnd}
             className={cn(
               "transition-all",
-              dropTarget?.sectionId === section.id && !dropTarget?.itemId && "border-t-2 border-amber-500/50",
+              dropTarget?.sectionId === section.id && !dropTarget?.itemId && `border-t-2 ${colors.dropIndicator}`,
               dragging?.kind === "section" && dragging.sectionId === section.id && "opacity-40"
             )}
           >
@@ -432,7 +467,7 @@ export function Sidebar() {
             {!collapsed && (
               <div className="flex items-center gap-1 px-3 pt-3 pb-1 group cursor-grab active:cursor-grabbing">
                 <GripVertical className="h-3 w-3 text-muted-foreground/20 group-hover:text-muted-foreground/60 transition-colors shrink-0" />
-                <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/40">
+                <span className={cn("text-[10px] font-semibold uppercase tracking-wider", colors.headerText)}>
                   {section.label}
                 </span>
               </div>
@@ -456,7 +491,7 @@ export function Sidebar() {
                     className={cn(
                       "relative group/item",
                       isBeingDragged && "opacity-30",
-                      isDropTarget && "before:absolute before:left-2 before:right-2 before:top-0 before:h-[2px] before:bg-amber-500 before:rounded-full"
+                      isDropTarget && `before:absolute before:left-2 before:right-2 before:top-0 before:h-[2px] before:rounded-full ${colors.activeBar}`
                     )}
                   >
                     <Link
@@ -466,12 +501,12 @@ export function Sidebar() {
                         "relative flex items-center gap-2.5 rounded-lg text-sm font-medium transition-all duration-200",
                         collapsed ? "justify-center p-2" : "px-2.5 py-1.5",
                         isActive
-                          ? "bg-amber-500/10 text-amber-400 border border-amber-500/20"
+                          ? `${colors.activeBg} ${colors.activeText} border ${colors.activeBorder}`
                           : "text-muted-foreground hover:text-foreground hover:bg-muted/50 border border-transparent"
                       )}
                     >
                       {isActive && (
-                        <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[2px] h-4 bg-amber-500 rounded-full" />
+                        <span className={cn("absolute left-0 top-1/2 -translate-y-1/2 w-[2px] h-4 rounded-full", colors.activeBar)} />
                       )}
                       {!collapsed && (
                         <GripVertical className="h-2.5 w-2.5 text-muted-foreground/0 group-hover/item:text-muted-foreground/40 transition-colors shrink-0 cursor-grab active:cursor-grabbing" />
@@ -479,7 +514,7 @@ export function Sidebar() {
                       <item.icon className={cn("shrink-0", collapsed ? "h-4.5 w-4.5" : "h-4 w-4")} />
                       {!collapsed && <span className="truncate">{item.label}</span>}
                       {!collapsed && item.badge && (
-                        <span className="ml-auto text-[9px] px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-400 font-medium">
+                        <span className={cn("ml-auto text-[9px] px-1.5 py-0.5 rounded-full font-medium", colors.badgeBg, colors.badgeText)}>
                           {item.badge}
                         </span>
                       )}
@@ -489,7 +524,8 @@ export function Sidebar() {
               })}
             </div>
           </div>
-        ))}
+          );
+        })}
       </nav>
 
       {/* Footer: Collapse + ⌘K hint */}

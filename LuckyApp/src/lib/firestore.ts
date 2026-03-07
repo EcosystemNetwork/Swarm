@@ -42,6 +42,10 @@ export interface Organization {
   githubAccountType?: 'Organization' | 'User';
   githubAccountAvatarUrl?: string;
   githubConnectedAt?: unknown;
+  // Swarm Protocol inventory slots
+  swarmSlots?: {
+    [slotId: string]: { agentId: string; assignedAt: unknown } | null;
+  };
 }
 
 export interface GitHubRepoLink {

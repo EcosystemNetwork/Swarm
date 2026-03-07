@@ -174,7 +174,7 @@ export const SKILL_REGISTRY: Skill[] = [
         tags: ["chainlink", "oracle", "automation", "cre", "web3"],
         pricing: { model: "free" },
         sidebarConfig: {
-            sectionId: "intelligence",
+            sectionId: "modifications",
             label: "Chainlink",
             href: "/chainlink",
             iconName: "Link",
