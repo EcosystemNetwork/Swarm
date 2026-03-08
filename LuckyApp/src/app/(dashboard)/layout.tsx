@@ -3,6 +3,7 @@ import { HeaderWrapper as Header } from "@/components/header-wrapper";
 import { Sidebar } from "@/components/sidebar";
 import { ProtectedRoute } from "@/components/protected-route";
 import { DashboardBackground } from "@/components/dashboard-bg";
+import { DashboardErrorBoundary } from "@/components/dashboard-error-boundary";
 
 export default function DashboardAppLayout({ children }: { children: React.ReactNode }) {
     return (
@@ -13,7 +14,9 @@ export default function DashboardAppLayout({ children }: { children: React.React
                     <Header />
                     <div className="flex flex-1 overflow-hidden">
                         <Sidebar />
-                        <main className="flex-1 min-w-0 overflow-y-auto p-6">{children}</main>
+                        <main className="flex-1 min-w-0 overflow-y-auto p-6">
+                            <DashboardErrorBoundary>{children}</DashboardErrorBoundary>
+                        </main>
                     </div>
                 </div>
             </div>

@@ -14,7 +14,7 @@ import { ethereum, avalanche, base } from "thirdweb/chains";
 
 export interface ChainConfig {
     /** Internal key */
-    key: "ethereum" | "avalanche" | "base" | "hedera" | "filecoin";
+    key: "ethereum" | "avalanche" | "base" | "hedera" | "filecoin" | "sepolia";
     /** Human-readable name */
     name: string;
     /** EVM chain ID */
@@ -43,6 +43,11 @@ export interface ChainConfig {
         agentRegistry?: string;
         brandVault?: string;
         agentTreasury?: string;
+        // LINK/Sepolia contracts
+        linkTaskBoard?: string;
+        linkAgentRegistry?: string;
+        linkASNRegistry?: string;
+        linkTreasury?: string;
     };
     /** Whether this chain is active in the UI */
     enabled: boolean;
@@ -70,6 +75,12 @@ const filecoin = defineChain({
     id: 314,
     name: "Filecoin",
     rpc: "https://api.node.glif.io/rpc/v1",
+});
+
+const sepoliaChain = defineChain({
+    id: 11155111,
+    name: "Ethereum Sepolia",
+    rpc: "https://ethereum-sepolia-rpc.publicnode.com",
 });
 
 // ═══════════════════════════════════════════════════════════════
@@ -177,6 +188,31 @@ export const CHAIN_CONFIGS: Record<string, ChainConfig> = {
         enabled: true,
         logo: "/chains/filecoin.svg",
     },
+
+    sepolia: {
+        key: "sepolia",
+        name: "Ethereum Sepolia",
+        chainId: 11155111,
+        thirdwebChain: sepoliaChain,
+        rpc: "https://ethereum-sepolia-rpc.publicnode.com",
+        nativeCurrency: { name: "Sepolia ETH", symbol: "ETH", decimals: 18 },
+        explorer: {
+            name: "Etherscan Sepolia",
+            baseUrl: "https://sepolia.etherscan.io",
+            txUrl: (h) => `https://sepolia.etherscan.io/tx/${h}`,
+            addressUrl: (a) => `https://sepolia.etherscan.io/address/${a}`,
+            contractUrl: (a) => `https://sepolia.etherscan.io/address/${a}`,
+        },
+        contracts: {
+            // Populated after deployment — run: cd contracts && npx hardhat run scripts/deploy.ts --network sepolia
+            linkAgentRegistry: "",
+            linkTaskBoard: "",
+            linkASNRegistry: "",
+            linkTreasury: "",
+        },
+        enabled: true,
+        logo: "/chains/ethereum.svg",
+    },
 };
 
 // ═══════════════════════════════════════════════════════════════
@@ -243,6 +279,9 @@ export function shortAddress(addr: string): string {
     return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
 }
 
+/** LINK token contract on Ethereum Sepolia testnet */
+export const LINK_TOKEN_SEPOLIA = "0x779877A7B0D9E8603169DdbD7836e478b4624789";
+
 // ═══════════════════════════════════════════════════════════════
 // Chainlink Services (oracle / CCIP — not a separate chain)
 // ═══════════════════════════════════════════════════════════════
@@ -268,6 +307,10 @@ export const CHAINLINK = {
         },
         hedera: {},
         filecoin: {},
+        sepolia: {
+            "ETH/USD": "0x694AA1769357215DE4FAC081bf1f309aDC325306",
+            "LINK/USD": "0xc59E3633BAAC79493d908e63626716e204A45EdF",
+        },
     } as Record<string, Record<string, string>>,
 
     /** RPC endpoints keyed by chain name (mirrors CHAINS config) */

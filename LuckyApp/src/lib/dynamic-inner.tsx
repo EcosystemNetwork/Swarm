@@ -26,7 +26,62 @@ const SUPPRESSED_PATTERNS = [
   'Cannot set a wallet without an account as active',
 ];
 
+/**
+ * Domains whose fetch errors we intercept to prevent infinite React Query
+ * retry loops inside the thirdweb SDK. When social.thirdweb.com returns 500,
+ * the ConnectButton's internal React Query retries endlessly, causing a
+ * cascading render loop that crashes the React tree and logs the user out.
+ */
+const INTERCEPTED_DOMAINS = [
+  'social.thirdweb.com',
+];
+
+let fetchPatched = false;
+
+function patchFetch() {
+  if (fetchPatched || typeof window === 'undefined') return;
+  fetchPatched = true;
+
+  const originalFetch = window.fetch;
+  window.fetch = async function patchedFetch(input: RequestInfo | URL, init?: RequestInit) {
+    const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+
+    // Check if this request targets an intercepted domain
+    const isIntercepted = INTERCEPTED_DOMAINS.some(d => url.includes(d));
+
+    if (isIntercepted) {
+      try {
+        const response = await originalFetch.call(this, input, init);
+        if (!response.ok) {
+          // Return a fake 200 with empty data to prevent infinite retries
+          console.warn(`[Swarm] Intercepted failing request to ${new URL(url).hostname} (${response.status})`);
+          return new Response(JSON.stringify({}), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          });
+        }
+        return response;
+      } catch {
+        // Network error — return empty 200 to prevent crash
+        console.warn(`[Swarm] Intercepted network error for ${url}`);
+        return new Response(JSON.stringify({}), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+    }
+
+    return originalFetch.call(this, input, init);
+  };
+}
+
 export function Web3ProviderInner({ children }: { children: React.ReactNode }) {
+  // Patch fetch ONCE to intercept failing thirdweb social API calls
+  // that cause infinite React Query retry loops.
+  useEffect(() => {
+    patchFetch();
+  }, []);
+
   // Catch known thirdweb SDK auto-connect errors that fire during
   // wallet reconnection when the previous session is stale.
   // Log them visibly so they can be debugged, but prevent them from crashing the app.
@@ -49,4 +104,3 @@ export function Web3ProviderInner({ children }: { children: React.ReactNode }) {
     </ThirdwebProvider>
   );
 }
-
