@@ -68,9 +68,7 @@ export function Leaderboard({ agents: rawAgents, currency = "$", limit = 6, comp
                     )}
                   >
                     {isPositive ? "+" : "-"}
-                    {currency === "HBAR"
-                      ? `${Math.abs(agent.pnl).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} HBAR`
-                      : `$${Math.abs(agent.pnl).toLocaleString()}`}
+                    {`$${Math.abs(agent.pnl).toLocaleString()}`}
                   </span>
                 </div>
 
