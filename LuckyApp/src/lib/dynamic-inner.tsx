@@ -20,19 +20,21 @@ const wallets = [
   createWallet('app.phantom'),
 ];
 
-/** Known non-fatal thirdweb auto-connect errors to suppress */
+/** Known non-fatal thirdweb auto-connect errors — log them instead of crashing */
 const SUPPRESSED_PATTERNS = [
   'connect() before enable()',
   'Cannot set a wallet without an account as active',
 ];
 
 export function Web3ProviderInner({ children }: { children: React.ReactNode }) {
-  // Suppress known thirdweb SDK auto-connect errors that fire during
+  // Catch known thirdweb SDK auto-connect errors that fire during
   // wallet reconnection when the previous session is stale.
+  // Log them visibly so they can be debugged, but prevent them from crashing the app.
   useEffect(() => {
     const handler = (e: PromiseRejectionEvent) => {
       const msg = String(e.reason?.message || e.reason || '');
       if (SUPPRESSED_PATTERNS.some((p) => msg.includes(p))) {
+        console.warn('[Swarm] AutoConnect issue (non-fatal):', msg);
         e.preventDefault();
       }
     };
