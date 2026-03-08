@@ -96,7 +96,7 @@ const DEFAULT_SECTIONS: NavSection[] = [
       { id: "memory", href: "/memory", label: "Memory", icon: HardDrive },
       { id: "metrics", href: "/metrics", label: "Metrics", icon: BarChart3 },
       { id: "usage", href: "/usage", label: "Usage", icon: Coins },
-      { id: "market", href: "/market", label: "Market", icon: Store },
+      { id: "market", href: "/market", label: "Market", icon: Store, badge: "NEW" },
       { id: "agent-map", href: "/agent-map", label: "Agent Map", icon: Map },
     ],
   },

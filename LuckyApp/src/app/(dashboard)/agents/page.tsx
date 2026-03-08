@@ -14,9 +14,11 @@ import { useOrg } from "@/contexts/OrgContext";
 import { useActiveAccount } from "thirdweb/react";
 import { createAgent, updateAgent, deleteAgent, getTasksByOrg, getJobsByOrg, type Agent, type Task, type Job } from "@/lib/firestore";
 import { getAgentAvatarUrl } from "@/lib/agent-avatar";
-import { collection, query, where, onSnapshot } from "firebase/firestore";
+import { generateASN } from "@/lib/chainlink";
+import { collection, query, where, onSnapshot, doc, updateDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { SKILL_REGISTRY, getInstalledSkills } from "@/lib/skills";
+import { useSwarmWrite } from "@/hooks/useSwarmWrite";
 import SpotlightCard from "@/components/reactbits/SpotlightCard";
 
 const TYPE_COLORS: Record<string, string> = {
@@ -150,6 +152,7 @@ export default function AgentsPage() {
   const [showSetup, setShowSetup] = useState(false);
   const { currentOrg } = useOrg();
   const account = useActiveAccount();
+  const { registerAgent: registerOnChain } = useSwarmWrite();
   const [agents, setAgents] = useState<Agent[]>([]);
   const [allTasks, setAllTasks] = useState<Task[]>([]);
   const [allJobs, setAllJobs] = useState<Job[]>([]);
@@ -322,6 +325,8 @@ export default function AgentsPage() {
       setError(null);
       const apiKeyForNew = crypto.randomUUID();
 
+      const asn = generateASN();
+
       const newAgentId = await createAgent({
         orgId: currentOrg.id,
         name: agentName.trim(),
@@ -331,8 +336,26 @@ export default function AgentsPage() {
         status: 'offline',
         projectIds: [],
         apiKey: apiKeyForNew,
+        asn,
+        creditScore: 680,
+        trustScore: 50,
+        onChainRegistered: false,
         createdAt: new Date(),
       });
+
+      // Attempt on-chain registration on Hedera Testnet (non-blocking)
+      if (account?.address) {
+        registerOnChain(`${agentName.trim()} | ${asn}`, TYPE_DESCRIPTIONS[agentType], 0)
+          .then(async (txHash) => {
+            if (txHash) {
+              await updateDoc(doc(db, "agents", newAgentId), {
+                onChainTxHash: txHash,
+                onChainRegistered: true,
+              });
+            }
+          })
+          .catch(() => {});
+      }
 
       const apiKey = apiKeyForNew;
 

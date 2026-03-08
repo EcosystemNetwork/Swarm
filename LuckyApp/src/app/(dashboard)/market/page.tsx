@@ -1,4 +1,4 @@
-/** Market — Marketplace for agent mods, plugins, and skills. */
+/** Market — Marketplace for agent mods, plugins, skills, and agents. */
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
@@ -8,6 +8,8 @@ import {
     Puzzle, Star, Shield, ShieldCheck, Wrench, Plug, Store,
     Layers, Users, Plus, Clock, CheckCircle2, XCircle,
     CreditCard, Crown, Infinity, Calendar, ChevronRight, Palette,
+    Bot, Fingerprint, TrendingUp, Briefcase, DollarSign, Zap,
+    Activity, StopCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -17,13 +19,15 @@ import { useOrg } from "@/contexts/OrgContext";
 import { useActiveAccount } from "thirdweb/react";
 import {
     type Skill, type OwnedItem, type MarketItemType, type CommunityMarketItem,
-    type MarketSubscription, type SubscriptionPlan,
+    type MarketSubscription, type SubscriptionPlan, type AgentInstall, type AgentDistribution,
     SKILL_REGISTRY, SKILL_BUNDLES, MOD_REGISTRY,
-    MOD_CATEGORIES, PLUGIN_CATEGORIES, SKILL_ONLY_CATEGORIES, SKIN_CATEGORIES,
+    MOD_CATEGORIES, PLUGIN_CATEGORIES, SKILL_ONLY_CATEGORIES, SKIN_CATEGORIES, AGENT_ITEM_CATEGORIES,
     acquireItem, removeFromInventory, toggleInventoryItem, getOwnedItems, acquireBundle,
     getCommunityItems, getUserSubmissions, deleteCommunityItem,
     getOrgSubscriptions, subscribeToItem, cancelSubscription,
+    getAgentInstalls, uninstallMarketplaceAgent,
 } from "@/lib/skills";
+import { type Agent, getAgentsByOrg } from "@/lib/firestore";
 import { SubmitMarketItemDialog } from "@/components/market/submit-dialog";
 import {
     Dialog,
@@ -36,9 +40,10 @@ import {
 // Tab Config
 // ═══════════════════════════════════════════════════════════════
 
-type Tab = "mods" | "plugins" | "skills" | "skins" | "bundles" | "inventory" | "submit";
+type Tab = "agents" | "mods" | "plugins" | "skills" | "skins" | "bundles" | "inventory" | "submit";
 
 const TABS: { key: Tab; label: string; icon: typeof Wrench; type?: MarketItemType }[] = [
+    { key: "agents", label: "Agents", icon: Bot, type: "agent" },
     { key: "mods", label: "Mods", icon: Wrench, type: "mod" },
     { key: "plugins", label: "Plugins", icon: Plug, type: "plugin" },
     { key: "skills", label: "Skills", icon: Puzzle, type: "skill" },
@@ -53,6 +58,7 @@ const CATEGORIES_BY_TYPE: Record<MarketItemType, string[]> = {
     plugin: PLUGIN_CATEGORIES,
     skill: SKILL_ONLY_CATEGORIES,
     skin: SKIN_CATEGORIES,
+    agent: AGENT_ITEM_CATEGORIES,
 };
 
 // ═══════════════════════════════════════════════════════════════
@@ -76,6 +82,130 @@ function getCheapestLabel(item: Skill): string | null {
     const lifetime = tiers.find((t) => t.plan === "lifetime");
     if (lifetime) return `${formatPrice(lifetime.price)} once`;
     return null;
+}
+
+/** Credit score color helper */
+function creditScoreColor(score: number): string {
+    if (score >= 750) return "text-emerald-400 border-emerald-500/20 bg-emerald-500/10";
+    if (score >= 600) return "text-amber-400 border-amber-500/20 bg-amber-500/10";
+    return "text-red-400 border-red-500/20 bg-red-500/10";
+}
+
+/** Agent card — enhanced layout with AIN, scores, and distribution actions */
+function AgentMarketCard({
+    agent,
+    onViewAgent,
+    busy,
+}: {
+    agent: Agent;
+    onViewAgent: () => void;
+    busy: boolean;
+}) {
+    const statusColor = agent.status === "online"
+        ? "bg-emerald-500"
+        : agent.status === "busy"
+            ? "bg-amber-500"
+            : "bg-zinc-500";
+
+    return (
+        <Card className="p-0 bg-card border-border transition-all hover:border-cyan-500/20 group overflow-hidden">
+            <div className="p-4">
+                {/* Top row — avatar, name, status */}
+                <div className="flex items-start gap-3 mb-3">
+                    <div className="relative shrink-0">
+                        {agent.avatarUrl ? (
+                            <img
+                                src={agent.avatarUrl}
+                                alt={agent.name}
+                                className="w-10 h-10 rounded-lg object-cover border border-border"
+                            />
+                        ) : (
+                            <div className="w-10 h-10 rounded-lg bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-lg">
+                                <Bot className="h-5 w-5 text-cyan-400" />
+                            </div>
+                        )}
+                        <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-card ${statusColor}`} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-0.5">
+                            <h3 className="font-semibold text-sm truncate">{agent.name}</h3>
+                            <Badge variant="outline" className="text-[10px]">{agent.type}</Badge>
+                            <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/40 opacity-0 group-hover:opacity-100 transition-opacity ml-auto shrink-0" />
+                        </div>
+                        <p className="text-xs text-muted-foreground line-clamp-1">
+                            {agent.bio || agent.description || `${agent.type} agent`}
+                        </p>
+                    </div>
+                </div>
+
+                {/* ASN + Score badges */}
+                <div className="flex items-center gap-1.5 flex-wrap mb-3">
+                    {agent.asn && (
+                        <Badge className="text-[10px] bg-cyan-500/10 text-cyan-400 border-cyan-500/20 font-mono">
+                            <Fingerprint className="h-2.5 w-2.5 mr-0.5" />
+                            {agent.asn.split("-").slice(0, 4).join("-")}
+                        </Badge>
+                    )}
+                    {agent.creditScore && (
+                        <Badge className={`text-[10px] ${creditScoreColor(agent.creditScore)}`}>
+                            <TrendingUp className="h-2.5 w-2.5 mr-0.5" />
+                            Credit: {agent.creditScore}
+                        </Badge>
+                    )}
+                    {agent.trustScore != null && (
+                        <Badge className="text-[10px] bg-blue-500/10 text-blue-400 border-blue-500/20">
+                            <Shield className="h-2.5 w-2.5 mr-0.5" />
+                            Trust: {agent.trustScore}
+                        </Badge>
+                    )}
+                    {agent.onChainRegistered && (
+                        <Badge variant="outline" className="text-[10px] border-purple-500/20 text-purple-400">
+                            <Zap className="h-2.5 w-2.5 mr-0.5" />On-Chain
+                        </Badge>
+                    )}
+                </div>
+
+                {/* Skills */}
+                {agent.reportedSkills && agent.reportedSkills.length > 0 && (
+                    <div className="flex items-center gap-1 flex-wrap mb-3">
+                        {agent.reportedSkills.slice(0, 4).map((s) => (
+                            <span key={s.id} className="text-[10px] px-1.5 py-0.5 rounded bg-muted/50 text-muted-foreground">
+                                {s.name}
+                            </span>
+                        ))}
+                        {agent.reportedSkills.length > 4 && (
+                            <span className="text-[10px] text-muted-foreground">+{agent.reportedSkills.length - 4}</span>
+                        )}
+                    </div>
+                )}
+
+                {/* Actions */}
+                <div className="flex items-center gap-2">
+                    <Link href={`/agents`} className="flex-1">
+                        <Button
+                            size="sm"
+                            variant="outline"
+                            className="w-full h-7 text-xs gap-1 border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/10"
+                        >
+                            <Bot className="h-3 w-3" />
+                            View Agent
+                        </Button>
+                    </Link>
+                    <Badge
+                        className={`text-[10px] ${agent.status === "online"
+                            ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
+                            : agent.status === "busy"
+                                ? "bg-amber-500/10 text-amber-400 border-amber-500/20"
+                                : "bg-zinc-500/10 text-zinc-400 border-zinc-500/20"
+                            }`}
+                    >
+                        <Activity className="h-2.5 w-2.5 mr-0.5" />
+                        {agent.status}
+                    </Badge>
+                </div>
+            </div>
+        </Card>
+    );
 }
 
 function MarketItemCard({
@@ -219,11 +349,13 @@ export default function MarketPage() {
     const [category, setCategory] = useState("All");
     const [sourceFilter, setSourceFilter] = useState<"all" | "verified" | "community">("all");
     const [busyId, setBusyId] = useState<string | null>(null);
-    const [tab, setTab] = useState<Tab>("mods");
+    const [tab, setTab] = useState<Tab>("agents");
     const [subscriptions, setSubscriptions] = useState<MarketSubscription[]>([]);
     const [subscribeTarget, setSubscribeTarget] = useState<Skill | null>(null);
     const [submitOpen, setSubmitOpen] = useState(false);
     const [deletingId, setDeletingId] = useState<string | null>(null);
+    const [orgAgents, setOrgAgents] = useState<Agent[]>([]);
+    const [agentInstalls, setAgentInstalls] = useState<AgentInstall[]>([]);
 
     const loadInventory = useCallback(async () => {
         if (!currentOrg) return;
@@ -267,12 +399,47 @@ export default function MarketPage() {
         }
     }, [currentOrg]);
 
+    const loadOrgAgents = useCallback(async () => {
+        if (!currentOrg) return;
+        try {
+            const agents = await getAgentsByOrg(currentOrg.id);
+            setOrgAgents(agents);
+        } catch (err) {
+            console.error("Failed to load org agents:", err);
+        }
+    }, [currentOrg]);
+
+    const loadAgentInstalls = useCallback(async () => {
+        if (!currentOrg) return;
+        try {
+            const installs = await getAgentInstalls(currentOrg.id);
+            setAgentInstalls(installs.filter(i => i.status === "active"));
+        } catch (err) {
+            console.error("Failed to load agent installs:", err);
+        }
+    }, [currentOrg]);
+
     useEffect(() => { loadInventory(); }, [loadInventory]);
     useEffect(() => { loadCommunityItems(); }, [loadCommunityItems]);
     useEffect(() => { loadUserSubmissions(); }, [loadUserSubmissions]);
     useEffect(() => { loadSubscriptions(); }, [loadSubscriptions]);
+    useEffect(() => { loadOrgAgents(); }, [loadOrgAgents]);
+    useEffect(() => { loadAgentInstalls(); }, [loadAgentInstalls]);
 
-    // Merge community items with registry
+    // Map agent type to market category
+    const agentTypeToCategory = (type: string): string => {
+        const map: Record<string, string> = {
+            Research: "Research", Trading: "Trading", Operations: "Operations",
+            Support: "Customer Support", Analytics: "Analytics", Scout: "Research",
+            Security: "Security", Creative: "Creative", Engineering: "Engineering",
+            DevOps: "Engineering", Marketing: "Operations", Finance: "Trading",
+            Data: "Analytics", Coordinator: "Operations", Legal: "Compliance",
+            Communication: "Customer Support",
+        };
+        return map[type] || "General";
+    };
+
+    // Merge community items + real agents with registry
     const allItems: Skill[] = useMemo(() => {
         const communitySkills: Skill[] = communityItems.map((c) => ({
             id: `community-${c.id}`,
@@ -288,8 +455,26 @@ export default function MarketPage() {
             tags: c.tags,
             pricing: c.pricing,
         }));
-        return [...SKILL_REGISTRY, ...communitySkills];
-    }, [communityItems]);
+
+        // Convert real Firestore agents into Skill entries for the Agents tab
+        const agentSkills: Skill[] = orgAgents.map((agent) => ({
+            id: `agent-${agent.id}`,
+            name: agent.name,
+            description: agent.description || `${agent.type} agent`,
+            type: "agent" as const,
+            source: "verified" as const,
+            category: agentTypeToCategory(agent.type),
+            icon: agent.avatarUrl || "🤖",
+            version: "1.0.0",
+            author: "Your Org",
+            tags: [agent.type.toLowerCase(), ...(agent.reportedSkills?.map(s => s.name.toLowerCase()) || [])],
+            pricing: { model: "free" as const },
+            // Stash the full agent for card rendering
+            _agent: agent,
+        } as Skill & { _agent: Agent }));
+
+        return [...SKILL_REGISTRY, ...communitySkills, ...agentSkills];
+    }, [communityItems, orgAgents]);
 
     const handleDeleteSubmission = async (docId: string) => {
         setDeletingId(docId);
@@ -413,6 +598,7 @@ export default function MarketPage() {
     }, [activeType, allItems]);
 
     // Counts per tab
+    const agentCount = allItems.filter((s) => s.type === "agent").length;
     const modCount = allItems.filter((s) => s.type === "mod").length;
     const pluginCount = allItems.filter((s) => s.type === "plugin").length;
     const skillCount = allItems.filter((s) => s.type === "skill").length;
@@ -420,7 +606,7 @@ export default function MarketPage() {
     const bundleCount = SKILL_BUNDLES.length;
     const submitCount = userSubmissions.length;
     const skinCount = allItems.filter((s) => s.type === "skin").length;
-    const tabCounts: Record<Tab, number> = { mods: modCount, plugins: pluginCount, skills: skillCount, skins: skinCount, bundles: bundleCount, inventory: inventoryCount, submit: submitCount };
+    const tabCounts: Record<Tab, number> = { agents: agentCount, mods: modCount, plugins: pluginCount, skills: skillCount, skins: skinCount, bundles: bundleCount, inventory: inventoryCount, submit: submitCount };
 
     if (!account) {
         return (
@@ -443,7 +629,7 @@ export default function MarketPage() {
                         Market
                     </h1>
                     <p className="text-sm text-muted-foreground mt-2">
-                        Browse and acquire mods, plugins, and skills for your swarm
+                        Browse agents, mods, plugins, and skills for your swarm
                     </p>
                 </div>
                 <Badge className="bg-amber-500/10 text-amber-500 border-amber-500/20 text-sm">
@@ -526,6 +712,21 @@ export default function MarketPage() {
                     ) : filteredItems.length > 0 ? (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                             {filteredItems.map((item) => {
+                                // Agent items use special card
+                                if (item.type === "agent" && item.id.startsWith("agent-")) {
+                                    const agent = (item as Skill & { _agent: Agent })._agent;
+                                    if (agent) {
+                                        return (
+                                            <AgentMarketCard
+                                                key={item.id}
+                                                agent={agent}
+                                                onViewAgent={() => {}}
+                                                busy={busyId === item.id}
+                                            />
+                                        );
+                                    }
+                                }
+
                                 // For community items, subscription key is the Firestore doc ID (strip "community-" prefix)
                                 const subKey = item.id.startsWith("community-") ? item.id.slice(10) : item.id;
                                 const sub = subscriptionMap.get(subKey);
@@ -544,6 +745,19 @@ export default function MarketPage() {
                                 );
                             })}
                         </div>
+                    ) : tab === "agents" && agentCount === 0 ? (
+                        <Card className="p-12 text-center bg-card border-border border-dashed">
+                            <Bot className="h-12 w-12 mx-auto text-muted-foreground/30 mb-4" />
+                            <h3 className="text-lg font-semibold mb-2">No agents yet</h3>
+                            <p className="text-sm text-muted-foreground mb-6">
+                                Register agents to your org to see them here. Agents get an ASN and are registered on-chain.
+                            </p>
+                            <Link href="/agents">
+                                <Button className="bg-cyan-600 hover:bg-cyan-700 text-white gap-2">
+                                    <Bot className="h-4 w-4" /> Go to Agents
+                                </Button>
+                            </Link>
+                        </Card>
                     ) : tab === "inventory" && inventory.length === 0 ? (
                         <Card className="p-12 text-center bg-card border-border border-dashed">
                             <Store className="h-12 w-12 mx-auto text-muted-foreground/30 mb-4" />

@@ -674,96 +674,6 @@ export const SKILL_REGISTRY: Skill[] = [
         pricing: { model: "free" },
     },
 
-    // ── Agents ──
-    {
-        id: "agent-research-analyst",
-        name: "Research Analyst",
-        description: "Autonomous research agent that monitors markets, reads PDFs, searches the web, and produces structured reports with source citations.",
-        type: "agent",
-        source: "verified",
-        category: "Research",
-        icon: "🔬",
-        version: "1.2.0",
-        author: "Swarm Labs",
-        requiredKeys: ["TAVILY_API_KEY"],
-        tags: ["research", "analysis", "reports", "markets", "autonomous", "web-search"],
-        pricing: { model: "purchase" },
-    },
-    {
-        id: "agent-trading-bot",
-        name: "Trading Bot",
-        description: "DeFi trading agent with configurable strategies, risk limits, and portfolio management. Supports Hedera, Ethereum, and Base chains.",
-        type: "agent",
-        source: "verified",
-        category: "Trading",
-        icon: "📈",
-        version: "2.1.0",
-        author: "Swarm Labs",
-        requiredKeys: ["HEDERA_PRIVATE_KEY"],
-        tags: ["trading", "defi", "strategy", "portfolio", "automation", "web3"],
-        pricing: { model: "subscription", tiers: [
-            { plan: "monthly", price: 120, currency: "USD" },
-            { plan: "yearly", price: 999, currency: "USD" },
-        ]},
-    },
-    {
-        id: "agent-support",
-        name: "Support Agent",
-        description: "Customer support agent with conversation memory, ticket management, escalation workflows, and Slack integration.",
-        type: "agent",
-        source: "verified",
-        category: "Customer Support",
-        icon: "💬",
-        version: "1.0.0",
-        author: "Swarm Labs",
-        requiredKeys: ["SLACK_BOT_TOKEN"],
-        tags: ["support", "customer", "tickets", "helpdesk", "chat", "slack"],
-        pricing: { model: "subscription", tiers: [
-            { plan: "monthly", price: 9, currency: "USD" },
-        ]},
-    },
-    {
-        id: "agent-compliance",
-        name: "Compliance Monitor",
-        description: "Monitors agent activity for policy violations, spending limits, and risk flags. Integrates with ASN credit scoring and governance workflows.",
-        type: "agent",
-        source: "verified",
-        category: "Compliance",
-        icon: "🛡️",
-        version: "1.1.0",
-        author: "Swarm Labs",
-        tags: ["compliance", "risk", "policy", "monitoring", "governance", "audit"],
-        pricing: { model: "free" },
-    },
-    {
-        id: "agent-defi-arb",
-        name: "DeFi Arbitrage Agent",
-        description: "Cross-chain arbitrage agent that identifies price discrepancies across DEXs and executes profitable trades with configurable profit-share model.",
-        type: "agent",
-        source: "verified",
-        category: "Trading",
-        icon: "⚡",
-        version: "1.5.0",
-        author: "Swarm Labs",
-        requiredKeys: ["HEDERA_PRIVATE_KEY"],
-        tags: ["arbitrage", "defi", "trading", "cross-chain", "profit-share", "MEV"],
-        pricing: { model: "subscription", tiers: [
-            { plan: "monthly", price: 99, currency: "USD" },
-        ]},
-    },
-    {
-        id: "agent-security",
-        name: "Security Sentinel",
-        description: "Security monitoring agent that scans for vulnerabilities, suspicious transactions, wallet drains, and contract exploits across your swarm.",
-        type: "agent",
-        source: "verified",
-        category: "Security",
-        icon: "🔒",
-        version: "1.0.0",
-        author: "Swarm Labs",
-        tags: ["security", "monitoring", "vulnerabilities", "alerts", "protection"],
-        pricing: { model: "free" },
-    },
 ];
 
 export const SKILL_BUNDLES: SkillBundle[] = [
@@ -810,6 +720,7 @@ export const MOD_CATEGORIES = categoriesForType("mod");
 export const PLUGIN_CATEGORIES = categoriesForType("plugin");
 export const SKILL_ONLY_CATEGORIES = categoriesForType("skill");
 export const SKIN_CATEGORIES = categoriesForType("skin");
+export const AGENT_ITEM_CATEGORIES = AGENT_CATEGORIES;
 
 // ═══════════════════════════════════════════════════════════════
 // Mod + Capability Registries (derived from SKILL_REGISTRY)
@@ -1350,4 +1261,167 @@ export async function getAgentCapabilities(
     }
 
     return resolved;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Firestore CRUD — Agent Marketplace
+// ═══════════════════════════════════════════════════════════════
+
+const MARKETPLACE_AGENTS_COLLECTION = "marketplaceAgents";
+const AGENT_INSTALLS_COLLECTION = "agentInstalls";
+const AGENT_RATINGS_COLLECTION = "agentRatings";
+
+/** Publish an agent package to the marketplace */
+export async function publishAgentPackage(
+    pkg: Omit<AgentPackage, "id" | "publishedAt" | "updatedAt" | "installCount" | "rentalCount" | "hireCount" | "avgRating" | "ratingCount" | "status">,
+): Promise<string> {
+    const ref = await addDoc(collection(db, MARKETPLACE_AGENTS_COLLECTION), {
+        ...pkg,
+        status: "review",
+        installCount: 0,
+        rentalCount: 0,
+        hireCount: 0,
+        avgRating: 0,
+        ratingCount: 0,
+        publishedAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+    });
+    return ref.id;
+}
+
+/** Get all approved marketplace agents */
+export async function getMarketplaceAgents(): Promise<AgentPackage[]> {
+    const q = query(
+        collection(db, MARKETPLACE_AGENTS_COLLECTION),
+        where("status", "==", "approved"),
+    );
+    const snap = await getDocs(q);
+    return snap.docs.map(d => {
+        const data = d.data();
+        return {
+            id: d.id,
+            ...data,
+            publishedAt: data.publishedAt instanceof Timestamp ? data.publishedAt.toDate() : null,
+            updatedAt: data.updatedAt instanceof Timestamp ? data.updatedAt.toDate() : null,
+        } as AgentPackage;
+    });
+}
+
+/** Get packages published by a specific creator */
+export async function getCreatorPackages(walletAddress: string): Promise<AgentPackage[]> {
+    const q = query(
+        collection(db, MARKETPLACE_AGENTS_COLLECTION),
+        where("authorWallet", "==", walletAddress),
+    );
+    const snap = await getDocs(q);
+    return snap.docs.map(d => ({
+        id: d.id,
+        ...d.data(),
+    } as AgentPackage));
+}
+
+/** Install/rent/hire a marketplace agent — tracks the acquisition */
+export async function installMarketplaceAgent(
+    packageId: string,
+    orgId: string,
+    agentId: string,
+    distribution: AgentDistribution,
+    installedBy: string,
+    ain?: string,
+    rentalModel?: RentalModel,
+    spendingCap?: number,
+    taskLimit?: number,
+    allowedChains?: number[],
+): Promise<string> {
+    const ref = await addDoc(collection(db, AGENT_INSTALLS_COLLECTION), {
+        packageId,
+        packageSlug: packageId,
+        orgId,
+        agentId,
+        version: "1.0.0",
+        distribution,
+        installedBy,
+        installedAt: serverTimestamp(),
+        onChainRegistered: false,
+        ain: ain ?? null,
+        status: "active",
+        ...(rentalModel ? { rentalModel } : {}),
+        ...(spendingCap ? { spendingCap } : {}),
+        ...(taskLimit ? { taskLimit } : {}),
+        ...(allowedChains ? { allowedChains } : {}),
+    });
+    return ref.id;
+}
+
+/** Get all agent installs for an org */
+export async function getAgentInstalls(orgId: string): Promise<AgentInstall[]> {
+    const q = query(
+        collection(db, AGENT_INSTALLS_COLLECTION),
+        where("orgId", "==", orgId),
+    );
+    const snap = await getDocs(q);
+    return snap.docs.map(d => {
+        const data = d.data();
+        return {
+            id: d.id,
+            ...data,
+            installedAt: data.installedAt instanceof Timestamp ? data.installedAt.toDate() : null,
+        } as AgentInstall;
+    });
+}
+
+/** Update on-chain registration status */
+export async function updateAgentInstallOnChain(
+    installId: string,
+    txHash: string,
+    ain?: string,
+): Promise<void> {
+    await updateDoc(doc(db, AGENT_INSTALLS_COLLECTION, installId), {
+        onChainRegistered: true,
+        onChainTxHash: txHash,
+        ...(ain ? { ain } : {}),
+    });
+}
+
+/** Uninstall a marketplace agent (soft-delete) */
+export async function uninstallMarketplaceAgent(installId: string): Promise<void> {
+    await updateDoc(doc(db, AGENT_INSTALLS_COLLECTION, installId), {
+        status: "uninstalled",
+    });
+}
+
+/** Submit a rating for a marketplace agent */
+export async function submitAgentRating(
+    packageId: string,
+    orgId: string,
+    reviewerWallet: string,
+    rating: number,
+    review?: string,
+): Promise<string> {
+    const ref = await addDoc(collection(db, AGENT_RATINGS_COLLECTION), {
+        packageId,
+        orgId,
+        reviewerWallet,
+        rating: Math.max(1, Math.min(5, rating)),
+        review: review?.slice(0, 500) || null,
+        createdAt: serverTimestamp(),
+    });
+    return ref.id;
+}
+
+/** Get ratings for a marketplace agent */
+export async function getAgentRatings(packageId: string): Promise<AgentRating[]> {
+    const q = query(
+        collection(db, AGENT_RATINGS_COLLECTION),
+        where("packageId", "==", packageId),
+    );
+    const snap = await getDocs(q);
+    return snap.docs.map(d => {
+        const data = d.data();
+        return {
+            id: d.id,
+            ...data,
+            createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate() : null,
+        } as AgentRating;
+    });
 }

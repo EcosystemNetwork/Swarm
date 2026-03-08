@@ -19,7 +19,7 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import { Loader2 } from "lucide-react";
-import { type MarketItemType, type PricingModel, type MarketPricing, submitMarketItem } from "@/lib/skills";
+import { type MarketItemType, type PricingModel, type MarketPricing, submitMarketItem, publishAgentPackage, AGENT_CATEGORIES } from "@/lib/skills";
 
 interface SubmitMarketItemDialogProps {
     open: boolean;
@@ -48,6 +48,17 @@ export function SubmitMarketItemDialog({
     const [lifetimePrice, setLifetimePrice] = useState("");
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    // Agent-specific fields
+    const [agentType, setAgentType] = useState("");
+    const [persona, setPersona] = useState("");
+    const [personality, setPersonality] = useState("");
+    const [rules, setRules] = useState("");
+    const [agentCategory, setAgentCategory] = useState("");
+    const [configPrice, setConfigPrice] = useState("");
+    const [rentalMonthly, setRentalMonthly] = useState("");
+    const [rentalUsage, setRentalUsage] = useState("");
+    const [performanceShare, setPerformanceShare] = useState("");
+    const [hirePerTask, setHirePerTask] = useState("");
 
     const resetForm = () => {
         setName("");
@@ -63,10 +74,21 @@ export function SubmitMarketItemDialog({
         setYearlyPrice("");
         setLifetimePrice("");
         setError(null);
+        setAgentType("");
+        setPersona("");
+        setPersonality("");
+        setRules("");
+        setAgentCategory("");
+        setConfigPrice("");
+        setRentalMonthly("");
+        setRentalUsage("");
+        setPerformanceShare("");
+        setHirePerTask("");
     };
 
     const handleSubmit = async () => {
-        if (!name.trim() || !type || !category.trim() || !icon.trim() || !description.trim()) return;
+        if (!name.trim() || !type || !icon.trim() || !description.trim()) return;
+        if (type !== "agent" && !category.trim()) return;
 
         setSubmitting(true);
         setError(null);
@@ -80,27 +102,67 @@ export function SubmitMarketItemDialog({
                 .map((k) => k.trim())
                 .filter(Boolean);
 
-            // Build pricing
-            const pricing: MarketPricing = { model: pricingModel };
-            if (pricingModel === "subscription") {
-                pricing.tiers = [];
-                if (monthlyPrice) pricing.tiers.push({ plan: "monthly", price: parseFloat(monthlyPrice), currency: "USD" });
-                if (yearlyPrice) pricing.tiers.push({ plan: "yearly", price: parseFloat(yearlyPrice), currency: "USD" });
-                if (lifetimePrice) pricing.tiers.push({ plan: "lifetime", price: parseFloat(lifetimePrice), currency: "USD" });
-            }
+            if (type === "agent") {
+                // Agent publishing flow
+                const distributions: ("config" | "rental" | "hire")[] = [];
+                if (configPrice) distributions.push("config");
+                if (rentalMonthly || rentalUsage || performanceShare) distributions.push("rental");
+                if (hirePerTask) distributions.push("hire");
+                if (distributions.length === 0) distributions.push("config");
 
-            await submitMarketItem({
-                name: name.trim(),
-                type: type as MarketItemType,
-                category: category.trim(),
-                icon: icon.trim(),
-                description: description.trim(),
-                version: version.trim() || "1.0.0",
-                tags,
-                requiredKeys: requiredKeys.length > 0 ? requiredKeys : undefined,
-                pricing,
-                submittedBy: submitterAddress,
-            });
+                await publishAgentPackage({
+                    slug: name.trim().toLowerCase().replace(/\s+/g, "-"),
+                    name: name.trim(),
+                    version: version.trim() || "1.0.0",
+                    description: description.trim(),
+                    author: submitterAddress.slice(0, 8) + "...",
+                    authorWallet: submitterAddress,
+                    icon: icon.trim(),
+                    category: (agentCategory.toLowerCase().replace(/\s+/g, "-") || "general") as "general",
+                    tags,
+                    distributions,
+                    pricing: {
+                        configPurchase: configPrice ? parseFloat(configPrice) : undefined,
+                        rentalMonthly: rentalMonthly ? parseFloat(rentalMonthly) : undefined,
+                        rentalUsage: rentalUsage ? parseFloat(rentalUsage) : undefined,
+                        rentalPerformance: performanceShare ? parseFloat(performanceShare) : undefined,
+                        hirePerTask: hirePerTask ? parseFloat(hirePerTask) : undefined,
+                        currency: "USD",
+                    },
+                    identity: {
+                        agentType: agentType || "General",
+                        persona: persona || description.trim(),
+                        personality: personality ? personality.split(",").map(p => p.trim()).filter(Boolean) : undefined,
+                        rules: rules ? rules.split("\n").map(r => r.trim()).filter(Boolean) : undefined,
+                    },
+                    requiredSkills: [],
+                    requiredKeys: requiredKeys.length > 0 ? requiredKeys : undefined,
+                    source: "community",
+                    creatorRevShare: 0.85,
+                });
+            } else {
+                // Standard market item submission
+                const pricing: MarketPricing = { model: pricingModel };
+                if (pricingModel === "subscription") {
+                    pricing.tiers = [];
+                    if (monthlyPrice) pricing.tiers.push({ plan: "monthly", price: parseFloat(monthlyPrice), currency: "USD" });
+                    if (yearlyPrice) pricing.tiers.push({ plan: "yearly", price: parseFloat(yearlyPrice), currency: "USD" });
+                    if (lifetimePrice) pricing.tiers.push({ plan: "lifetime", price: parseFloat(lifetimePrice), currency: "USD" });
+                }
+
+                await submitMarketItem({
+                    name: name.trim(),
+                    type: type as MarketItemType,
+                    category: category.trim(),
+                    icon: icon.trim(),
+                    description: description.trim(),
+                    version: version.trim() || "1.0.0",
+                    tags,
+                    requiredKeys: requiredKeys.length > 0 ? requiredKeys : undefined,
+                    pricing,
+                    submittedBy: submitterAddress,
+                });
+            }
 
             resetForm();
             onOpenChange(false);
@@ -112,8 +174,8 @@ export function SubmitMarketItemDialog({
         }
     };
 
-    const hasValidPricing = pricingModel === "free" || (monthlyPrice || yearlyPrice || lifetimePrice);
-    const isValid = name.trim() && type && category.trim() && icon.trim() && description.trim() && hasValidPricing;
+    const hasValidPricing = type === "agent" || pricingModel === "free" || (monthlyPrice || yearlyPrice || lifetimePrice);
+    const isValid = name.trim() && type && (type === "agent" || category.trim()) && icon.trim() && description.trim() && hasValidPricing;
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
@@ -150,6 +212,7 @@ export function SubmitMarketItemDialog({
                                     <SelectValue placeholder="Select type" />
                                 </SelectTrigger>
                                 <SelectContent>
+                                    <SelectItem value="agent">Agent</SelectItem>
                                     <SelectItem value="mod">Mod</SelectItem>
                                     <SelectItem value="plugin">Plugin</SelectItem>
                                     <SelectItem value="skill">Skill</SelectItem>
@@ -176,6 +239,127 @@ export function SubmitMarketItemDialog({
                         />
                     </div>
 
+                    {/* Agent-specific fields */}
+                    {type === "agent" && (
+                        <div className="space-y-3 p-3 rounded-lg border border-cyan-500/20 bg-cyan-500/5">
+                            <p className="text-xs font-medium text-cyan-400">Agent Identity</p>
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="text-[11px] font-medium mb-0.5 block text-muted-foreground">Agent Type</label>
+                                    <Select value={agentType} onValueChange={setAgentType}>
+                                        <SelectTrigger className="h-8 text-sm">
+                                            <SelectValue placeholder="Select type" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {["Research", "Trading", "Operations", "Support", "Analytics", "Security", "Creative", "Engineering"].map(t => (
+                                                <SelectItem key={t} value={t}>{t}</SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <div>
+                                    <label className="text-[11px] font-medium mb-0.5 block text-muted-foreground">Category</label>
+                                    <Select value={agentCategory} onValueChange={setAgentCategory}>
+                                        <SelectTrigger className="h-8 text-sm">
+                                            <SelectValue placeholder="Select category" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {AGENT_CATEGORIES.filter(c => c !== "All").map(c => (
+                                                <SelectItem key={c} value={c}>{c}</SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                            </div>
+                            <div>
+                                <label className="text-[11px] font-medium mb-0.5 block text-muted-foreground">Persona</label>
+                                <Textarea
+                                    placeholder="Short persona description..."
+                                    value={persona}
+                                    onChange={(e) => setPersona(e.target.value)}
+                                    rows={2}
+                                    className="text-sm"
+                                />
+                            </div>
+                            <div>
+                                <label className="text-[11px] font-medium mb-0.5 block text-muted-foreground">Personality Traits</label>
+                                <Input
+                                    placeholder="analytical, concise, thorough"
+                                    value={personality}
+                                    onChange={(e) => setPersonality(e.target.value)}
+                                    className="h-8 text-sm"
+                                />
+                                <p className="text-[10px] text-muted-foreground mt-0.5">Comma-separated</p>
+                            </div>
+                            <div>
+                                <label className="text-[11px] font-medium mb-0.5 block text-muted-foreground">Rules</label>
+                                <Textarea
+                                    placeholder="One rule per line..."
+                                    value={rules}
+                                    onChange={(e) => setRules(e.target.value)}
+                                    rows={2}
+                                    className="text-sm"
+                                />
+                            </div>
+
+                            {/* Agent pricing */}
+                            <p className="text-xs font-medium text-cyan-400 mt-2">Distribution Pricing</p>
+                            <div className="grid grid-cols-2 gap-2">
+                                <div>
+                                    <label className="text-[11px] font-medium mb-0.5 block text-muted-foreground">Config Purchase ($)</label>
+                                    <Input
+                                        type="number" min="0" step="0.01"
+                                        placeholder="39"
+                                        value={configPrice}
+                                        onChange={(e) => setConfigPrice(e.target.value)}
+                                        className="h-8 text-sm"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-[11px] font-medium mb-0.5 block text-muted-foreground">Rental Monthly ($)</label>
+                                    <Input
+                                        type="number" min="0" step="0.01"
+                                        placeholder="15"
+                                        value={rentalMonthly}
+                                        onChange={(e) => setRentalMonthly(e.target.value)}
+                                        className="h-8 text-sm"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-[11px] font-medium mb-0.5 block text-muted-foreground">Per Request ($)</label>
+                                    <Input
+                                        type="number" min="0" step="0.01"
+                                        placeholder="2"
+                                        value={rentalUsage}
+                                        onChange={(e) => setRentalUsage(e.target.value)}
+                                        className="h-8 text-sm"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-[11px] font-medium mb-0.5 block text-muted-foreground">Hire Per Task ($)</label>
+                                    <Input
+                                        type="number" min="0" step="0.01"
+                                        placeholder="5"
+                                        value={hirePerTask}
+                                        onChange={(e) => setHirePerTask(e.target.value)}
+                                        className="h-8 text-sm"
+                                    />
+                                </div>
+                            </div>
+                            <div>
+                                <label className="text-[11px] font-medium mb-0.5 block text-muted-foreground">Performance Share (%)</label>
+                                <Input
+                                    type="number" min="0" max="100" step="1"
+                                    placeholder="20"
+                                    value={performanceShare}
+                                    onChange={(e) => setPerformanceShare(e.target.value)}
+                                    className="h-8 text-sm w-24"
+                                />
+                            </div>
+                            <p className="text-[10px] text-muted-foreground">Leave blank for fields you don't want to offer. Revenue split: Creator 85% / Platform 15% for sales, Creator 70% / Host 15% / Platform 15% for rentals.</p>
+                        </div>
+                    )}
+
                     <div className="grid grid-cols-2 gap-3">
                         <div>
                             <label className="text-sm font-medium mb-1 block">Version</label>
@@ -196,8 +380,8 @@ export function SubmitMarketItemDialog({
                         </div>
                     </div>
 
-                    {/* Pricing Model */}
-                    <div className="space-y-3 p-3 rounded-lg border border-border bg-muted/30">
+                    {/* Pricing Model (non-agent types) */}
+                    {type !== "agent" && <div className="space-y-3 p-3 rounded-lg border border-border bg-muted/30">
                         <div>
                             <label className="text-sm font-medium mb-1 block">Access Model</label>
                             <Select value={pricingModel} onValueChange={(v) => setPricingModel(v as PricingModel)}>
@@ -256,7 +440,7 @@ export function SubmitMarketItemDialog({
                                 </p>
                             </div>
                         )}
-                    </div>
+                    </div>}
 
                     <div>
                         <label className="text-sm font-medium mb-1 block">Tags</label>

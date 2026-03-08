@@ -91,6 +91,16 @@ export interface Agent {
   bio?: string;
   /** Skills/plugins the agent self-reports when connecting */
   reportedSkills?: ReportedSkill[];
+  /** Agent Social Number — unique identity assigned on registration */
+  asn?: string;
+  /** On-chain registration tx hash (Hedera Testnet) */
+  onChainTxHash?: string;
+  /** On-chain registration status */
+  onChainRegistered?: boolean;
+  /** Credit score (300-900) */
+  creditScore?: number;
+  /** Trust score (0-100) */
+  trustScore?: number;
   createdAt: unknown;
 }
 
