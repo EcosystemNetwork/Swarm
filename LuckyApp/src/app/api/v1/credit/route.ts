@@ -19,6 +19,7 @@ import {
     LINK_ASN_REGISTRY_ABI,
     SEPOLIA_RPC_URL,
 } from "@/lib/link-contracts";
+import { requirePlatformAdmin, forbidden } from "@/lib/auth-guard";
 
 /** Update credit scores on-chain via platform wallet */
 async function updateCreditOnChain(
@@ -68,6 +69,10 @@ async function updateCreditOnChain(
 }
 
 export async function POST(request: NextRequest) {
+    // Auth: platform admin only — arbitrary credit writes are privileged
+    const auth = requirePlatformAdmin(request);
+    if (!auth.ok) return forbidden(auth.error);
+
     let body: Record<string, unknown>;
     try {
         body = await request.json();

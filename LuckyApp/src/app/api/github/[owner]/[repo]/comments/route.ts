@@ -11,7 +11,7 @@ export async function POST(
   const body = await req.json();
   const { orgId, issueNumber, comment } = body;
 
-  const { ctx, error, status } = await resolveGitHubOrg(orgId);
+  const { ctx, error, status } = await resolveGitHubOrg(orgId, req);
   if (!ctx) return NextResponse.json({ error }, { status });
 
   if (!issueNumber || !comment) {

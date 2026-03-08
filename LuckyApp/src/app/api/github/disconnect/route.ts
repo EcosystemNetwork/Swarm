@@ -1,6 +1,9 @@
-/** GitHub disconnect — clears GitHub connection from an organization. */
+/** GitHub disconnect — clears GitHub connection from an organization.
+ *  Auth: org admin (owner) only.
+ */
 import { NextRequest, NextResponse } from "next/server";
-import { getOrganization, updateOrganization } from "@/lib/firestore";
+import { updateOrganization } from "@/lib/firestore";
+import { requireOrgAdmin } from "@/lib/auth-guard";
 
 export async function POST(req: NextRequest) {
   const { orgId } = await req.json();
@@ -9,9 +12,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Missing orgId" }, { status: 400 });
   }
 
-  const org = await getOrganization(orgId);
-  if (!org) {
-    return NextResponse.json({ error: "Organization not found" }, { status: 404 });
+  // Auth: only org owner can disconnect GitHub
+  const auth = await requireOrgAdmin(req, orgId);
+  if (!auth.ok) {
+    return NextResponse.json({ error: auth.error }, { status: auth.status || 403 });
   }
 
   await updateOrganization(orgId, {

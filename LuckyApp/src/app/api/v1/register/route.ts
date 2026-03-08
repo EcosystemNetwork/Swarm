@@ -13,7 +13,7 @@ import { NextRequest } from "next/server";
 import { ethers } from "ethers";
 import { PLATFORM_BRIEFING } from "../briefing";
 import { getAgentAvatarUrl } from "@/lib/agent-avatar";
-import { agentCheckIn, type Agent } from "@/lib/firestore";
+import { agentCheckIn, getOrganization, type Agent } from "@/lib/firestore";
 import { generateASN } from "@/lib/chainlink";
 import { CONTRACTS, AGENT_REGISTRY_ABI, HEDERA_GAS_LIMIT } from "@/lib/swarm-contracts";
 import {
@@ -163,6 +163,18 @@ export async function POST(request: NextRequest) {
         return Response.json(
             { error: "publicKey, agentName, and orgId are required" },
             { status: 400 }
+        );
+    }
+
+    // Validate the target org exists and is not private (prevents rogue agent registration)
+    const org = await getOrganization(orgId);
+    if (!org) {
+        return Response.json({ error: "Organization not found" }, { status: 404 });
+    }
+    if (org.isPrivate) {
+        return Response.json(
+            { error: "Cannot register agents to a private organization without membership" },
+            { status: 403 }
         );
     }
 

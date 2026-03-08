@@ -1,7 +1,8 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
+import { requireInternalService } from '@/lib/auth-guard';
 
 const OPENCLAW_DIR = process.env.OPENCLAW_DIR || path.join(os.homedir(), '.openclaw');
 const AGENT_ID = process.env.OPENCLAW_AGENT || 'main';
@@ -11,7 +12,18 @@ function getCronFile() {
     return path.join(memDir, 'CRON.json');
 }
 
-export async function GET() {
+function verifyServiceAuth(req: NextRequest): boolean {
+    const auth = requireInternalService(req);
+    return auth.ok;
+}
+
+export async function GET(req: NextRequest) {
+    // Auth: internal service or local dashboard (check origin)
+    const isLocal = req.headers.get('host')?.startsWith('localhost') || req.headers.get('host')?.startsWith('127.0.0.1');
+    if (!isLocal && !verifyServiceAuth(req)) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     try {
         const cronFile = getCronFile();
         if (!fs.existsSync(cronFile)) {
@@ -25,7 +37,13 @@ export async function GET() {
     }
 }
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
+    // Auth: internal service or local dashboard
+    const isLocal = req.headers.get('host')?.startsWith('localhost') || req.headers.get('host')?.startsWith('127.0.0.1');
+    if (!isLocal && !verifyServiceAuth(req)) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     try {
         const body = await req.json();
         const action = body.action; // 'toggle', 'trigger', 'update'

@@ -6,6 +6,7 @@
  */
 import { NextRequest } from "next/server";
 import { verifyAgentRequest, isTimestampFresh, unauthorized } from "../verify";
+import { rateLimit } from "../rate-limit";
 import { db } from "@/lib/firebase";
 import {
     collection,
@@ -23,6 +24,9 @@ export async function GET(request: NextRequest) {
     const agentId = searchParams.get("agent");
     const sinceParam = searchParams.get("since") || "0";
     const sig = searchParams.get("sig");
+
+    const limited = rateLimit(agentId || "anon");
+    if (limited) return limited;
 
     if (!agentId || !sig) {
         return unauthorized("agent and sig parameters are required");

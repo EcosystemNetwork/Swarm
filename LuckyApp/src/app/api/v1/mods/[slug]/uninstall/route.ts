@@ -6,6 +6,7 @@
  */
 import { NextRequest } from "next/server";
 import { getModBySlug, uninstallMod } from "@/lib/skills";
+import { requireOrgMember, forbidden } from "@/lib/auth-guard";
 
 export async function POST(
     req: NextRequest,
@@ -20,7 +21,7 @@ export async function POST(
 
     try {
         const body = await req.json();
-        const { installationId } = body;
+        const { installationId, orgId } = body;
 
         if (!installationId) {
             return Response.json(
@@ -28,6 +29,13 @@ export async function POST(
                 { status: 400 },
             );
         }
+
+        // Auth: require org membership to uninstall mods
+        if (!orgId) {
+            return Response.json({ error: "orgId is required" }, { status: 400 });
+        }
+        const auth = await requireOrgMember(req, orgId);
+        if (!auth.ok) return forbidden(auth.error);
 
         await uninstallMod(installationId);
 

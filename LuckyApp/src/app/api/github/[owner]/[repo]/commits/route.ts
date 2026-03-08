@@ -11,7 +11,7 @@ export async function GET(
   const orgId = req.nextUrl.searchParams.get("orgId");
   const branch = req.nextUrl.searchParams.get("branch") || undefined;
 
-  const { ctx, error, status } = await resolveGitHubOrg(orgId);
+  const { ctx, error, status } = await resolveGitHubOrg(orgId, req);
   if (!ctx) return NextResponse.json({ error }, { status });
 
   try {

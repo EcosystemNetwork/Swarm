@@ -11,7 +11,7 @@ export async function GET(
   const orgId = req.nextUrl.searchParams.get("orgId");
   const state = req.nextUrl.searchParams.get("state") || "open";
 
-  const { ctx, error, status } = await resolveGitHubOrg(orgId);
+  const { ctx, error, status } = await resolveGitHubOrg(orgId, req);
   if (!ctx) return NextResponse.json({ error }, { status });
 
   try {
@@ -33,7 +33,7 @@ export async function POST(
   const body = await req.json();
   const { orgId, title, issueBody, labels } = body;
 
-  const { ctx, error, status } = await resolveGitHubOrg(orgId);
+  const { ctx, error, status } = await resolveGitHubOrg(orgId, req);
   if (!ctx) return NextResponse.json({ error }, { status });
 
   if (!title) {

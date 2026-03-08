@@ -1053,7 +1053,7 @@ export default function DashboardPage() {
 
   if (!currentOrg) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-1.5">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
           <p className="text-muted-foreground mt-1">No organization selected</p>
@@ -1064,13 +1064,13 @@ export default function DashboardPage() {
 
   if (loading) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-1.5">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">{greeting}</h1>
           <p className="text-muted-foreground mt-1">{currentOrg.name}</p>
         </div>
         {/* Skeleton grid matching widget layout */}
-        <div className="grid gap-4 grid-cols-2 md:grid-cols-4 lg:grid-cols-6 grid-flow-row-dense auto-rows-auto">
+        <div className="grid gap-1 grid-cols-2 md:grid-cols-4 lg:grid-cols-6 grid-flow-row-dense auto-rows-auto">
           {/* Briefing skeleton — 3 cols */}
           <div className="col-span-2 md:col-span-3 lg:col-span-3 h-40 rounded-lg bg-muted/30 animate-pulse" />
           {/* 6 stat card skeletons */}
@@ -1089,7 +1089,7 @@ export default function DashboardPage() {
 
   if (error) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-1.5">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">{greeting}</h1>
           <p className="text-muted-foreground mt-1">{currentOrg.name}</p>
@@ -1124,9 +1124,9 @@ export default function DashboardPage() {
   /* ── Render ── */
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-1.5">
       {/* Dashboard header */}
-      <div className="space-y-4">
+      <div className="space-y-1.5">
         <div className="flex items-end justify-between">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">{greeting}</h1>
@@ -1155,7 +1155,7 @@ export default function DashboardPage() {
 
         {/* Summary stats bar */}
         {stats && (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-1">
             {[
               { label: "Agents Online", value: `${onlineAgents.length}/${agents.length}`, color: onlineAgents.length > 0 ? "text-emerald-400" : "text-muted-foreground" },
               { label: "Active Tasks", value: String(stats.activeTasks), color: stats.activeTasks > 0 ? "text-amber-400" : "text-muted-foreground" },
@@ -1180,11 +1180,11 @@ export default function DashboardPage() {
         </TabsList>
 
         <TabsContent value="overview">
-          <div className="space-y-6">
+          <div className="space-y-1.5">
 
             {/* ═══ Draggable Main Widgets ═══ */}
             {widgetOrder.length > 0 && (
-              <div className="grid gap-4 grid-cols-2 md:grid-cols-4 lg:grid-cols-6 grid-flow-row-dense auto-rows-auto">
+              <div className="grid gap-1 grid-cols-2 md:grid-cols-4 lg:grid-cols-6 grid-flow-row-dense auto-rows-auto">
                 {widgetOrder.map((id, index) => {
                   const widget = widgetRenderers[id];
                   if (!widget) return null;
@@ -1216,7 +1216,7 @@ export default function DashboardPage() {
                       onDragEnd={onWidgetDragEnd}
                       onDragLeave={() => setDropTargetWidget(null)}
                       className={`relative group cursor-grab active:cursor-grabbing transition-all duration-200 overflow-hidden rounded-lg ${spanClass} ${isDragging ? "opacity-40 scale-[0.98] z-50" : ""
-                        } ${isDropTarget ? "ring-2 ring-amber-500 ring-offset-2 ring-offset-background" : ""}`}
+                        } ${isDropTarget ? "ring-2 ring-amber-500 ring-offset-0" : ""}`}
                     >
                       <div className="absolute top-3 right-3 z-10 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button

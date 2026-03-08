@@ -1,9 +1,10 @@
-/** Root Layout — App-level providers (ThirdwebProvider, ThemeProvider, OrgProvider), global fonts, and metadata. */
+/** Root Layout — App-level providers (ThirdwebProvider, ThemeProvider, OrgProvider, SessionProvider), global fonts, and metadata. */
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { Web3Provider } from "@/lib/dynamic";
 import { OrgProvider } from "@/contexts/OrgContext";
+import { SessionProvider } from "@/contexts/SessionContext";
 import SparkleTrail from "@/components/SparkleTrail";
 import { ThemeProvider } from "@/components/theme-provider";
 import { SkinProvider } from "@/contexts/SkinContext";
@@ -35,12 +36,14 @@ export default function RootLayout({
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem>
           <SkinProvider>
           <Web3Provider>
+            <SessionProvider>
             <OrgProvider>
               <SparkleTrail>
                 <CommandBar />
                 {children}
               </SparkleTrail>
             </OrgProvider>
+            </SessionProvider>
           </Web3Provider>
           </SkinProvider>
         </ThemeProvider>

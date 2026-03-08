@@ -8,6 +8,7 @@
  */
 import { NextRequest } from "next/server";
 import { verifyAgentRequest, unauthorized } from "../verify";
+import { rateLimit } from "../rate-limit";
 import { db } from "@/lib/firebase";
 import {
     collection,
@@ -17,9 +18,23 @@ import {
     serverTimestamp,
 } from "firebase/firestore";
 
-// Simple in-memory nonce tracking (prevents replay within server lifetime)
-const usedNonces = new Set<string>();
-const MAX_NONCES = 10000;
+// ── Replay Protection ────────────────────────────────────────────────────────
+// In-memory nonce tracking with TTL-based expiry.
+// LIMITATION: in-memory only — nonces are lost on server restart or across
+// multiple instances. For production multi-instance deployments, replace with
+// Redis (SET nonce EX <ttl> NX) or a Firestore TTL collection.
+const NONCE_TTL_MS = 10 * 60 * 1000; // 10 minutes — nonces older than this are evictable
+const MAX_NONCES = 50_000;
+const NONCE_SWEEP_INTERVAL_MS = 60 * 1000; // sweep expired nonces every 60s
+const usedNonces = new Map<string, number>(); // nonce → timestamp when recorded
+
+// Periodic sweep of expired nonces (prevents unbounded growth)
+setInterval(() => {
+    const cutoff = Date.now() - NONCE_TTL_MS;
+    for (const [nonce, ts] of usedNonces) {
+        if (ts < cutoff) usedNonces.delete(nonce);
+    }
+}, NONCE_SWEEP_INTERVAL_MS).unref();
 
 export async function POST(request: NextRequest) {
     let body: Record<string, unknown>;
@@ -30,6 +45,12 @@ export async function POST(request: NextRequest) {
     }
 
     const agentId = body.agent as string | undefined;
+
+    // Rate limit by agentId (falls back to "anon" for malformed requests —
+    // those will fail validation below anyway)
+    const limited = rateLimit(agentId || "anon");
+    if (limited) return limited;
+
     const channelId = body.channelId as string | undefined;
     const text = body.text as string | undefined;
     const nonce = body.nonce as string | undefined;
@@ -84,14 +105,14 @@ export async function POST(request: NextRequest) {
     const agentData = await verifyAgentRequest(agentId, signedMessage, sig);
     if (!agentData) return unauthorized();
 
-    // Record nonce
-    usedNonces.add(nonce);
+    // Record nonce with current timestamp for TTL-based expiry
+    usedNonces.set(nonce, Date.now());
     if (usedNonces.size > MAX_NONCES) {
-        // Evict oldest nonces (simple FIFO via Set iteration order)
-        const iterator = usedNonces.values();
+        // Emergency eviction: drop oldest entries by insertion order
+        const iterator = usedNonces.keys();
         for (let i = 0; i < 1000; i++) {
-            const val = iterator.next().value;
-            if (val) usedNonces.delete(val);
+            const key = iterator.next().value;
+            if (key) usedNonces.delete(key);
         }
     }
 

@@ -15,11 +15,15 @@
  */
 import { NextRequest } from "next/server";
 import { verifyAgentRequest, isTimestampFresh, unauthorized } from "../verify";
+import { rateLimit } from "../rate-limit";
 import { authenticateAgent, unauthorized as webhookUnauthorized } from "../../webhooks/auth";
 import { getPlatformSnapshot } from "@/lib/firestore";
 
 export async function GET(req: NextRequest) {
     const url = req.nextUrl;
+
+    const limited = rateLimit(url.searchParams.get("agent") || url.searchParams.get("agentId") || "anon");
+    if (limited) return limited;
 
     // Try Ed25519 auth first
     const agent = url.searchParams.get("agent");

@@ -19,6 +19,7 @@ import {
     LINK_ASN_REGISTRY_ABI,
     SEPOLIA_RPC_URL,
 } from "@/lib/link-contracts";
+import { requireOrgMember, forbidden } from "@/lib/auth-guard";
 
 export async function POST(request: NextRequest) {
     let body: Record<string, unknown>;
@@ -33,6 +34,10 @@ export async function POST(request: NextRequest) {
     if (!agentId || !orgId) {
         return Response.json({ error: "agentId and orgId are required" }, { status: 400 });
     }
+
+    // Auth: require org membership to register agents on-chain
+    const auth = await requireOrgMember(request, orgId);
+    if (!auth.ok) return forbidden(auth.error);
 
     // Load agent from Firestore
     const agentRef = doc(db, "agents", agentId);

@@ -1,7 +1,8 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
+import { requireInternalService } from '@/lib/auth-guard';
 
 const OPENCLAW_DIR = process.env.OPENCLAW_DIR || path.join(os.homedir(), '.openclaw');
 const AGENT_ID = process.env.OPENCLAW_AGENT || 'main'; // Target agent id
@@ -46,7 +47,18 @@ function getFileList(dir: string, baseDir: string = dir): any[] {
     return results;
 }
 
-export async function GET(req: Request) {
+function verifyAccess(req: NextRequest): boolean {
+    // Allow local dashboard access, require service auth for remote
+    const host = req.headers.get('host') || '';
+    if (host.startsWith('localhost') || host.startsWith('127.0.0.1')) return true;
+    return requireInternalService(req).ok;
+}
+
+export async function GET(req: NextRequest) {
+    if (!verifyAccess(req)) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     try {
         const url = new URL(req.url);
         const getPath = url.searchParams.get('path');
@@ -61,6 +73,11 @@ export async function GET(req: Request) {
             // Read a specific file safely
             const safePath = path.normalize(getPath).replace(/^(\.\.(\/|\\|$))+/, '');
             const targetFile = path.join(workspaceDir, safePath);
+
+            // Additional path traversal guard
+            if (!targetFile.startsWith(workspaceDir)) {
+                return NextResponse.json({ error: 'Invalid path' }, { status: 403 });
+            }
 
             if (fs.existsSync(targetFile) && fs.statSync(targetFile).isFile()) {
                 const content = fs.readFileSync(targetFile, 'utf8');
@@ -79,7 +96,11 @@ export async function GET(req: Request) {
     }
 }
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
+    if (!verifyAccess(req)) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     try {
         const body = await req.json();
         const action = body.action; // 'save', 'delete'

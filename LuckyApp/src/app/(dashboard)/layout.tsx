@@ -14,7 +14,7 @@ export default function DashboardAppLayout({ children }: { children: React.React
                     <Header />
                     <div className="flex flex-1 overflow-hidden">
                         <Sidebar />
-                        <main className="flex-1 min-w-0 overflow-y-auto p-6">
+                        <main className="flex-1 min-w-0 overflow-y-auto p-1.5">
                             <DashboardErrorBoundary>{children}</DashboardErrorBoundary>
                         </main>
                     </div>

@@ -726,6 +726,34 @@ export const AGENT_ITEM_CATEGORIES = AGENT_CATEGORIES;
 // Mod + Capability Registries (derived from SKILL_REGISTRY)
 // ═══════════════════════════════════════════════════════════════
 
+/**
+ * Parse a semver string into [major, minor, patch].
+ * Returns [0,0,0] for invalid input.
+ */
+function parseSemver(v: string): [number, number, number] {
+    const parts = v.replace(/^v/, "").split(".").map(Number);
+    return [parts[0] || 0, parts[1] || 0, parts[2] || 0];
+}
+
+/**
+ * Check whether an installed version is compatible with a registry version.
+ * Uses semver major-version compatibility: same major = compatible.
+ */
+export function isVersionCompatible(installed: string, registry: string): boolean {
+    const [iMajor] = parseSemver(installed);
+    const [rMajor] = parseSemver(registry);
+    return iMajor === rMajor;
+}
+
+/**
+ * Check whether a subscription is currently active (not expired).
+ */
+export function isSubscriptionActive(sub: { status: string; endDate: Date | null }): boolean {
+    if (sub.status !== "active") return false;
+    if (!sub.endDate) return true; // lifetime
+    return sub.endDate.getTime() > Date.now();
+}
+
 function inferPermissions(desc: string, id: string): PermissionScope[] {
     const scopes: PermissionScope[] = ["execute"];
     const text = `${desc} ${id}`.toLowerCase();
@@ -1115,7 +1143,7 @@ export async function deleteCommunityItem(docId: string): Promise<void> {
 
 const MOD_INSTALL_COLLECTION = "modInstallations";
 
-/** Install a mod for an org */
+/** Install a mod for an org (with duplicate & subscription guards) */
 export async function installMod(
     modId: string,
     orgId: string,
@@ -1125,6 +1153,38 @@ export async function installMod(
     const mod = MOD_REGISTRY.find((m) => m.id === modId);
     if (!mod) throw new Error(`Mod not found: ${modId}`);
 
+    // Guard: prevent duplicate installs for same org
+    const existing = await getDocs(
+        query(
+            collection(db, MOD_INSTALL_COLLECTION),
+            where("modId", "==", modId),
+            where("orgId", "==", orgId),
+        ),
+    );
+    if (!existing.empty) {
+        throw new Error(`Mod ${modId} is already installed for org ${orgId}`);
+    }
+
+    // Guard: if mod requires a paid subscription, verify it
+    if (mod.pricing?.model === "subscription") {
+        const subs = await getOrgSubscriptions(orgId);
+        const activeSub = subs.find(
+            (s) => s.itemId === mod.legacySkillId || s.itemId === modId,
+        );
+        if (!activeSub) {
+            throw new Error(`Active subscription required for mod ${modId}`);
+        }
+    }
+
+    // Validate requested capabilities exist on this mod
+    if (enabledCapabilities) {
+        const validCaps = new Set(mod.capabilities);
+        const invalid = enabledCapabilities.filter((c) => !validCaps.has(c));
+        if (invalid.length > 0) {
+            throw new Error(`Invalid capabilities for mod ${modId}: ${invalid.join(", ")}`);
+        }
+    }
+
     const ref = await addDoc(collection(db, MOD_INSTALL_COLLECTION), {
         modId,
         orgId,
@@ -1133,6 +1193,7 @@ export async function installMod(
         config: {},
         installedBy,
         installedAt: serverTimestamp(),
+        installedVersion: mod.version,
     });
 
     // Backward compat: also write to legacy inventory
@@ -1221,17 +1282,33 @@ export async function getAgentCapabilities(
     agentId: string,
     orgId: string,
 ): Promise<ResolvedCapability[]> {
-    const [installations, agentAssignments] = await Promise.all([
+    const [installations, agentAssignments, subscriptions] = await Promise.all([
         getModInstallations(orgId),
         getAgentSkills(agentId),
+        getOrgSubscriptions(orgId),
     ]);
 
     const enabledInstalls = installations.filter((i) => i.enabled);
     const assignedSkillIds = new Set(agentAssignments.map((a) => a.skillId));
 
-    // Collect all enabled capability IDs from org mod installations
+    // Exclude mods whose paid subscriptions have expired
+    const expiredModIds = new Set<string>();
+    for (const install of enabledInstalls) {
+        const mod = MOD_REGISTRY.find((m) => m.id === install.modId);
+        if (mod?.pricing?.model === "subscription") {
+            const sub = subscriptions.find(
+                (s) => s.itemId === install.modId || s.itemId === mod.legacySkillId,
+            );
+            if (!sub || !isSubscriptionActive(sub)) {
+                expiredModIds.add(install.modId);
+            }
+        }
+    }
+
+    // Collect enabled capability IDs, skipping expired subscription mods
     const capabilityIds = new Set<string>();
     for (const install of enabledInstalls) {
+        if (expiredModIds.has(install.modId)) continue;
         for (const capId of install.enabledCapabilities) {
             capabilityIds.add(capId);
         }
@@ -1261,6 +1338,47 @@ export async function getAgentCapabilities(
     }
 
     return resolved;
+}
+
+/**
+ * Enforce that an agent has a specific capability before allowing an action.
+ * Returns the resolved capability if granted, throws if not.
+ */
+export async function enforceCapability(
+    agentId: string,
+    orgId: string,
+    requiredCapabilityKey: string,
+    requiredScope?: PermissionScope,
+): Promise<ResolvedCapability> {
+    const capabilities = await getAgentCapabilities(agentId, orgId);
+    const match = capabilities.find((c) => c.key === requiredCapabilityKey);
+
+    if (!match) {
+        throw new Error(
+            `Agent ${agentId} does not have capability "${requiredCapabilityKey}". ` +
+            `Install the required mod or assign the capability to this agent.`,
+        );
+    }
+
+    if (requiredScope && !match.permissionScopes.includes(requiredScope)) {
+        throw new Error(
+            `Capability "${requiredCapabilityKey}" does not grant "${requiredScope}" permission for agent ${agentId}.`,
+        );
+    }
+
+    return match;
+}
+
+/**
+ * Check whether an agent has a capability (non-throwing variant).
+ */
+export async function hasCapability(
+    agentId: string,
+    orgId: string,
+    capabilityKey: string,
+): Promise<boolean> {
+    const capabilities = await getAgentCapabilities(agentId, orgId);
+    return capabilities.some((c) => c.key === capabilityKey);
 }
 
 // ═══════════════════════════════════════════════════════════════

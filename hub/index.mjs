@@ -1,3 +1,4 @@
+import "dotenv/config";
 import express from "express";
 import http from "http";
 import { WebSocketServer } from "ws";
@@ -20,19 +21,41 @@ import {
 } from "firebase/firestore";
 
 // ── Config ──────────────────────────────────────────────────────────────────
-const PORT = parseInt(process.env.PORT || "8400", 10);
-const RATE_LIMIT_WINDOW = 60_000; // 1 min
-const RATE_LIMIT_MAX = 60;
-const MAX_CONNECTIONS_PER_AGENT = 5;
-const AUTH_WINDOW_MS = 5 * 60 * 1000; // 5 min for connection signature freshness
 
+/**
+ * Load and validate a required environment variable.
+ * Exits the process with a clear message if missing.
+ */
+function requireEnv(name) {
+  const val = process.env[name];
+  if (!val) {
+    console.error(`[FATAL] Missing required environment variable: ${name}`);
+    process.exit(1);
+  }
+  return val;
+}
+
+/**
+ * Load an optional env var with a default.
+ */
+function optionalEnv(name, fallback) {
+  return process.env[name] || fallback;
+}
+
+const PORT = parseInt(optionalEnv("PORT", "8400"), 10);
+const RATE_LIMIT_WINDOW = parseInt(optionalEnv("RATE_LIMIT_WINDOW_MS", "60000"), 10);
+const RATE_LIMIT_MAX = parseInt(optionalEnv("RATE_LIMIT_MAX", "60"), 10);
+const MAX_CONNECTIONS_PER_AGENT = parseInt(optionalEnv("MAX_CONNECTIONS_PER_AGENT", "5"), 10);
+const AUTH_WINDOW_MS = parseInt(optionalEnv("AUTH_WINDOW_MS", String(5 * 60 * 1000)), 10);
+
+// Firebase — loaded from environment, never hardcoded
 const FIREBASE_CONFIG = {
-  apiKey: "AIzaSyAwsFqFmZpw2QN0ZR1UmpgsC4ApTqHmoOM",
-  authDomain: "lucky-st.firebaseapp.com",
-  projectId: "lucky-st",
-  storageBucket: "lucky-st.firebasestorage.app",
-  messagingSenderId: "1075065834255",
-  appId: "1:1075065834255:web:f66fd6e4fa05f812c18c7a",
+  apiKey: requireEnv("FIREBASE_API_KEY"),
+  authDomain: requireEnv("FIREBASE_AUTH_DOMAIN"),
+  projectId: requireEnv("FIREBASE_PROJECT_ID"),
+  storageBucket: optionalEnv("FIREBASE_STORAGE_BUCKET", ""),
+  messagingSenderId: optionalEnv("FIREBASE_MESSAGING_SENDER_ID", ""),
+  appId: requireEnv("FIREBASE_APP_ID"),
 };
 
 const firebaseApp = initializeApp(FIREBASE_CONFIG);

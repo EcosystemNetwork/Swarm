@@ -20,6 +20,7 @@ import {
     LINK_ASN_REGISTRY_ABI,
     SEPOLIA_RPC_URL,
 } from "@/lib/link-contracts";
+import { requirePlatformAdminOrAgent, unauthorized } from "@/lib/auth-guard";
 
 /** Update credit scores on-chain via platform wallet */
 async function updateCreditOnChain(
@@ -94,6 +95,10 @@ async function recordTaskCompletionOnChain(
 }
 
 export async function POST(request: NextRequest) {
+    // Auth: platform admin or authenticated agent
+    const auth = await requirePlatformAdminOrAgent(request, "POST:/v1/credit/task-complete");
+    if (!auth.ok) return unauthorized(auth.error);
+
     let body: Record<string, unknown>;
     try {
         body = await request.json();
@@ -104,6 +109,11 @@ export async function POST(request: NextRequest) {
     const agentId = body.agentId as string | undefined;
     if (!agentId) {
         return Response.json({ error: "agentId is required" }, { status: 400 });
+    }
+
+    // If agent-authed, verify the agent can only record completions for itself
+    if (auth.agent && auth.agent.agentId !== agentId) {
+        return Response.json({ error: "Agents can only record their own task completions" }, { status: 403 });
     }
 
     // Load agent from Firestore

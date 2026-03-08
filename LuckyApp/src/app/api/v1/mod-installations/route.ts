@@ -6,6 +6,7 @@
  */
 import { NextRequest } from "next/server";
 import { getModInstallations, getModById } from "@/lib/skills";
+import { requireOrgMember, forbidden } from "@/lib/auth-guard";
 
 export async function GET(req: NextRequest) {
     const orgId = req.nextUrl.searchParams.get("orgId");
@@ -13,6 +14,10 @@ export async function GET(req: NextRequest) {
     if (!orgId) {
         return Response.json({ error: "orgId parameter is required" }, { status: 400 });
     }
+
+    // Auth: require org membership to view installation details
+    const auth = await requireOrgMember(req, orgId);
+    if (!auth.ok) return forbidden(auth.error);
 
     try {
         const installations = await getModInstallations(orgId);

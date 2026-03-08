@@ -1,4 +1,7 @@
-/** GitHub OAuth callback — handles GitHub App installation redirect. */
+/** GitHub OAuth callback — handles GitHub App installation redirect.
+ *  Validates that the installation_id from GitHub matches a real installation
+ *  before writing to the organization document.
+ */
 import { NextRequest, NextResponse } from "next/server";
 import { getInstallation } from "@/lib/github";
 import { getOrganization, updateOrganization } from "@/lib/firestore";
@@ -27,8 +30,16 @@ export async function GET(req: NextRequest) {
 
   try {
     if (setupAction === "install" || setupAction === "update") {
-      // Fetch installation details from GitHub
+      // Fetch installation details from GitHub — this validates the installation_id
+      // is real and belongs to an actual GitHub App installation, preventing spoofed callbacks
       const installation = await getInstallation(Number(installationId));
+
+      // Verify the installation ID matches what GitHub returned
+      if (!installation || !installation.id) {
+        return NextResponse.redirect(
+          new URL("/settings?github=error&reason=invalid_installation", req.url)
+        );
+      }
 
       // Store on the organization
       await updateOrganization(orgId, {

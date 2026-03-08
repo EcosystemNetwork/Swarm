@@ -17,6 +17,7 @@
  */
 import { NextRequest } from "next/server";
 import { verifyAgentRequest, isTimestampFresh, unauthorized } from "../verify";
+import { rateLimit } from "../rate-limit";
 import { authenticateAgent, unauthorized as webhookUnauthorized } from "../../webhooks/auth";
 import { db } from "@/lib/firebase";
 import { collection, getDocs, query, where, Timestamp } from "firebase/firestore";
@@ -39,6 +40,9 @@ export async function GET(req: NextRequest) {
     if (!orgId) {
         return Response.json({ error: "org parameter is required" }, { status: 400 });
     }
+
+    const limited = rateLimit(url.searchParams.get("agent") || url.searchParams.get("agentId") || "anon");
+    if (limited) return limited;
 
     // Authenticate — try Ed25519 first
     const agent = url.searchParams.get("agent");

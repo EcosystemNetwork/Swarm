@@ -2,6 +2,7 @@
  *  Replaces generic spinners with informative, branded UI. */
 'use client';
 
+import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { ConnectButton } from 'thirdweb/react';
@@ -14,8 +15,14 @@ import {
   Sparkles,
   AlertTriangle,
   RefreshCw,
+  CloudOff,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import {
+  getDegradedDomains,
+  subscribeDegraded,
+  getCircuitDiagnostics,
+} from '@/lib/fetch-interceptor';
 
 const client = createThirdwebClient({
   clientId: process.env.NEXT_PUBLIC_THIRDWEB_CLIENT_ID || 'cbd8abcfa13db759ca2f5fa7d8a5a5e5',
@@ -188,6 +195,57 @@ export function ReconnectionBanner({ visible }: { visible: boolean }) {
         <span className="h-2 w-2 rounded-full bg-amber-400 animate-pulse" />
         Reconnecting wallet...
       </span>
+    </div>
+  );
+}
+
+// ─── Degraded Service UI ─────────────────────────────────────────────
+
+/** React hook — subscribes to the fetch interceptor's degraded-state observable. */
+export function useDegradedServices(): string[] {
+  const [domains, setDomains] = useState<string[]>(getDegradedDomains);
+  useEffect(() => {
+    const update = () => setDomains(getDegradedDomains());
+    return subscribeDegraded(update);
+  }, []);
+  return domains;
+}
+
+/** Banner shown when one or more third-party services are in circuit-breaker mode. */
+export function DegradedServiceBanner() {
+  const domains = useDegradedServices();
+  const [showDiag, setShowDiag] = useState(false);
+
+  if (domains.length === 0) return null;
+
+  const diagnostics = showDiag ? getCircuitDiagnostics() : null;
+
+  return (
+    <div className="bg-orange-500/10 border-b border-orange-500/20 px-4 py-2 text-sm text-orange-400 animate-in slide-in-from-top duration-300">
+      <div className="flex items-center justify-center gap-2">
+        <CloudOff className="h-3.5 w-3.5 shrink-0" />
+        <span>
+          {domains.length === 1
+            ? `${domains[0]} is temporarily unavailable`
+            : `${domains.length} services temporarily unavailable`}
+          {' — some features may be limited'}
+        </span>
+        <button
+          onClick={() => setShowDiag((v) => !v)}
+          className="ml-2 text-[10px] underline underline-offset-2 opacity-60 hover:opacity-100 transition-opacity"
+        >
+          {showDiag ? 'hide' : 'details'}
+        </button>
+      </div>
+      {diagnostics && (
+        <div className="mt-2 mx-auto max-w-lg text-[10px] font-mono text-orange-300/70 space-y-0.5">
+          {Object.entries(diagnostics).map(([domain, info]) => (
+            <div key={domain}>
+              {domain}: {info.state} | failures: {info.consecutiveFailures}/{info.totalFailures} total | last: {info.lastFailure ?? 'n/a'}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
