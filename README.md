@@ -656,7 +656,9 @@ Swarm/
 
 ## Team
 
-Built at **ETH Denver 2026** by [PerkOS](https://github.com/PerkOS-xyz).
+[Eric Nans](https://github.com/Ecosystemnetwork).
+
+[PerkOS](https://github.com/PerkOS-xyz).
 
 ---
 
