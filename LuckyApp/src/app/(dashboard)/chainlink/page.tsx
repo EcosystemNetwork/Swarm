@@ -19,7 +19,8 @@ import {
     TrendingUp, Bot, CheckCircle, Workflow,
     FileCode, GraduationCap, Copy, ChevronDown, ChevronRight,
     ArrowRight, Terminal, Clock, Activity, Cpu, Handshake,
-    Zap, Shield, Layers,
+    Zap, Shield, Layers, Fingerprint, Scale, AlertTriangle,
+    Search, Eye, Ban,
 } from "lucide-react";
 import {
     CHAINLINK_TOOLS,
@@ -28,6 +29,15 @@ import {
     CHAINLINK_AGENT_SKILLS,
     CHAINLINK_DOCS,
     PLAYGROUND_MOCK_RESPONSES,
+    MOCK_ASN_PROFILES,
+    MOCK_FRAUD_ALERTS,
+    ASN_SCORE_BANDS,
+    generateASN,
+    getScoreBand,
+    getDefaultPolicy,
+    type ASNProfile,
+    type ScoreBand,
+    type PolicyState,
 } from "@/lib/chainlink";
 import {
     fetchAllPrices, fetchLivePrices,
@@ -42,7 +52,7 @@ import {
 const ICON_MAP: Record<string, React.ComponentType<React.SVGProps<SVGSVGElement>>> = {
     GitBranch, BarChart3, RefreshCw, ShieldCheck,
     TrendingUp, Handshake, Bot, CheckCircle, Workflow,
-    Rocket, FileCode, GraduationCap,
+    Rocket, FileCode, GraduationCap, Fingerprint,
 };
 
 function resolveIcon(name: string) {
@@ -60,6 +70,11 @@ const TOOL_TO_PLAYGROUND: Record<string, string> = {
     "publish-attestation": "publish_attestation",
     "ccip-propagate": "ccip_propagate",
     "trigger-risk-policy": "trigger_risk_policy",
+    "generate-asn": "generate_asn",
+    "register-identity": "register_identity",
+    "lookup-asn": "lookup_asn",
+    "freeze-identity": "freeze_identity",
+    "identity-graph": "generate_asn",
 };
 
 const WORKFLOW_TYPE_META: Record<WorkflowType, { icon: React.ComponentType<React.SVGProps<SVGSVGElement>>; color: string }> = {
@@ -82,8 +97,21 @@ export default function ChainlinkPage() {
     const [playgroundRunning, setPlaygroundRunning] = useState(false);
     const [playgroundResult, setPlaygroundResult] = useState<string | null>(null);
     const [playgroundLatency, setPlaygroundLatency] = useState<string | null>(null);
-    const [activeDoc, setActiveDoc] = useState("quickstart");
+    const [activeDoc, setActiveDoc] = useState("asn-overview");
     const [copied, setCopied] = useState(false);
+
+    // ─── ASN state ───
+    const [asnProfiles, setAsnProfiles] = useState<ASNProfile[]>(MOCK_ASN_PROFILES);
+    const [asnSearch, setAsnSearch] = useState("");
+    const [asnBandFilter, setAsnBandFilter] = useState<ScoreBand | "all">("all");
+    const [selectedAsn, setSelectedAsn] = useState<ASNProfile | null>(null);
+    const [showRegister, setShowRegister] = useState(false);
+    const [regName, setRegName] = useState("");
+    const [regType, setRegType] = useState("Research");
+    const [regWallet, setRegWallet] = useState("");
+    const [regProvider, setRegProvider] = useState("anthropic");
+    const [registering, setRegistering] = useState(false);
+    const [policyAgent, setPolicyAgent] = useState<ASNProfile | null>(null);
 
     // ─── Live price feeds ───
     const [livePrices, setLivePrices] = useState<PriceFeedResult[]>([]);
@@ -216,11 +244,56 @@ export default function ChainlinkPage() {
         setTimeout(() => setCopied(false), 1500);
     };
 
+    // ─── ASN handlers ───
+    const handleRegisterASN = async () => {
+        if (!regName.trim() || !regWallet.trim()) return;
+        setRegistering(true);
+        await new Promise((r) => setTimeout(r, 1500));
+        const newProfile: ASNProfile = {
+            asn: generateASN(),
+            agentName: regName.trim(),
+            agentType: regType,
+            creatorOrgId: currentOrg?.id || "unknown",
+            creatorWallet: regWallet.trim(),
+            linkedWallets: [regWallet.trim()],
+            deploymentEnvironment: "mainnet",
+            modelProvider: regProvider,
+            skillModules: [],
+            creationTimestamp: new Date().toISOString(),
+            verificationLevel: "basic",
+            status: "active",
+            jurisdictionTag: "US",
+            riskFlags: [],
+            trustScore: 50,
+            fraudRiskScore: 25,
+            creditScore: 680,
+            activitySummary: { totalTasks: 0, completedTasks: 0, totalTransactions: 0, totalVolumeUsd: 0, activeChains: [], firstSeen: new Date().toISOString(), lastActive: new Date().toISOString() },
+            connectionGraphHash: "0x" + Math.random().toString(16).substring(2, 14),
+            attestationRefs: [],
+        };
+        setAsnProfiles((prev) => [newProfile, ...prev]);
+        setRegName(""); setRegWallet(""); setShowRegister(false);
+        setRegistering(false);
+    };
+
+    const filteredProfiles = asnProfiles.filter((p) => {
+        const matchSearch = !asnSearch || p.asn.toLowerCase().includes(asnSearch.toLowerCase()) || p.agentName.toLowerCase().includes(asnSearch.toLowerCase());
+        const matchBand = asnBandFilter === "all" || getScoreBand(p.creditScore).band === asnBandFilter;
+        return matchSearch && matchBand;
+    });
+
+    const asnStats = {
+        total: asnProfiles.length,
+        active: asnProfiles.filter((p) => p.status === "active").length,
+        suspended: asnProfiles.filter((p) => p.status === "suspended").length,
+        avgCredit: Math.round(asnProfiles.reduce((s, p) => s + p.creditScore, 0) / (asnProfiles.length || 1)),
+    };
+
     // ─── Stats for overview ───
     const stats = [
+        { label: "ASN Identities", value: asnProfiles.length, icon: Fingerprint, color: "text-purple-400", bg: "bg-purple-500/10 border-purple-500/20" },
         { label: "Dev Tools", value: CHAINLINK_TOOLS.length, icon: Wrench, color: "text-blue-400", bg: "bg-blue-500/10 border-blue-500/20" },
         { label: "Workflows", value: workflows.length + CHAINLINK_WORKFLOWS.length, icon: GitBranch, color: "text-amber-400", bg: "bg-amber-500/10 border-amber-500/20" },
-        { label: "Agent Skills", value: CHAINLINK_AGENT_SKILLS.length, icon: Cpu, color: "text-purple-400", bg: "bg-purple-500/10 border-purple-500/20" },
         { label: "Live Feeds", value: livePrices.length, icon: Activity, color: "text-emerald-400", bg: "bg-emerald-500/10 border-emerald-500/20" },
     ];
 
@@ -237,13 +310,16 @@ export default function ChainlinkPage() {
                         <p className="text-sm text-muted-foreground">CRE Developer Toolkit</p>
                     </div>
                 </div>
-                <Badge variant="outline" className="text-xs">v1.0.0</Badge>
+                <Badge variant="outline" className="text-xs">v2.0.0</Badge>
             </div>
 
             {/* Tabs */}
             <Tabs value={activeTab} onValueChange={setActiveTab}>
                 <TabsList className="w-full justify-start overflow-x-auto">
                     <TabsTrigger value="overview">Overview</TabsTrigger>
+                    <TabsTrigger value="asn-registry">ASN Registry</TabsTrigger>
+                    <TabsTrigger value="credit-bureau">Credit Bureau</TabsTrigger>
+                    <TabsTrigger value="policy-engine">Policy Engine</TabsTrigger>
                     <TabsTrigger value="tools">Tools</TabsTrigger>
                     <TabsTrigger value="workflows">Workflows</TabsTrigger>
                     <TabsTrigger value="examples">Examples</TabsTrigger>
@@ -278,10 +354,11 @@ export default function ChainlinkPage() {
                         {/* Quick Actions */}
                         <div>
                             <h3 className="text-sm font-semibold mb-3">Quick Actions</h3>
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
                                 {[
+                                    { label: "ASN Registry", desc: "Agent identity management", icon: Fingerprint, tab: "asn-registry", color: "text-purple-400", bg: "bg-purple-500/10 border-purple-500/20" },
+                                    { label: "Credit Bureau", desc: "Scores, bands & risk", icon: Scale, tab: "credit-bureau", color: "text-amber-400", bg: "bg-amber-500/10 border-amber-500/20" },
                                     { label: "Explore Tools", desc: "Browse CRE tools and APIs", icon: Wrench, tab: "tools", color: "text-blue-400", bg: "bg-blue-500/10 border-blue-500/20" },
-                                    { label: "Browse Workflows", desc: "Templates + your workflows", icon: GitBranch, tab: "workflows", color: "text-amber-400", bg: "bg-amber-500/10 border-amber-500/20" },
                                     { label: "Open Playground", desc: "Live oracle queries", icon: FlaskConical, tab: "playground", color: "text-emerald-400", bg: "bg-emerald-500/10 border-emerald-500/20" },
                                 ].map((a) => (
                                     <button
@@ -297,6 +374,40 @@ export default function ChainlinkPage() {
                                         <div className="text-xs text-muted-foreground mt-0.5">{a.desc}</div>
                                     </button>
                                 ))}
+                            </div>
+                        </div>
+
+                        {/* ASN Summary */}
+                        <div>
+                            <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                                <Fingerprint className="h-4 w-4 text-purple-400" />
+                                Agent Social Numbers
+                            </h3>
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                                {[
+                                    { label: "Registered", value: asnStats.total, color: "text-purple-400" },
+                                    { label: "Active", value: asnStats.active, color: "text-emerald-400" },
+                                    { label: "Suspended", value: asnStats.suspended, color: "text-red-400" },
+                                    { label: "Avg Credit", value: asnStats.avgCredit, color: getScoreBand(asnStats.avgCredit).color },
+                                ].map((s) => (
+                                    <Card key={s.label} className="border-border">
+                                        <CardContent className="p-3">
+                                            <p className="text-[10px] text-muted-foreground uppercase tracking-wider">{s.label}</p>
+                                            <p className={`text-xl font-bold ${s.color}`}>{s.value}</p>
+                                        </CardContent>
+                                    </Card>
+                                ))}
+                            </div>
+                            <div className="flex gap-1.5 mt-3">
+                                {ASN_SCORE_BANDS.map((band) => {
+                                    const count = asnProfiles.filter((p) => getScoreBand(p.creditScore).band === band.band).length;
+                                    return (
+                                        <div key={band.band} className={`flex-1 rounded-lg border p-2 text-center ${band.bgColor} ${band.borderColor}`}>
+                                            <p className={`text-lg font-bold ${band.color}`}>{count}</p>
+                                            <p className="text-[10px] text-muted-foreground">{band.label}</p>
+                                        </div>
+                                    );
+                                })}
                             </div>
                         </div>
 
@@ -341,6 +452,471 @@ export default function ChainlinkPage() {
                                                 <code className="text-xs font-mono text-purple-400">{skill.id}</code>
                                             </div>
                                             <p className="text-xs text-muted-foreground">{skill.description}</p>
+                                        </CardContent>
+                                    </Card>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                </TabsContent>
+
+                {/* ═══════════════════════════════════════════════════ */}
+                {/* ASN REGISTRY TAB                                    */}
+                {/* ═══════════════════════════════════════════════════ */}
+                <TabsContent value="asn-registry">
+                    <div className="space-y-6">
+                        {/* Header */}
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <div className="p-2.5 rounded-xl bg-purple-500/10 border border-purple-500/20">
+                                    <Fingerprint className="h-6 w-6 text-purple-400" />
+                                </div>
+                                <div>
+                                    <h2 className="text-lg font-bold">Agent Social Numbers</h2>
+                                    <p className="text-xs text-muted-foreground">Persistent identity for AI agents — TransUnion for autonomous software</p>
+                                </div>
+                            </div>
+                            <Button className="bg-purple-600 hover:bg-purple-700 text-white gap-1.5" onClick={() => setShowRegister(true)}>
+                                <Plus className="h-3.5 w-3.5" /> Register Agent
+                            </Button>
+                        </div>
+
+                        {/* Stats */}
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                            {[
+                                { label: "Total Registered", value: asnStats.total, color: "text-purple-400", bg: "bg-purple-500/10 border-purple-500/20" },
+                                { label: "Active", value: asnStats.active, color: "text-emerald-400", bg: "bg-emerald-500/10 border-emerald-500/20" },
+                                { label: "Suspended", value: asnStats.suspended, color: "text-red-400", bg: "bg-red-500/10 border-red-500/20" },
+                                { label: "Avg Credit Score", value: asnStats.avgCredit, color: getScoreBand(asnStats.avgCredit).color, bg: `${getScoreBand(asnStats.avgCredit).bgColor} ${getScoreBand(asnStats.avgCredit).borderColor}` },
+                            ].map((s) => (
+                                <Card key={s.label} className={`border ${s.bg}`}>
+                                    <CardContent className="p-4">
+                                        <p className="text-[10px] text-muted-foreground uppercase tracking-wider">{s.label}</p>
+                                        <p className={`text-2xl font-bold ${s.color}`}>{s.value}</p>
+                                    </CardContent>
+                                </Card>
+                            ))}
+                        </div>
+
+                        {/* Search + Filter */}
+                        <div className="flex gap-3">
+                            <div className="relative flex-1">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                <Input placeholder="Search by ASN or agent name..." value={asnSearch} onChange={(e) => setAsnSearch(e.target.value)} className="pl-9" />
+                            </div>
+                            <Select value={asnBandFilter} onValueChange={(v) => setAsnBandFilter(v as ScoreBand | "all")}>
+                                <SelectTrigger className="w-40"><SelectValue placeholder="All Bands" /></SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">All Bands</SelectItem>
+                                    {ASN_SCORE_BANDS.map((b) => (
+                                        <SelectItem key={b.band} value={b.band}>{b.label} ({b.range})</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+
+                        {/* Agent Cards */}
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                            {filteredProfiles.map((profile) => {
+                                const band = getScoreBand(profile.creditScore);
+                                return (
+                                    <SpotlightCard key={profile.asn} className="p-0 cursor-pointer" spotlightColor="rgba(168, 85, 247, 0.06)" onClick={() => setSelectedAsn(profile)}>
+                                        <CardContent className="p-4">
+                                            <div className="flex items-start justify-between mb-3">
+                                                <div>
+                                                    <code className="text-xs font-mono text-purple-400 bg-purple-500/10 px-2 py-0.5 rounded">{profile.asn}</code>
+                                                    <div className="flex items-center gap-2 mt-1.5">
+                                                        <span className="font-semibold text-sm">{profile.agentName}</span>
+                                                        <Badge variant="outline" className="text-[10px]">{profile.agentType}</Badge>
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-center gap-1.5">
+                                                    <Badge variant="outline" className={`text-[10px] ${
+                                                        profile.verificationLevel === "certified" ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
+                                                        : profile.verificationLevel === "verified" ? "bg-blue-500/10 text-blue-400 border-blue-500/20"
+                                                        : profile.verificationLevel === "basic" ? "bg-amber-500/10 text-amber-400 border-amber-500/20"
+                                                        : "bg-muted text-muted-foreground"
+                                                    }`}>
+                                                        {profile.verificationLevel}
+                                                    </Badge>
+                                                    <div className={`w-2 h-2 rounded-full ${profile.status === "active" ? "bg-emerald-400" : profile.status === "suspended" ? "bg-red-400" : "bg-muted-foreground"}`} />
+                                                </div>
+                                            </div>
+
+                                            {/* Three-Layer Scores */}
+                                            <div className="grid grid-cols-3 gap-2 mb-3">
+                                                <div className="rounded-lg bg-muted/50 p-2 text-center">
+                                                    <p className="text-[10px] text-muted-foreground">Trust</p>
+                                                    <p className="text-sm font-bold text-emerald-400">{profile.trustScore}</p>
+                                                </div>
+                                                <div className="rounded-lg bg-muted/50 p-2 text-center">
+                                                    <p className="text-[10px] text-muted-foreground">Fraud Risk</p>
+                                                    <p className={`text-sm font-bold ${profile.fraudRiskScore > 50 ? "text-red-400" : profile.fraudRiskScore > 25 ? "text-amber-400" : "text-emerald-400"}`}>{profile.fraudRiskScore}</p>
+                                                </div>
+                                                <div className="rounded-lg bg-muted/50 p-2 text-center">
+                                                    <p className="text-[10px] text-muted-foreground">Credit</p>
+                                                    <p className={`text-sm font-bold ${band.color}`}>{profile.creditScore}</p>
+                                                </div>
+                                            </div>
+
+                                            {/* Band + Activity */}
+                                            <div className="flex items-center justify-between text-xs">
+                                                <Badge className={`text-[10px] ${band.bgColor} ${band.color} ${band.borderColor}`}>{band.label} ({band.range})</Badge>
+                                                <span className="text-muted-foreground">{profile.activitySummary.completedTasks}/{profile.activitySummary.totalTasks} tasks</span>
+                                            </div>
+
+                                            {/* Risk Flags */}
+                                            {profile.riskFlags.length > 0 && (
+                                                <div className="flex gap-1 mt-2 flex-wrap">
+                                                    {profile.riskFlags.map((flag) => (
+                                                        <Badge key={flag} variant="outline" className="text-[9px] text-red-400 border-red-500/20 bg-red-500/5">
+                                                            <AlertTriangle className="h-2.5 w-2.5 mr-0.5" />{flag.replace(/_/g, " ")}
+                                                        </Badge>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </CardContent>
+                                    </SpotlightCard>
+                                );
+                            })}
+                        </div>
+
+                        {filteredProfiles.length === 0 && (
+                            <Card className="border-border">
+                                <div className="py-10 text-center">
+                                    <Fingerprint className="h-8 w-8 text-muted-foreground/30 mx-auto mb-2" />
+                                    <p className="text-sm text-muted-foreground">No agents match your search</p>
+                                </div>
+                            </Card>
+                        )}
+                    </div>
+                </TabsContent>
+
+                {/* ═══════════════════════════════════════════════════ */}
+                {/* CREDIT BUREAU TAB                                  */}
+                {/* ═══════════════════════════════════════════════════ */}
+                <TabsContent value="credit-bureau">
+                    <div className="space-y-6">
+                        {/* Header */}
+                        <div className="flex items-center gap-3">
+                            <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20">
+                                <Scale className="h-6 w-6 text-amber-400" />
+                            </div>
+                            <div>
+                                <h2 className="text-lg font-bold">Credit Bureau</h2>
+                                <p className="text-xs text-muted-foreground">Three-layer scoring system for agent trustworthiness and risk</p>
+                            </div>
+                        </div>
+
+                        {/* Score Bands Reference */}
+                        <div>
+                            <h3 className="text-sm font-semibold mb-3">Credit Score Bands</h3>
+                            <div className="space-y-2">
+                                {ASN_SCORE_BANDS.map((band) => {
+                                    const count = asnProfiles.filter((p) => getScoreBand(p.creditScore).band === band.band).length;
+                                    const policy = getDefaultPolicy(band.min);
+                                    return (
+                                        <Card key={band.band} className={`border ${band.borderColor}`}>
+                                            <CardContent className="p-4">
+                                                <div className="flex items-center justify-between">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className={`w-3 h-8 rounded-full ${band.bgColor}`} style={{ background: `var(--${band.color.replace("text-", "")})` }} />
+                                                        <div>
+                                                            <div className="flex items-center gap-2">
+                                                                <span className={`font-semibold ${band.color}`}>{band.label}</span>
+                                                                <Badge variant="outline" className="text-[10px]">{band.range}</Badge>
+                                                            </div>
+                                                            <p className="text-xs text-muted-foreground mt-0.5">
+                                                                ${policy.spendingCapUsd.toLocaleString()} cap | {Math.round(policy.escrowRatio * 100)}% escrow | {policy.maxConcurrentTasks} tasks
+                                                                {policy.requiresManualReview && " | manual review"}
+                                                                {policy.sensitiveWorkflowAccess && " | sensitive access"}
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                    <div className="text-right">
+                                                        <p className={`text-lg font-bold ${band.color}`}>{count}</p>
+                                                        <p className="text-[10px] text-muted-foreground">agents</p>
+                                                    </div>
+                                                </div>
+                                            </CardContent>
+                                        </Card>
+                                    );
+                                })}
+                            </div>
+                        </div>
+
+                        {/* Three-Layer Scoring */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            {[
+                                {
+                                    title: "Trust Score",
+                                    range: "0–100",
+                                    icon: ShieldCheck,
+                                    color: "text-emerald-400",
+                                    bg: "bg-emerald-500/10 border-emerald-500/20",
+                                    desc: "Measures operational reliability and consistency.",
+                                    inputs: ["Task completion rate", "On-time settlement", "Uptime & availability", "Protocol diversity", "Endorsements from peers"],
+                                },
+                                {
+                                    title: "Fraud Risk Score",
+                                    range: "0–100 (lower = safer)",
+                                    icon: AlertTriangle,
+                                    color: "text-red-400",
+                                    bg: "bg-red-500/10 border-red-500/20",
+                                    desc: "Measures likelihood of malicious behavior.",
+                                    inputs: ["Bridge-hopping frequency", "Circular fund flows", "Wash trading patterns", "Wallet clustering / sybil", "Sanctions proximity"],
+                                },
+                                {
+                                    title: "Credit Score",
+                                    range: "300–900",
+                                    icon: Scale,
+                                    color: "text-amber-400",
+                                    bg: "bg-amber-500/10 border-amber-500/20",
+                                    desc: "Composite score determining financial permissions.",
+                                    inputs: ["Trust score (positive)", "Fraud risk (negative)", "Settlement history", "Identity age & volume", "Policy violation history"],
+                                },
+                            ].map((layer) => (
+                                <SpotlightCard key={layer.title} className="p-0" spotlightColor="rgba(59, 130, 246, 0.06)">
+                                    <CardHeader className="pb-2">
+                                        <div className="flex items-center gap-2">
+                                            <div className={`p-1.5 rounded-lg border ${layer.bg}`}>
+                                                <layer.icon className={`h-4 w-4 ${layer.color}`} />
+                                            </div>
+                                            <div>
+                                                <CardTitle className="text-sm">{layer.title}</CardTitle>
+                                                <p className="text-[10px] text-muted-foreground">{layer.range}</p>
+                                            </div>
+                                        </div>
+                                    </CardHeader>
+                                    <CardContent>
+                                        <p className="text-xs text-muted-foreground mb-3">{layer.desc}</p>
+                                        <ul className="space-y-1">
+                                            {layer.inputs.map((input) => (
+                                                <li key={input} className="text-xs text-muted-foreground flex items-center gap-1.5">
+                                                    <span className={`w-1 h-1 rounded-full ${layer.color.replace("text-", "bg-")}`} />
+                                                    {input}
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    </CardContent>
+                                </SpotlightCard>
+                            ))}
+                        </div>
+
+                        {/* Agent Credit Lookup */}
+                        <div>
+                            <h3 className="text-sm font-semibold mb-3">Agent Credit Lookup</h3>
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                                {asnProfiles.filter((p) => p.status === "active").map((profile) => {
+                                    const band = getScoreBand(profile.creditScore);
+                                    return (
+                                        <Card key={profile.asn} className="border-border">
+                                            <CardContent className="p-4">
+                                                <div className="flex items-center justify-between mb-3">
+                                                    <div>
+                                                        <span className="font-semibold text-sm">{profile.agentName}</span>
+                                                        <code className="text-[10px] font-mono text-muted-foreground ml-2">{profile.asn}</code>
+                                                    </div>
+                                                    <Badge className={`text-[10px] ${band.bgColor} ${band.color} ${band.borderColor}`}>{band.label}</Badge>
+                                                </div>
+                                                {/* Score bars */}
+                                                <div className="space-y-2">
+                                                    <div>
+                                                        <div className="flex justify-between text-[10px] mb-0.5">
+                                                            <span className="text-muted-foreground">Trust</span>
+                                                            <span className="text-emerald-400 font-medium">{profile.trustScore}/100</span>
+                                                        </div>
+                                                        <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                                                            <div className="h-full rounded-full bg-emerald-500 transition-all" style={{ width: `${profile.trustScore}%` }} />
+                                                        </div>
+                                                    </div>
+                                                    <div>
+                                                        <div className="flex justify-between text-[10px] mb-0.5">
+                                                            <span className="text-muted-foreground">Fraud Risk</span>
+                                                            <span className={`font-medium ${profile.fraudRiskScore > 50 ? "text-red-400" : "text-emerald-400"}`}>{profile.fraudRiskScore}/100</span>
+                                                        </div>
+                                                        <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                                                            <div className={`h-full rounded-full transition-all ${profile.fraudRiskScore > 50 ? "bg-red-500" : profile.fraudRiskScore > 25 ? "bg-amber-500" : "bg-emerald-500"}`} style={{ width: `${profile.fraudRiskScore}%` }} />
+                                                        </div>
+                                                    </div>
+                                                    <div>
+                                                        <div className="flex justify-between text-[10px] mb-0.5">
+                                                            <span className="text-muted-foreground">Credit</span>
+                                                            <span className={`font-medium ${band.color}`}>{profile.creditScore}/900</span>
+                                                        </div>
+                                                        <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                                                            <div className={`h-full rounded-full transition-all`} style={{ width: `${((profile.creditScore - 300) / 600) * 100}%`, background: band.color.includes("emerald") ? "#34d399" : band.color.includes("blue") ? "#60a5fa" : band.color.includes("amber") ? "#fbbf24" : band.color.includes("orange") ? "#fb923c" : "#f87171" }} />
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </CardContent>
+                                        </Card>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    </div>
+                </TabsContent>
+
+                {/* ═══════════════════════════════════════════════════ */}
+                {/* POLICY ENGINE TAB                                  */}
+                {/* ═══════════════════════════════════════════════════ */}
+                <TabsContent value="policy-engine">
+                    <div className="space-y-6">
+                        {/* Header */}
+                        <div className="flex items-center gap-3">
+                            <div className="p-2.5 rounded-xl bg-blue-500/10 border border-blue-500/20">
+                                <Shield className="h-6 w-6 text-blue-400" />
+                            </div>
+                            <div>
+                                <h2 className="text-lg font-bold">Policy Engine</h2>
+                                <p className="text-xs text-muted-foreground">Automated risk policies mapped to credit score bands</p>
+                            </div>
+                        </div>
+
+                        {/* Policy Rules Table */}
+                        <SpotlightCard className="p-0 overflow-hidden" spotlightColor="rgba(59, 130, 246, 0.06)">
+                            <CardHeader className="pb-0">
+                                <CardTitle className="text-sm">Policy Rules by Score Band</CardTitle>
+                            </CardHeader>
+                            <CardContent className="p-0 mt-4">
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-sm">
+                                        <thead>
+                                            <tr className="border-b border-border text-left">
+                                                <th className="px-4 py-2 text-xs text-muted-foreground font-medium">Band</th>
+                                                <th className="px-4 py-2 text-xs text-muted-foreground font-medium">Spending Cap</th>
+                                                <th className="px-4 py-2 text-xs text-muted-foreground font-medium">Escrow</th>
+                                                <th className="px-4 py-2 text-xs text-muted-foreground font-medium">Max Tasks</th>
+                                                <th className="px-4 py-2 text-xs text-muted-foreground font-medium">Review</th>
+                                                <th className="px-4 py-2 text-xs text-muted-foreground font-medium">Sensitive Access</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {ASN_SCORE_BANDS.map((band) => {
+                                                const policy = getDefaultPolicy(band.min);
+                                                return (
+                                                    <tr key={band.band} className="border-b border-border/50 hover:bg-muted/30 transition-colors">
+                                                        <td className="px-4 py-3">
+                                                            <div className="flex items-center gap-2">
+                                                                <Badge className={`text-[10px] ${band.bgColor} ${band.color} ${band.borderColor}`}>{band.label}</Badge>
+                                                                <span className="text-[10px] text-muted-foreground">{band.range}</span>
+                                                            </div>
+                                                        </td>
+                                                        <td className="px-4 py-3 font-mono text-xs">${policy.spendingCapUsd.toLocaleString()}</td>
+                                                        <td className="px-4 py-3 font-mono text-xs">{Math.round(policy.escrowRatio * 100)}%</td>
+                                                        <td className="px-4 py-3 font-mono text-xs">{policy.maxConcurrentTasks}</td>
+                                                        <td className="px-4 py-3">
+                                                            {policy.requiresManualReview
+                                                                ? <Badge variant="outline" className="text-[10px] text-amber-400 border-amber-500/20 bg-amber-500/5">Required</Badge>
+                                                                : <Badge variant="outline" className="text-[10px] text-emerald-400 border-emerald-500/20 bg-emerald-500/5">Auto</Badge>
+                                                            }
+                                                        </td>
+                                                        <td className="px-4 py-3">
+                                                            {policy.sensitiveWorkflowAccess
+                                                                ? <CheckCircle className="h-4 w-4 text-emerald-400" />
+                                                                : <Ban className="h-4 w-4 text-red-400/50" />
+                                                            }
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </CardContent>
+                        </SpotlightCard>
+
+                        {/* Agent Policy Viewer */}
+                        <div>
+                            <h3 className="text-sm font-semibold mb-3">Agent Policy Viewer</h3>
+                            <div className="flex gap-2 flex-wrap mb-4">
+                                {asnProfiles.map((p) => (
+                                    <button
+                                        key={p.asn}
+                                        onClick={() => setPolicyAgent(p)}
+                                        className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                                            policyAgent?.asn === p.asn
+                                                ? "bg-blue-500/20 text-blue-400 border border-blue-500/30"
+                                                : "bg-muted/50 text-muted-foreground hover:bg-muted border border-transparent"
+                                        }`}
+                                    >
+                                        {p.agentName}
+                                    </button>
+                                ))}
+                            </div>
+                            {policyAgent && (() => {
+                                const band = getScoreBand(policyAgent.creditScore);
+                                const policy = getDefaultPolicy(policyAgent.creditScore);
+                                return (
+                                    <Card className={`border ${band.borderColor}`}>
+                                        <CardContent className="p-4">
+                                            <div className="flex items-center justify-between mb-4">
+                                                <div>
+                                                    <span className="font-semibold">{policyAgent.agentName}</span>
+                                                    <code className="text-[10px] font-mono text-muted-foreground ml-2">{policyAgent.asn}</code>
+                                                </div>
+                                                <Badge className={`${band.bgColor} ${band.color} ${band.borderColor}`}>{band.label} — {policyAgent.creditScore}</Badge>
+                                            </div>
+                                            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                                                <div className="rounded-lg bg-muted/50 p-3">
+                                                    <p className="text-[10px] text-muted-foreground">Spending Cap</p>
+                                                    <p className="text-sm font-bold">${policy.spendingCapUsd.toLocaleString()}</p>
+                                                </div>
+                                                <div className="rounded-lg bg-muted/50 p-3">
+                                                    <p className="text-[10px] text-muted-foreground">Escrow Ratio</p>
+                                                    <p className="text-sm font-bold">{Math.round(policy.escrowRatio * 100)}%</p>
+                                                </div>
+                                                <div className="rounded-lg bg-muted/50 p-3">
+                                                    <p className="text-[10px] text-muted-foreground">Max Tasks</p>
+                                                    <p className="text-sm font-bold">{policy.maxConcurrentTasks}</p>
+                                                </div>
+                                                <div className="rounded-lg bg-muted/50 p-3">
+                                                    <p className="text-[10px] text-muted-foreground">Manual Review</p>
+                                                    <p className={`text-sm font-bold ${policy.requiresManualReview ? "text-amber-400" : "text-emerald-400"}`}>{policy.requiresManualReview ? "Required" : "Auto"}</p>
+                                                </div>
+                                                <div className="rounded-lg bg-muted/50 p-3">
+                                                    <p className="text-[10px] text-muted-foreground">Sensitive Access</p>
+                                                    <p className={`text-sm font-bold ${policy.sensitiveWorkflowAccess ? "text-emerald-400" : "text-red-400"}`}>{policy.sensitiveWorkflowAccess ? "Granted" : "Denied"}</p>
+                                                </div>
+                                            </div>
+                                        </CardContent>
+                                    </Card>
+                                );
+                            })()}
+                        </div>
+
+                        {/* Fraud Alerts */}
+                        <div>
+                            <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                                <AlertTriangle className="h-4 w-4 text-amber-400" />
+                                Active Alerts
+                            </h3>
+                            <div className="space-y-2">
+                                {MOCK_FRAUD_ALERTS.map((alert) => (
+                                    <Card key={alert.id} className={`border ${
+                                        alert.severity === "critical" ? "border-red-500/20" : alert.severity === "warning" ? "border-amber-500/20" : "border-border"
+                                    }`}>
+                                        <CardContent className="p-3 flex items-start gap-3">
+                                            <AlertTriangle className={`h-4 w-4 shrink-0 mt-0.5 ${
+                                                alert.severity === "critical" ? "text-red-400" : alert.severity === "warning" ? "text-amber-400" : "text-blue-400"
+                                            }`} />
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex items-center gap-2 mb-0.5">
+                                                    <span className="text-sm font-medium">{alert.type}</span>
+                                                    <Badge variant="outline" className={`text-[9px] ${
+                                                        alert.severity === "critical" ? "text-red-400 border-red-500/20 bg-red-500/5"
+                                                        : alert.severity === "warning" ? "text-amber-400 border-amber-500/20 bg-amber-500/5"
+                                                        : "text-blue-400 border-blue-500/20 bg-blue-500/5"
+                                                    }`}>{alert.severity}</Badge>
+                                                </div>
+                                                <p className="text-xs text-muted-foreground">{alert.message}</p>
+                                                <div className="flex items-center gap-2 mt-1">
+                                                    <code className="text-[10px] font-mono text-purple-400">{alert.asn}</code>
+                                                    <span className="text-[10px] text-muted-foreground">{alert.agentName}</span>
+                                                    <span className="text-[10px] text-muted-foreground ml-auto">{new Date(alert.timestamp).toLocaleDateString()}</span>
+                                                </div>
+                                            </div>
                                         </CardContent>
                                     </Card>
                                 ))}
@@ -813,6 +1389,259 @@ export default function ChainlinkPage() {
                             {creating ? "Creating..." : "Create"}
                         </Button>
                     </div>
+                </DialogContent>
+            </Dialog>
+
+            {/* Register ASN Dialog */}
+            <Dialog open={showRegister} onOpenChange={setShowRegister}>
+                <DialogContent className="max-w-lg">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                            <Fingerprint className="h-5 w-5 text-purple-400" />
+                            Register Agent Identity
+                        </DialogTitle>
+                    </DialogHeader>
+                    <p className="text-xs text-muted-foreground -mt-2">Generate a unique ASN and create an identity profile with baseline scores.</p>
+                    <div className="space-y-4">
+                        <div>
+                            <label className="text-sm font-medium mb-1 block">Agent Name</label>
+                            <Input placeholder="e.g. Oracle Prime" value={regName} onChange={(e) => setRegName(e.target.value)} />
+                        </div>
+                        <div>
+                            <label className="text-sm font-medium mb-1 block">Agent Type</label>
+                            <Select value={regType} onValueChange={setRegType}>
+                                <SelectTrigger><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                    {["Research", "Trading", "Operations", "Analytics", "Finance", "Security", "Engineering", "DevOps", "Support"].map((t) => (
+                                        <SelectItem key={t} value={t}>{t}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div>
+                            <label className="text-sm font-medium mb-1 block">Creator Wallet</label>
+                            <Input placeholder="0x..." value={regWallet} onChange={(e) => setRegWallet(e.target.value)} />
+                        </div>
+                        <div>
+                            <label className="text-sm font-medium mb-1 block">Model Provider</label>
+                            <Select value={regProvider} onValueChange={setRegProvider}>
+                                <SelectTrigger><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="anthropic">Anthropic</SelectItem>
+                                    <SelectItem value="openai">OpenAI</SelectItem>
+                                    <SelectItem value="google">Google</SelectItem>
+                                    <SelectItem value="local">Local / Self-hosted</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <Card className="border-border bg-muted/30">
+                            <CardContent className="p-3">
+                                <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Initial Scores</p>
+                                <div className="grid grid-cols-3 gap-2 text-center">
+                                    <div>
+                                        <p className="text-xs text-muted-foreground">Trust</p>
+                                        <p className="text-sm font-bold text-amber-400">50</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-xs text-muted-foreground">Fraud Risk</p>
+                                        <p className="text-sm font-bold text-amber-400">25</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-xs text-muted-foreground">Credit</p>
+                                        <p className="text-sm font-bold text-amber-400">680</p>
+                                    </div>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </div>
+                    <div className="flex gap-2 justify-end pt-2">
+                        <Button variant="outline" onClick={() => setShowRegister(false)}>Cancel</Button>
+                        <Button onClick={handleRegisterASN} disabled={registering || !regName.trim() || !regWallet.trim()} className="bg-purple-600 hover:bg-purple-700 text-white gap-1.5">
+                            {registering ? (
+                                <>
+                                    <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                                    Generating ASN...
+                                </>
+                            ) : (
+                                <>
+                                    <Fingerprint className="h-3.5 w-3.5" />
+                                    Register
+                                </>
+                            )}
+                        </Button>
+                    </div>
+                </DialogContent>
+            </Dialog>
+
+            {/* ASN Profile Detail Dialog */}
+            <Dialog open={!!selectedAsn} onOpenChange={(open) => !open && setSelectedAsn(null)}>
+                <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+                    {selectedAsn && (() => {
+                        const band = getScoreBand(selectedAsn.creditScore);
+                        const policy = getDefaultPolicy(selectedAsn.creditScore);
+                        return (
+                            <>
+                                <DialogHeader>
+                                    <DialogTitle className="flex items-center gap-2">
+                                        <Fingerprint className="h-5 w-5 text-purple-400" />
+                                        {selectedAsn.agentName}
+                                    </DialogTitle>
+                                </DialogHeader>
+                                <div className="space-y-4">
+                                    {/* ASN + Status */}
+                                    <div className="flex items-center justify-between">
+                                        <code className="text-sm font-mono text-purple-400 bg-purple-500/10 px-3 py-1 rounded-lg">{selectedAsn.asn}</code>
+                                        <div className="flex items-center gap-2">
+                                            <Badge variant="outline" className={`text-[10px] ${
+                                                selectedAsn.verificationLevel === "certified" ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
+                                                : selectedAsn.verificationLevel === "verified" ? "bg-blue-500/10 text-blue-400 border-blue-500/20"
+                                                : selectedAsn.verificationLevel === "basic" ? "bg-amber-500/10 text-amber-400 border-amber-500/20"
+                                                : "bg-muted text-muted-foreground"
+                                            }`}>{selectedAsn.verificationLevel}</Badge>
+                                            <Badge className={`text-[10px] ${selectedAsn.status === "active" ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" : "bg-red-500/10 text-red-400 border-red-500/20"}`}>
+                                                {selectedAsn.status}
+                                            </Badge>
+                                        </div>
+                                    </div>
+
+                                    {/* Three-Layer Scores */}
+                                    <div className="grid grid-cols-3 gap-3">
+                                        <div className="rounded-xl bg-emerald-500/5 border border-emerald-500/20 p-3 text-center">
+                                            <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Trust Score</p>
+                                            <p className="text-2xl font-bold text-emerald-400">{selectedAsn.trustScore}</p>
+                                            <p className="text-[10px] text-muted-foreground">/ 100</p>
+                                        </div>
+                                        <div className={`rounded-xl border p-3 text-center ${selectedAsn.fraudRiskScore > 50 ? "bg-red-500/5 border-red-500/20" : "bg-emerald-500/5 border-emerald-500/20"}`}>
+                                            <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Fraud Risk</p>
+                                            <p className={`text-2xl font-bold ${selectedAsn.fraudRiskScore > 50 ? "text-red-400" : selectedAsn.fraudRiskScore > 25 ? "text-amber-400" : "text-emerald-400"}`}>{selectedAsn.fraudRiskScore}</p>
+                                            <p className="text-[10px] text-muted-foreground">/ 100</p>
+                                        </div>
+                                        <div className={`rounded-xl border p-3 text-center ${band.bgColor} ${band.borderColor}`}>
+                                            <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Credit Score</p>
+                                            <p className={`text-2xl font-bold ${band.color}`}>{selectedAsn.creditScore}</p>
+                                            <p className={`text-[10px] ${band.color}`}>{band.label}</p>
+                                        </div>
+                                    </div>
+
+                                    {/* Identity Details */}
+                                    <div className="grid grid-cols-2 gap-3 text-sm">
+                                        <div>
+                                            <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Agent Type</p>
+                                            <p className="font-medium">{selectedAsn.agentType}</p>
+                                        </div>
+                                        <div>
+                                            <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Model Provider</p>
+                                            <p className="font-medium">{selectedAsn.modelProvider}</p>
+                                        </div>
+                                        <div>
+                                            <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Environment</p>
+                                            <p className="font-medium">{selectedAsn.deploymentEnvironment}</p>
+                                        </div>
+                                        <div>
+                                            <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Jurisdiction</p>
+                                            <p className="font-medium">{selectedAsn.jurisdictionTag}</p>
+                                        </div>
+                                        <div>
+                                            <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Creator Wallet</p>
+                                            <code className="text-xs font-mono text-muted-foreground">{selectedAsn.creatorWallet}</code>
+                                        </div>
+                                        <div>
+                                            <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Linked Wallets</p>
+                                            <p className="font-medium">{selectedAsn.linkedWallets.length}</p>
+                                        </div>
+                                    </div>
+
+                                    {/* Activity Summary */}
+                                    <div>
+                                        <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-2">Activity Summary</p>
+                                        <div className="grid grid-cols-4 gap-2">
+                                            <div className="rounded-lg bg-muted/50 p-2 text-center">
+                                                <p className="text-sm font-bold">{selectedAsn.activitySummary.completedTasks}/{selectedAsn.activitySummary.totalTasks}</p>
+                                                <p className="text-[10px] text-muted-foreground">Tasks</p>
+                                            </div>
+                                            <div className="rounded-lg bg-muted/50 p-2 text-center">
+                                                <p className="text-sm font-bold">{selectedAsn.activitySummary.totalTransactions.toLocaleString()}</p>
+                                                <p className="text-[10px] text-muted-foreground">Txns</p>
+                                            </div>
+                                            <div className="rounded-lg bg-muted/50 p-2 text-center">
+                                                <p className="text-sm font-bold">${(selectedAsn.activitySummary.totalVolumeUsd / 1000).toFixed(0)}k</p>
+                                                <p className="text-[10px] text-muted-foreground">Volume</p>
+                                            </div>
+                                            <div className="rounded-lg bg-muted/50 p-2 text-center">
+                                                <p className="text-sm font-bold">{selectedAsn.activitySummary.activeChains.length}</p>
+                                                <p className="text-[10px] text-muted-foreground">Chains</p>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Policy State */}
+                                    <div>
+                                        <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-2">Derived Policy</p>
+                                        <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+                                            <div className="rounded-lg bg-muted/50 p-2">
+                                                <p className="text-[10px] text-muted-foreground">Spending Cap</p>
+                                                <p className="text-xs font-bold">${policy.spendingCapUsd.toLocaleString()}</p>
+                                            </div>
+                                            <div className="rounded-lg bg-muted/50 p-2">
+                                                <p className="text-[10px] text-muted-foreground">Escrow</p>
+                                                <p className="text-xs font-bold">{Math.round(policy.escrowRatio * 100)}%</p>
+                                            </div>
+                                            <div className="rounded-lg bg-muted/50 p-2">
+                                                <p className="text-[10px] text-muted-foreground">Max Tasks</p>
+                                                <p className="text-xs font-bold">{policy.maxConcurrentTasks}</p>
+                                            </div>
+                                            <div className="rounded-lg bg-muted/50 p-2">
+                                                <p className="text-[10px] text-muted-foreground">Review</p>
+                                                <p className={`text-xs font-bold ${policy.requiresManualReview ? "text-amber-400" : "text-emerald-400"}`}>{policy.requiresManualReview ? "Manual" : "Auto"}</p>
+                                            </div>
+                                            <div className="rounded-lg bg-muted/50 p-2">
+                                                <p className="text-[10px] text-muted-foreground">Sensitive</p>
+                                                <p className={`text-xs font-bold ${policy.sensitiveWorkflowAccess ? "text-emerald-400" : "text-red-400"}`}>{policy.sensitiveWorkflowAccess ? "Yes" : "No"}</p>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Skills */}
+                                    {selectedAsn.skillModules.length > 0 && (
+                                        <div>
+                                            <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-2">Skill Modules</p>
+                                            <div className="flex gap-1.5 flex-wrap">
+                                                {selectedAsn.skillModules.map((skill) => (
+                                                    <Badge key={skill} variant="outline" className="text-[10px] font-mono">{skill}</Badge>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Risk Flags */}
+                                    {selectedAsn.riskFlags.length > 0 && (
+                                        <div>
+                                            <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-2">Risk Flags</p>
+                                            <div className="flex gap-1.5 flex-wrap">
+                                                {selectedAsn.riskFlags.map((flag) => (
+                                                    <Badge key={flag} variant="outline" className="text-[10px] text-red-400 border-red-500/20 bg-red-500/5">
+                                                        <AlertTriangle className="h-2.5 w-2.5 mr-1" />{flag.replace(/_/g, " ")}
+                                                    </Badge>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Attestations */}
+                                    {selectedAsn.attestationRefs.length > 0 && (
+                                        <div>
+                                            <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-2">Attestation Refs</p>
+                                            <div className="flex gap-1.5 flex-wrap">
+                                                {selectedAsn.attestationRefs.map((ref) => (
+                                                    <Badge key={ref} variant="outline" className="text-[10px] font-mono">{ref}</Badge>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            </>
+                        );
+                    })()}
                 </DialogContent>
             </Dialog>
 

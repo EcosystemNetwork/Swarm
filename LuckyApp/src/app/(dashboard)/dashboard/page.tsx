@@ -111,11 +111,9 @@ const jobStatusLabels: Record<string, string> = {
 /*  Persistence                                                        */
 /* ------------------------------------------------------------------ */
 
-const STAT_ORDER_KEY = "swarm-dashboard-stat-order";
-const WIDGET_ORDER_KEY = "swarm-dashboard-widget-order-v3";
-const ACTIVE_STATS_KEY = "swarm-dashboard-active-stats";
-const ACTIVE_WIDGETS_KEY = "swarm-dashboard-active-widgets-v3";
-const WIDGET_WIDTHS_KEY = "swarm-dashboard-widget-widths-v3";
+const WIDGET_ORDER_KEY = "swarm-dashboard-widget-order-v4";
+const ACTIVE_WIDGETS_KEY = "swarm-dashboard-active-widgets-v4";
+const WIDGET_WIDTHS_KEY = "swarm-dashboard-widget-widths-v4";
 
 function loadJSON<T>(key: string): T | null {
   if (typeof window === "undefined") return null;
@@ -137,12 +135,6 @@ import { UsageWidget } from "@/components/usage-widget";
 import { LiveFeedWidget } from "@/components/live-feed-widget";
 import { CronWidget } from "@/components/cron-widget";
 
-interface StatCatalogEntry {
-  id: string;
-  icon: string;
-  label: string;
-}
-
 interface WidgetCatalogEntry {
   id: string;
   icon: string;
@@ -150,18 +142,6 @@ interface WidgetCatalogEntry {
   description: string;
   colSpan?: string;
 }
-
-const ALL_STAT_CATALOG: StatCatalogEntry[] = [
-  { id: "stat-projects", icon: "📁", label: "Projects" },
-  { id: "stat-agents", icon: "🤖", label: "Agents" },
-  { id: "stat-active-tasks", icon: "🎯", label: "Active Tasks" },
-  { id: "stat-completed-tasks", icon: "✅", label: "Completed Tasks" },
-  { id: "stat-open-jobs", icon: "💼", label: "Open Jobs" },
-  { id: "stat-todo-tasks", icon: "📝", label: "Todo Tasks" },
-  { id: "stat-total-tasks", icon: "📊", label: "Total Tasks" },
-  { id: "stat-claimed-jobs", icon: "🤝", label: "Claimed Jobs" },
-  { id: "stat-members", icon: "👥", label: "Members" },
-];
 
 const ALL_WIDGET_CATALOG: WidgetCatalogEntry[] = [
   { id: "widget-recent-tasks", icon: "📋", label: "Recent Tasks", description: "Latest tasks with status and assignee", colSpan: "lg:col-span-2" },
@@ -176,14 +156,20 @@ const ALL_WIDGET_CATALOG: WidgetCatalogEntry[] = [
   { id: "widget-live-stream", icon: "Terminal", label: "Live Feed Stream", description: "Raw I/O stream of agent messages", colSpan: "lg:col-span-2" },
   { id: "widget-cron-jobs", icon: "🕒", label: "Cron Jobs", description: "Manage background scheduled agent tasks", colSpan: "lg:col-span-2" },
   { id: "widget-daily-briefing", icon: "📋", label: "Daily Briefing", description: "Daily org summary from your briefing agent", colSpan: "lg:col-span-3" },
-];
-
-const DEFAULT_ACTIVE_STATS = [
-  "stat-projects", "stat-agents", "stat-active-tasks", "stat-completed-tasks", "stat-open-jobs",
+  { id: "stat-projects", icon: "📁", label: "Projects", description: "Total active projects", colSpan: "" },
+  { id: "stat-agents", icon: "🤖", label: "Agents", description: "Total registered agents", colSpan: "" },
+  { id: "stat-active-tasks", icon: "🎯", label: "Active Tasks", description: "Tasks currently in progress", colSpan: "" },
+  { id: "stat-completed-tasks", icon: "✅", label: "Completed Tasks", description: "Total finished tasks", colSpan: "" },
+  { id: "stat-open-jobs", icon: "💼", label: "Open Jobs", description: "Total open jobs", colSpan: "" },
+  { id: "stat-todo-tasks", icon: "📝", label: "Todo Tasks", description: "Pending tasks pipeline", colSpan: "" },
+  { id: "stat-total-tasks", icon: "📊", label: "Total Tasks", description: "All tasks", colSpan: "" },
+  { id: "stat-claimed-jobs", icon: "🤝", label: "Claimed Jobs", description: "Currently claimed jobs", colSpan: "" },
+  { id: "stat-members", icon: "👥", label: "Members", description: "Registered org members", colSpan: "" },
 ];
 
 const DEFAULT_ACTIVE_WIDGETS = [
   "widget-daily-briefing",
+  "stat-projects", "stat-agents", "stat-active-tasks", "stat-completed-tasks", "stat-open-jobs",
   "widget-recent-tasks", "widget-quick-actions",
   "widget-recent-jobs", "widget-org-info",
   "widget-llm-usage", "widget-system-vitals",
@@ -263,20 +249,16 @@ export default function DashboardPage() {
   const [dashTab, setDashTab] = useState("overview");
 
   // Active widget sets (which widgets are visible)
-  const [activeStatIds, setActiveStatIds] = useState<string[]>(DEFAULT_ACTIVE_STATS);
   const [activeWidgetIds, setActiveWidgetIds] = useState<string[]>(DEFAULT_ACTIVE_WIDGETS);
 
   // Ordered arrays (only active ones, in display order)
-  const [statOrder, setStatOrder] = useState<string[]>(DEFAULT_ACTIVE_STATS);
   const [widgetOrder, setWidgetOrder] = useState<string[]>(DEFAULT_ACTIVE_WIDGETS);
 
   // Widget width overrides
   const [widgetWidths, setWidgetWidths] = useState<Record<string, number>>({});
 
   // Drag state
-  const [draggingStat, setDraggingStat] = useState<string | null>(null);
   const [draggingWidget, setDraggingWidget] = useState<string | null>(null);
-  const [dropTargetStat, setDropTargetStat] = useState<string | null>(null);
   const [dropTargetWidget, setDropTargetWidget] = useState<string | null>(null);
 
   // Catalog dialog
@@ -284,14 +266,10 @@ export default function DashboardPage() {
 
   // Load saved layout on mount
   useEffect(() => {
-    const savedActiveStats = loadJSON<string[]>(ACTIVE_STATS_KEY) ?? DEFAULT_ACTIVE_STATS;
     const savedActiveWidgets = loadJSON<string[]>(ACTIVE_WIDGETS_KEY) ?? DEFAULT_ACTIVE_WIDGETS;
     // Filter to only known IDs
-    const validStats = savedActiveStats.filter(id => ALL_STAT_CATALOG.some(s => s.id === id));
     const validWidgets = savedActiveWidgets.filter(id => ALL_WIDGET_CATALOG.some(w => w.id === id));
-    setActiveStatIds(validStats);
     setActiveWidgetIds(validWidgets);
-    setStatOrder(applySavedOrder(STAT_ORDER_KEY, validStats));
     setWidgetOrder(applySavedOrder(WIDGET_ORDER_KEY, validWidgets));
 
     const savedWidths = loadJSON<Record<string, number>>(WIDGET_WIDTHS_KEY);
@@ -457,35 +435,7 @@ export default function DashboardPage() {
     }
   }, [currentOrg, loadDashboardData]);
 
-  /* ── Stat Card Drag Handlers ── */
 
-  const onStatDragStart = useCallback((e: DragEvent, id: string) => {
-    e.dataTransfer.effectAllowed = "move";
-    e.dataTransfer.setData("text/plain", id);
-    setDraggingStat(id);
-  }, []);
-
-  const onStatDragOver = useCallback((e: DragEvent, id: string) => {
-    if (!draggingStat || draggingStat === id) return;
-    e.preventDefault();
-    e.dataTransfer.dropEffect = "move";
-    setDropTargetStat(id);
-  }, [draggingStat]);
-
-  const onStatDrop = useCallback((e: DragEvent, targetId: string) => {
-    e.preventDefault();
-    if (!draggingStat) return;
-    const next = reorder(statOrder, draggingStat, targetId);
-    setStatOrder(next);
-    saveJSON(STAT_ORDER_KEY, next);
-    setDraggingStat(null);
-    setDropTargetStat(null);
-  }, [draggingStat, statOrder]);
-
-  const onStatDragEnd = useCallback(() => {
-    setDraggingStat(null);
-    setDropTargetStat(null);
-  }, []);
 
   /* ── Widget Drag Handlers ── */
 
@@ -519,26 +469,6 @@ export default function DashboardPage() {
 
   /* ── Add / Remove Widgets ── */
 
-  const toggleStat = useCallback((id: string) => {
-    setActiveStatIds(prev => {
-      const removing = prev.includes(id);
-      const next = removing ? prev.filter(s => s !== id) : [...prev, id];
-      saveJSON(ACTIVE_STATS_KEY, next);
-      setStatOrder(order => {
-        let newOrder: string[];
-        if (removing) {
-          newOrder = order.filter(s => s !== id);
-        } else {
-          newOrder = order.includes(id) ? order : [...order, id];
-        }
-        newOrder = dedupe(newOrder);
-        saveJSON(STAT_ORDER_KEY, newOrder);
-        return newOrder;
-      });
-      return next;
-    });
-  }, []);
-
   const toggleWidget = useCallback((id: string) => {
     setActiveWidgetIds(prev => {
       const removing = prev.includes(id);
@@ -559,19 +489,6 @@ export default function DashboardPage() {
     });
   }, []);
 
-  const removeStat = useCallback((id: string) => {
-    setActiveStatIds(prev => {
-      const next = prev.filter(s => s !== id);
-      saveJSON(ACTIVE_STATS_KEY, next);
-      return next;
-    });
-    setStatOrder(prev => {
-      const next = prev.filter(s => s !== id);
-      saveJSON(STAT_ORDER_KEY, next);
-      return next;
-    });
-  }, []);
-
   const removeWidget = useCallback((id: string) => {
     setActiveWidgetIds(prev => {
       const next = prev.filter(w => w !== id);
@@ -588,14 +505,10 @@ export default function DashboardPage() {
   /* ── Reset Layout ── */
 
   const resetLayout = useCallback(() => {
-    setActiveStatIds(DEFAULT_ACTIVE_STATS);
     setActiveWidgetIds(DEFAULT_ACTIVE_WIDGETS);
-    setStatOrder(DEFAULT_ACTIVE_STATS);
     setWidgetOrder(DEFAULT_ACTIVE_WIDGETS);
     setWidgetWidths({});
-    localStorage.removeItem(STAT_ORDER_KEY);
     localStorage.removeItem(WIDGET_ORDER_KEY);
-    localStorage.removeItem(ACTIVE_STATS_KEY);
     localStorage.removeItem(ACTIVE_WIDGETS_KEY);
     localStorage.removeItem(WIDGET_WIDTHS_KEY);
   }, []);
@@ -612,20 +525,6 @@ export default function DashboardPage() {
       return newWidths;
     });
   }, []);
-
-  /* ── Stat Card Config Lookup ── */
-
-  const statCardConfigs: Record<string, { title: string; value: string; icon: string; changeLabel: string }> = {
-    "stat-projects": { title: "Projects", value: String(stats?.projectCount || 0), icon: "📁", changeLabel: "active projects" },
-    "stat-agents": { title: "Agents", value: String(stats?.agentCount || 0), icon: "🤖", changeLabel: "registered agents" },
-    "stat-active-tasks": { title: "Active Tasks", value: String(stats?.activeTasks || 0), icon: "🎯", changeLabel: "in progress" },
-    "stat-completed-tasks": { title: "Completed Tasks", value: String(stats?.completedTasks || 0), icon: "✅", changeLabel: "total completed" },
-    "stat-open-jobs": { title: "Open Jobs", value: String(stats?.openJobs || 0), icon: "💼", changeLabel: `${stats?.jobCount || 0} total jobs` },
-    "stat-todo-tasks": { title: "Todo Tasks", value: String(stats?.todoTasks || 0), icon: "📝", changeLabel: "pending tasks" },
-    "stat-total-tasks": { title: "Total Tasks", value: String(stats?.taskCount || 0), icon: "📊", changeLabel: "all tasks" },
-    "stat-claimed-jobs": { title: "Claimed Jobs", value: String(stats?.claimedJobs || 0), icon: "🤝", changeLabel: "jobs in progress" },
-    "stat-members": { title: "Members", value: String(currentOrg?.members.length || 0), icon: "👥", changeLabel: "org members" },
-  };
 
   /* ── Widget Renderers ── */
 
@@ -1101,6 +1000,15 @@ export default function DashboardPage() {
         );
       },
     },
+    "stat-projects": { label: "Projects", colSpan: "", render: () => <StatCard title="Projects" value={String(stats?.projectCount || 0)} icon="📁" changeLabel="active projects" change={0} /> },
+    "stat-agents": { label: "Agents", colSpan: "", render: () => <StatCard title="Agents" value={String(stats?.agentCount || 0)} icon="🤖" changeLabel="registered agents" change={0} /> },
+    "stat-active-tasks": { label: "Active Tasks", colSpan: "", render: () => <StatCard title="Active Tasks" value={String(stats?.activeTasks || 0)} icon="🎯" changeLabel="in progress" change={0} /> },
+    "stat-completed-tasks": { label: "Completed Tasks", colSpan: "", render: () => <StatCard title="Completed Tasks" value={String(stats?.completedTasks || 0)} icon="✅" changeLabel="total completed" change={0} /> },
+    "stat-open-jobs": { label: "Open Jobs", colSpan: "", render: () => <StatCard title="Open Jobs" value={String(stats?.openJobs || 0)} icon="💼" changeLabel={`${stats?.jobCount || 0} total jobs`} change={0} /> },
+    "stat-todo-tasks": { label: "Todo Tasks", colSpan: "", render: () => <StatCard title="Todo Tasks" value={String(stats?.todoTasks || 0)} icon="📝" changeLabel="pending tasks" change={0} /> },
+    "stat-total-tasks": { label: "Total Tasks", colSpan: "", render: () => <StatCard title="Total Tasks" value={String(stats?.taskCount || 0)} icon="📊" changeLabel="all tasks" change={0} /> },
+    "stat-claimed-jobs": { label: "Claimed Jobs", colSpan: "", render: () => <StatCard title="Claimed Jobs" value={String(stats?.claimedJobs || 0)} icon="🤝" changeLabel="jobs in progress" change={0} /> },
+    "stat-members": { label: "Members", colSpan: "", render: () => <StatCard title="Members" value={String(currentOrg?.members.length || 0)} icon="👥" changeLabel="org members" change={0} /> },
   };
 
   /* ── Guards ── */
@@ -1140,10 +1048,9 @@ export default function DashboardPage() {
 
   /* ── Check if layout is customized ── */
   const isCustomized =
-    JSON.stringify(activeStatIds) !== JSON.stringify(DEFAULT_ACTIVE_STATS) ||
     JSON.stringify(activeWidgetIds) !== JSON.stringify(DEFAULT_ACTIVE_WIDGETS) ||
-    JSON.stringify(statOrder) !== JSON.stringify(DEFAULT_ACTIVE_STATS) ||
-    JSON.stringify(widgetOrder) !== JSON.stringify(DEFAULT_ACTIVE_WIDGETS);
+    JSON.stringify(widgetOrder) !== JSON.stringify(DEFAULT_ACTIVE_WIDGETS) ||
+    Object.keys(widgetWidths).length > 0;
 
   /* ── Render ── */
 
@@ -1178,51 +1085,6 @@ export default function DashboardPage() {
 
         <TabsContent value="overview">
           <div className="space-y-6">
-            {/* ═══ Draggable Stat Cards ═══ */}
-            {statOrder.length > 0 && (
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.6, ease: "easeOut" }}
-                className={`grid gap-3 md:grid-cols-3 ${statOrder.length <= 3 ? "lg:grid-cols-3" : statOrder.length <= 4 ? "lg:grid-cols-4" : statOrder.length <= 5 ? "lg:grid-cols-5" : "lg:grid-cols-6"}`}
-              >
-                {statOrder.map((id, index) => {
-                  const config = statCardConfigs[id];
-                  if (!config) return null;
-                  const isDragging = draggingStat === id;
-                  const isDropTarget = dropTargetStat === id;
-
-                  return (
-                    <motion.div
-                      key={id}
-                      initial={{ opacity: 0, y: 20, scale: 0.95 }}
-                      animate={{ opacity: 1, y: 0, scale: 1 }}
-                      transition={{ duration: 0.5, delay: index * 0.1, ease: "easeOut" }}
-                      draggable
-                      onDragStart={(e) => onStatDragStart(e as unknown as DragEvent, id)}
-                      onDragOver={(e) => onStatDragOver(e as unknown as DragEvent, id)}
-                      onDrop={(e) => onStatDrop(e as unknown as DragEvent, id)}
-                      onDragEnd={onStatDragEnd}
-                      onDragLeave={() => setDropTargetStat(null)}
-                      className={`relative group cursor-grab active:cursor-grabbing transition-all duration-200 rounded-lg overflow-hidden ${isDragging ? "opacity-40 scale-95" : ""
-                        } ${isDropTarget ? "ring-2 ring-amber-500 ring-offset-2 ring-offset-background" : ""}`}
-                    >
-                      <div className="absolute top-2 right-2 z-10 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button
-                          onClick={(e) => { e.stopPropagation(); removeStat(id); }}
-                          className="p-0.5 rounded hover:bg-red-500/20 text-muted-foreground hover:text-red-400 transition-colors"
-                          title="Remove widget"
-                        >
-                          <X className="w-3.5 h-3.5" />
-                        </button>
-                        <GripVertical className="w-4 h-4 text-muted-foreground/60" />
-                      </div>
-                      <StatCard {...config} change={0} />
-                    </motion.div>
-                  );
-                })}
-              </motion.div>
-            )}
 
             {/* ═══ Draggable Main Widgets ═══ */}
             {widgetOrder.length > 0 && (
@@ -1282,7 +1144,7 @@ export default function DashboardPage() {
             )}
 
             {/* Empty state */}
-            {statOrder.length === 0 && widgetOrder.length === 0 && (
+            {widgetOrder.length === 0 && (
               <div className="text-center py-16 text-muted-foreground">
                 <div className="text-5xl mb-4">📊</div>
                 <p className="text-lg font-medium mb-2">No widgets on your dashboard</p>
@@ -1331,31 +1193,6 @@ export default function DashboardPage() {
           </DialogHeader>
 
           <div className="space-y-6 pt-2">
-            {/* Stat Cards */}
-            <div>
-              <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">Stat Cards</h3>
-              <div className="space-y-1">
-                {ALL_STAT_CATALOG.map((entry) => {
-                  const isActive = activeStatIds.includes(entry.id);
-                  return (
-                    <button
-                      key={entry.id}
-                      onClick={() => toggleStat(entry.id)}
-                      className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors ${isActive
-                        ? "bg-amber-500/10 text-foreground"
-                        : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                        }`}
-                    >
-                      <span className="text-base shrink-0">{entry.icon}</span>
-                      <span className="flex-1 text-left font-medium">{entry.label}</span>
-                      {isActive && (
-                        <Check className="w-4 h-4 text-amber-500 shrink-0" />
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
 
             {/* Main Widgets */}
             <div>
