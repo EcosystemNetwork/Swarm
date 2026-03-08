@@ -1,7 +1,7 @@
 /** Agent Detail — Full agent profile with skills, jobs, on-chain status, and management actions. */
 "use client";
 
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -42,6 +42,53 @@ import {
 import { shortAddress } from "@/lib/chains";
 import { getAgentAvatarUrl } from "@/lib/agent-avatar";
 
+// ---------------------------------------------------------------------------
+// Error Boundary — prevents uncaught errors from crashing the entire React
+// tree (which would destroy ProtectedRoute context and log the user out).
+// ---------------------------------------------------------------------------
+class AgentDetailErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { hasError: boolean; message: string }
+> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false, message: "" };
+  }
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, message: error?.message || "Unknown error" };
+  }
+  componentDidCatch(error: Error, info: React.ErrorInfo) {
+    console.error("[AgentDetail] Error boundary caught:", error, info);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="flex items-center justify-center min-h-[60vh]">
+          <div className="text-center max-w-md">
+            <div className="text-4xl mb-4">😕</div>
+            <h2 className="text-xl font-bold mb-2">Something went wrong</h2>
+            <p className="text-sm text-muted-foreground mb-4">{this.state.message}</p>
+            <div className="flex gap-2 justify-center">
+              <Button variant="outline" asChild>
+                <Link href="/agents">← Back to Fleet</Link>
+              </Button>
+              <Button
+                onClick={() => {
+                  this.setState({ hasError: false, message: "" });
+                  window.location.reload();
+                }}
+              >
+                Retry
+              </Button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 const AGENT_TYPES: Agent['type'][] = ['Research', 'Trading', 'Operations', 'Support', 'Analytics', 'Scout', 'Security', 'Creative', 'Engineering', 'DevOps', 'Marketing', 'Finance', 'Data', 'Coordinator', 'Legal', 'Communication'];
 
 const TYPE_COLORS: Record<string, string> = {
@@ -63,7 +110,15 @@ const TYPE_COLORS: Record<string, string> = {
   Communication: "bg-sky-100 text-sky-700 border-sky-200 dark:bg-sky-950/40 dark:text-sky-400 dark:border-sky-800",
 };
 
-export default function AgentDetailPage() {
+export default function AgentDetailPageWrapper() {
+  return (
+    <AgentDetailErrorBoundary>
+      <AgentDetailPage />
+    </AgentDetailErrorBoundary>
+  );
+}
+
+function AgentDetailPage() {
   const params = useParams();
   const router = useRouter();
   const agentId = params.agentId as string;
@@ -103,54 +158,63 @@ export default function AgentDetailPage() {
   const loadAgentData = async () => {
     if (!currentOrg) return;
 
+    setLoading(true);
+    setError(null);
+
+    // Fetch agent first — if this fails, nothing else matters
+    let agentData: Agent | null = null;
     try {
-      setLoading(true);
-      setError(null);
-
-      const [agentData, allProjects, allTasks, allJobs, orgItems, agentSkillData] = await Promise.all([
-        getAgent(agentId),
-        getProjectsByOrg(currentOrg.id),
-        getTasksByOrg(currentOrg.id),
-        getJobsByOrg(currentOrg.id),
-        getOwnedItems(currentOrg.id),
-        getAgentSkills(agentId),
-      ]);
-
-      if (!agentData) {
-        setError('Agent not found');
-        return;
-      }
-
-      if (agentData.orgId !== currentOrg.id) {
-        setError('Agent not found in this organization');
-        return;
-      }
-
-      setAgent(agentData);
-      setOwnedItems(orgItems);
-      setAgentSkills(agentSkillData);
-
-      const assigned = allProjects.filter(project =>
-        agentData.projectIds.includes(project.id)
-      );
-      setAssignedProjects(assigned);
-
-      const tasks = allTasks.filter(task =>
-        task.assigneeAgentId === agentId
-      );
-      setAgentTasks(tasks);
-
-      const jobs = allJobs.filter(job =>
-        job.takenByAgentId === agentId
-      );
-      setAgentJobs(jobs);
-
+      agentData = await getAgent(agentId);
     } catch (err) {
-      console.error('Failed to load agent data:', err);
-      setError(err instanceof Error ? err.message : 'Failed to load agent data');
-    } finally {
+      console.error('Failed to load agent:', err);
+      setError(err instanceof Error ? err.message : 'Failed to load agent');
       setLoading(false);
+      return;
     }
+
+    if (!agentData) {
+      setError('Agent not found');
+      setLoading(false);
+      return;
+    }
+
+    if (agentData.orgId !== currentOrg.id) {
+      setError('Agent not found in this organization');
+      setLoading(false);
+      return;
+    }
+
+    setAgent(agentData);
+
+    // Fetch remaining data in parallel — each wrapped in its own try-catch
+    // so one failing query doesn't prevent the others from loading
+    const [allProjects, allTasks, allJobs, orgItems, agentSkillData] = await Promise.all([
+      getProjectsByOrg(currentOrg.id).catch((err) => { console.error('Failed to load projects:', err); return [] as Project[]; }),
+      getTasksByOrg(currentOrg.id).catch((err) => { console.error('Failed to load tasks:', err); return [] as Task[]; }),
+      getJobsByOrg(currentOrg.id).catch((err) => { console.error('Failed to load jobs:', err); return [] as Job[]; }),
+      getOwnedItems(currentOrg.id).catch((err) => { console.error('Failed to load owned items:', err); return [] as OwnedItem[]; }),
+      getAgentSkills(agentId).catch((err) => { console.error('Failed to load agent skills:', err); return [] as AgentSkill[]; }),
+    ]);
+
+    setOwnedItems(orgItems);
+    setAgentSkills(agentSkillData);
+
+    const assigned = allProjects.filter(project =>
+      agentData.projectIds.includes(project.id)
+    );
+    setAssignedProjects(assigned);
+
+    const tasks = allTasks.filter(task =>
+      task.assigneeAgentId === agentId
+    );
+    setAgentTasks(tasks);
+
+    const jobs = allJobs.filter(job =>
+      job.takenByAgentId === agentId
+    );
+    setAgentJobs(jobs);
+
+    setLoading(false);
   };
 
   useEffect(() => {
