@@ -583,10 +583,22 @@ body::after {
    FUTURISTIC SKIN (Arwes-Inspired)
    ═══════════════════════════════════════════ */
 
-/* ── 1. Shadcn variable overrides ── */
+/* ── 1. Shadcn variable overrides + Tailwind color remap ── */
 .skin-futuristic {
   --primary: 187 96% 51%;
   --ring: 187 96% 51%;
+  /* Remap amber → cyan across ALL Tailwind utilities */
+  --color-amber-50: oklch(98.4% 0.019 200.873);
+  --color-amber-100: oklch(95.6% 0.045 203.388);
+  --color-amber-200: oklch(91.7% 0.08 205.041);
+  --color-amber-300: oklch(86.5% 0.127 207.078);
+  --color-amber-400: oklch(78.9% 0.154 211.53);
+  --color-amber-500: oklch(71.5% 0.143 215.221);
+  --color-amber-600: oklch(60.9% 0.126 221.723);
+  --color-amber-700: oklch(52% 0.105 223.128);
+  --color-amber-800: oklch(45% 0.085 224.283);
+  --color-amber-900: oklch(39.8% 0.07 227.392);
+  --color-amber-950: oklch(30.2% 0.056 229.695);
 }
 .skin-futuristic.dark {
   --primary: 187 96% 51%;
@@ -793,6 +805,18 @@ body::after {
 .skin-retro-terminal {
   --primary: 25 100% 50%;
   --ring: 25 100% 50%;
+  /* Remap amber → orange for CRT phosphor look */
+  --color-amber-50: oklch(98% 0.016 73.684);
+  --color-amber-100: oklch(95.4% 0.038 75.164);
+  --color-amber-200: oklch(90.1% 0.076 70.697);
+  --color-amber-300: oklch(83.7% 0.128 66.29);
+  --color-amber-400: oklch(75% 0.183 55.934);
+  --color-amber-500: oklch(70.5% 0.213 47.604);
+  --color-amber-600: oklch(64.6% 0.222 41.116);
+  --color-amber-700: oklch(55.3% 0.195 38.402);
+  --color-amber-800: oklch(47% 0.157 37.304);
+  --color-amber-900: oklch(40.8% 0.123 38.172);
+  --color-amber-950: oklch(26.6% 0.079 36.259);
 }
 .skin-retro-terminal.dark {
   --primary: 25 100% 50%;
@@ -912,6 +936,18 @@ body::after {
 .skin-cyberpunk {
   --primary: 328 100% 54%;
   --ring: 328 100% 54%;
+  /* Remap amber → pink for neon cyberpunk */
+  --color-amber-50: oklch(97.1% 0.014 343.198);
+  --color-amber-100: oklch(94.8% 0.028 342.258);
+  --color-amber-200: oklch(89.9% 0.061 343.231);
+  --color-amber-300: oklch(82.3% 0.12 346.018);
+  --color-amber-400: oklch(71.8% 0.202 349.761);
+  --color-amber-500: oklch(65.6% 0.241 354.308);
+  --color-amber-600: oklch(59.2% 0.249 0.584);
+  --color-amber-700: oklch(52.5% 0.223 3.958);
+  --color-amber-800: oklch(45.9% 0.187 3.815);
+  --color-amber-900: oklch(40.8% 0.153 2.432);
+  --color-amber-950: oklch(28.4% 0.109 3.907);
 }
 .skin-cyberpunk.dark {
   --primary: 328 100% 54%;
@@ -1020,6 +1056,18 @@ body::after {
 .skin-midnight {
   --primary: 250 80% 60%;
   --ring: 250 80% 60%;
+  /* Remap amber → indigo for refined midnight */
+  --color-amber-50: oklch(96.2% 0.018 272.314);
+  --color-amber-100: oklch(93% 0.034 272.788);
+  --color-amber-200: oklch(87% 0.065 274.039);
+  --color-amber-300: oklch(78.5% 0.115 274.713);
+  --color-amber-400: oklch(67.3% 0.182 276.935);
+  --color-amber-500: oklch(58.5% 0.233 277.117);
+  --color-amber-600: oklch(51.1% 0.262 276.966);
+  --color-amber-700: oklch(45.7% 0.24 277.023);
+  --color-amber-800: oklch(39.8% 0.195 277.366);
+  --color-amber-900: oklch(35.9% 0.144 278.697);
+  --color-amber-950: oklch(25.7% 0.09 281.288);
 }
 .skin-midnight.dark {
   --primary: 250 80% 60%;
@@ -1117,6 +1165,18 @@ body::after {
 .skin-hacker {
   --primary: 142 100% 50%;
   --ring: 142 100% 50%;
+  /* Remap amber → green for Matrix/hacker terminal */
+  --color-amber-50: oklch(98.2% 0.018 155.826);
+  --color-amber-100: oklch(96.2% 0.044 156.743);
+  --color-amber-200: oklch(92.5% 0.084 155.995);
+  --color-amber-300: oklch(87.1% 0.15 154.449);
+  --color-amber-400: oklch(79.2% 0.209 151.711);
+  --color-amber-500: oklch(72.3% 0.219 149.579);
+  --color-amber-600: oklch(62.7% 0.194 149.214);
+  --color-amber-700: oklch(52.7% 0.154 150.069);
+  --color-amber-800: oklch(44.8% 0.119 151.328);
+  --color-amber-900: oklch(39.3% 0.095 152.535);
+  --color-amber-950: oklch(26.6% 0.065 152.934);
 }
 .skin-hacker.dark {
   --primary: 142 100% 50%;

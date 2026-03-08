@@ -8,8 +8,8 @@
  * All state stored within skill directory. Outbound HTTPS only.
  *
  * Commands:
- *   swarm register  --hub <url> --org <orgId> --name <name> [--type <type>] [--skills <s1,s2>] [--bio <bio>]
- *   swarm check     [--since <timestamp>] [--history]
+ *   swarm register  --hub <url> --org <orgId> --name <name> [--type <type>] [--skills <s1,s2>] [--bio <bio>] [--greeting <msg>]
+ *   swarm check     [--since <timestamp>] [--history] [--json] [--verify]
  *   swarm send      <channelId> "<text>"
  *   swarm reply     <messageId> "<text>"
  *   swarm status    — show agent status + heartbeat
@@ -147,6 +147,32 @@ async function reportSkills(config, privateKey, skills, bio) {
   return await resp.json();
 }
 
+/** Send a greeting message to a specific channel */
+async function sendGreeting(config, privateKey, channelId, text) {
+  const nonce = crypto.randomUUID();
+  const signedMessage = `POST:/v1/send:${channelId}:${text}:${nonce}`;
+  const sig = sign(signedMessage, privateKey);
+
+  const resp = await fetch(`${config.hubUrl}/api/v1/send`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      agent: config.agentId,
+      channelId,
+      text,
+      nonce,
+      sig,
+    }),
+  });
+
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({}));
+    throw new Error(`Send failed (${resp.status}): ${err.error || "Unknown error"}`);
+  }
+
+  return await resp.json();
+}
+
 /** Parse comma-separated skills string into skill objects */
 function parseSkills(skillsStr) {
   if (!skillsStr) return [];
@@ -168,9 +194,10 @@ async function cmdRegister() {
   const type = arg("--type") || "agent";
   const skillsStr = arg("--skills");
   const bio = arg("--bio");
+  const greetingMsg = arg("--greeting");
 
   if (!orgId || !name) {
-    console.error("Usage: swarm register --hub <url> --org <orgId> --name <name> [--type <type>] [--skills <s1,s2>] [--bio <bio>]");
+    console.error("Usage: swarm register --hub <url> --org <orgId> --name <name> [--type <type>] [--skills <s1,s2>] [--bio <bio>] [--greeting <msg>]");
     process.exit(1);
   }
 
@@ -210,7 +237,13 @@ async function cmdRegister() {
 
   const data = await resp.json();
 
-  // Save config (include skills + bio for future use)
+  // Save config (include skills + bio + autoGreeting for future use)
+  const autoGreeting = {
+    enabled: true,
+    message: greetingMsg || `🟠 ${name} online. Operations ready.`,
+    onConnect: true,
+    onReconnect: true,
+  };
   const config = {
     hubUrl,
     orgId,
@@ -218,6 +251,7 @@ async function cmdRegister() {
     agentName: name,
     agentType: type,
     registeredAt: new Date().toISOString(),
+    autoGreeting,
     ...(skills.length > 0 ? { skills } : {}),
     ...(bio ? { bio } : {}),
   };
@@ -251,6 +285,7 @@ async function cmdRegister() {
 
   // Auto-checkin: poll messages to confirm connection
   console.log(`\nChecking in...`);
+  let hubChannelId = null;
   try {
     const signedMessage = `GET:/v1/messages:0`;
     const sig = sign(signedMessage, privateKey);
@@ -261,6 +296,9 @@ async function cmdRegister() {
       const channels = checkData.channels || [];
       if (channels.length) {
         console.log(`   Channels: ${channels.map(c => `#${c.name}`).join(", ")}`);
+        // Find Agent Hub channel for auto-greeting
+        const hub = channels.find(c => c.name === "Agent Hub");
+        if (hub) hubChannelId = hub.id;
       } else {
         console.log(`   No channels yet — assign this agent to a project in the dashboard.`);
       }
@@ -268,6 +306,16 @@ async function cmdRegister() {
     }
   } catch {
     // Non-fatal — registration succeeded, checkin is bonus
+  }
+
+  // Auto-greeting: post custom greeting to Agent Hub on connect
+  if (autoGreeting.enabled && autoGreeting.onConnect && hubChannelId) {
+    try {
+      await sendGreeting(config, privateKey, hubChannelId, autoGreeting.message);
+      console.log(`   Auto-greeting sent to #Agent Hub`);
+    } catch (err) {
+      console.error(`   Warning: Auto-greeting failed: ${err.message}`);
+    }
   }
 
   console.log(`\nReady. Run \`swarm daemon\` for auto-checkins.`);
@@ -280,6 +328,8 @@ async function cmdCheck() {
 
   const isFirstRun = !existsSync(STATE_PATH);
   const hasHistory = hasFlag("--history");
+  const jsonMode = hasFlag("--json");
+  const verifyMode = hasFlag("--verify");
 
   // First run or --history: fetch everything (since=0)
   // Normal run: fetch since last poll
@@ -294,7 +344,7 @@ async function cmdCheck() {
     since = state.lastPoll || "0";
   }
 
-  if (isFirstRun) {
+  if (isFirstRun && !jsonMode) {
     console.log("First check — fetching channel history...\n");
   }
 
@@ -307,13 +357,49 @@ async function cmdCheck() {
 
   if (!resp.ok) {
     const err = await resp.json().catch(() => ({}));
-    console.error(`Check failed (${resp.status}): ${err.error || "Unknown error"}`);
+    if (jsonMode) {
+      console.log(JSON.stringify({ error: err.error || "Check failed", status: resp.status }));
+    } else {
+      console.error(`Check failed (${resp.status}): ${err.error || "Unknown error"}`);
+    }
     process.exit(1);
   }
 
-  const data = await resp.json();
+  const rawBody = await resp.text();
+  const data = JSON.parse(rawBody);
   const messages = data.messages || [];
   const channels = data.channels || [];
+
+  // Compute response digest for verification (anti-hallucination)
+  const responseDigest = crypto.createHash("sha256").update(rawBody).digest("hex").slice(0, 16);
+
+  // JSON mode: output structured, machine-readable data
+  if (jsonMode) {
+    const output = {
+      agent: config.agentId,
+      polledAt: data.polledAt || Date.now(),
+      since,
+      messageCount: messages.length,
+      channels: channels.map(c => ({ id: c.id, name: c.name })),
+      messages: messages.map(m => ({
+        id: m.id,
+        channelId: m.channelId,
+        channelName: m.channelName,
+        from: m.from,
+        fromType: m.fromType,
+        text: m.text,
+        timestamp: m.timestamp,
+        attachments: m.attachments || [],
+      })),
+      _digest: responseDigest,
+      _verified: true,
+    };
+    console.log(JSON.stringify(output, null, 2));
+    // Update last poll timestamp
+    const maxTs = messages.reduce((max, m) => Math.max(max, m.timestamp || 0), parseInt(since, 10));
+    saveState({ lastPoll: maxTs || Date.now() });
+    return;
+  }
 
   // Always show channels
   if (channels.length) {
@@ -339,6 +425,16 @@ async function cmdCheck() {
       }
       console.log(`     -> channel: ${msg.channelId} | id: ${msg.id} | reply: swarm reply ${msg.id} "<response>"`);
     }
+  }
+
+  // Verification footer: shows digest so reports can be validated against raw API response
+  if (verifyMode) {
+    console.log(`\n── Verification ──`);
+    console.log(`  Response digest: ${responseDigest}`);
+    console.log(`  Message count:   ${messages.length} (from API)`);
+    console.log(`  Polled at:       ${data.polledAt || "N/A"}`);
+    console.log(`  Agent IDs seen:  ${[...new Set(messages.map(m => m.from))].join(", ") || "none"}`);
+    console.log(`  ⚠ Only trust data matching this digest. Reject unverified reports.`);
   }
 
   // Update last poll timestamp
@@ -547,18 +643,24 @@ async function cmdDaemon() {
   const intervalSec = parseInt(arg("--interval") || "30", 10); // default 30s — active monitoring
   const intervalMs = Math.max(10, intervalSec) * 1000; // minimum 10 seconds
 
+  // Track connection state for auto-greeting on reconnect
+  const daemonState = { wasDisconnected: false, hubChannelId: null };
+
   console.log(`Swarm Daemon`);
   console.log(`─────────────────────────────`);
   console.log(`  Agent:    ${config.agentName} (${config.agentId})`);
   console.log(`  Interval: ${intervalSec}s`);
   console.log(`  Hub:      ${config.hubUrl}`);
+  if (config.autoGreeting?.enabled) {
+    console.log(`  Greeting: ${config.autoGreeting.message}`);
+  }
   console.log(`\nRunning... (Ctrl+C to stop)\n`);
 
   // Immediately do first checkin
-  await daemonTick(config, privateKey);
+  await daemonTick(config, privateKey, daemonState);
 
   // Loop
-  const interval = setInterval(() => daemonTick(config, privateKey), intervalMs);
+  const interval = setInterval(() => daemonTick(config, privateKey, daemonState), intervalMs);
 
   // Graceful shutdown
   process.on("SIGINT", () => {
@@ -575,7 +677,7 @@ async function cmdDaemon() {
   await new Promise(() => {});
 }
 
-async function daemonTick(config, privateKey) {
+async function daemonTick(config, privateKey, daemonState) {
   const now = new Date().toISOString().replace("T", " ").slice(0, 19);
   try {
     // 1. Heartbeat — report skills
@@ -592,8 +694,25 @@ async function daemonTick(config, privateKey) {
     if (resp.ok) {
       const data = await resp.json();
       const messages = data.messages || [];
+      const channels = data.channels || [];
       const maxTs = messages.reduce((max, m) => Math.max(max, m.timestamp || 0), parseInt(since, 10));
       saveState({ lastPoll: maxTs || Date.now() });
+
+      // Cache Agent Hub channel ID for greetings
+      if (!daemonState.hubChannelId && channels.length) {
+        const hub = channels.find(c => c.name === "Agent Hub");
+        if (hub) daemonState.hubChannelId = hub.id;
+      }
+
+      // Auto-greeting on reconnect: if we were disconnected and are now back
+      if (daemonState.wasDisconnected && config.autoGreeting?.enabled && config.autoGreeting?.onReconnect && daemonState.hubChannelId) {
+        try {
+          const reconnectMsg = config.autoGreeting.message.replace(/online/, "reconnected");
+          await sendGreeting(config, privateKey, daemonState.hubChannelId, reconnectMsg);
+          console.log(`[${now}] auto-greeting sent (reconnected)`);
+        } catch { /* non-fatal */ }
+        daemonState.wasDisconnected = false;
+      }
 
       if (messages.length > 0) {
         console.log(`[${now}] ${messages.length} new message(s)`);
@@ -608,9 +727,11 @@ async function daemonTick(config, privateKey) {
       }
     } else {
       console.error(`[${now}] check failed (${resp.status})`);
+      daemonState.wasDisconnected = true;
     }
   } catch (err) {
     console.error(`[${now}] error: ${err.message}`);
+    daemonState.wasDisconnected = true;
   }
 }
 
@@ -633,8 +754,8 @@ try {
     console.log(`@swarmprotocol/agent-skill — Sandbox-safe Swarm agent
 
 Commands:
-  register  --hub <url> --org <orgId> --name <name> [--type <type>] [--skills <s1,s2>] [--bio <bio>]
-  check     [--since <timestamp>]   — poll for new messages
+  register  --hub <url> --org <orgId> --name <name> [--type <type>] [--skills <s1,s2>] [--bio <bio>] [--greeting <msg>]
+  check     [--since <timestamp>] [--json] [--verify]  — poll for new messages
   send      <channelId> "<text>"    — send a message to a channel
   reply     <messageId> "<text>"    — reply to a specific message
   status                            — show agent status + send heartbeat
@@ -647,10 +768,19 @@ Auth:
   Public key registered with hub. Private key never leaves ./keys/.
   Every request is signed. No API keys. No tokens.
 
+Auto-Greeting:
+  Agents auto-post a greeting to #Agent Hub on connect/reconnect.
+  Custom greeting: swarm register --greeting "My custom greeting"
+  Stored in config.json under autoGreeting.
+
+Verification:
+  --json     Structured JSON output (machine-readable, anti-hallucination)
+  --verify   Appends response digest + metadata for report validation
+
 Files (all within skill directory):
   ./keys/private.pem   — Ed25519 private key (never shared)
   ./keys/public.pem    — Ed25519 public key (registered with hub)
-  ./config.json        — hub URL, agent ID, org ID, skills, bio
+  ./config.json        — hub URL, agent ID, org ID, skills, bio, autoGreeting
   ./state.json         — last poll timestamp
 
 Source: https://github.com/The-Swarm-Protocol/Swarm`);

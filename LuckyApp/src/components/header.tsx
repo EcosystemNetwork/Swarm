@@ -17,7 +17,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { NotificationCenter } from '@/components/notification-center';
-import { useSkin } from '@/contexts/SkinContext';
+import { useSkin, SKINS } from '@/contexts/SkinContext';
 
 const client = createThirdwebClient({
   clientId: process.env.NEXT_PUBLIC_THIRDWEB_CLIENT_ID || 'cbd8abcfa13db759ca2f5fa7d8a5a5e5',
@@ -108,7 +108,7 @@ export function Header() {
           <div className="flex items-center gap-4">
             <Link href="/" className="flex items-center gap-2">
               <Image src="/lobsterlogo.png" alt="Swarm Logo" width={32} height={32} />
-              <GradientText colors={skin === 'futuristic' ? ['#26dafd', '#fc26fa', '#be26fc'] : ['#FFD700', '#FFA500', '#FF8C00']} animationSpeed={4} className="text-lg font-bold text-glow-gold">Swarm</GradientText>
+              <GradientText colors={SKINS.find(s => s.id === skin)?.colors ?? ['#FFD700', '#FFA500', '#FF8C00']} animationSpeed={4} className="text-lg font-bold text-glow-gold">Swarm</GradientText>
             </Link>
           </div>
           <div className="flex items-center gap-2">

@@ -61,16 +61,6 @@ const SECTION_COLORS: Record<string, { activeBg: string; activeText: string; act
     dropIndicator: "border-cyan-500/50",
     headerText: "text-cyan-400/50",
   },
-  futuristic: {
-    activeBg: "bg-cyan-400/10",
-    activeText: "text-cyan-300",
-    activeBorder: "border-cyan-400/20",
-    activeBar: "bg-cyan-400",
-    badgeBg: "bg-cyan-400/20",
-    badgeText: "text-cyan-300",
-    dropIndicator: "border-cyan-400/50",
-    headerText: "text-cyan-400/40",
-  },
 };
 
 const DEFAULT_SECTIONS: NavSection[] = [
@@ -193,6 +183,7 @@ function applySavedState(base: NavSection[] = DEFAULT_SECTIONS): NavSection[] {
   // Apply saved item order within each section
   if (itemOrder) {
     const allItems = buildItemLookup(base);
+    const globalClaimed = new Set<string>(); // prevent duplicates across sections
     for (const section of sections) {
       const savedItemIds = itemOrder[section.id];
       if (!savedItemIds) continue;
@@ -203,12 +194,16 @@ function applySavedState(base: NavSection[] = DEFAULT_SECTIONS): NavSection[] {
       const ordered: NavItem[] = [];
       const used = new Set<string>();
       for (const id of savedItemIds) {
+        if (globalClaimed.has(id)) continue; // already placed in another section
         const item = sectionItemLookup[id] || allItems[id];
-        if (item) { ordered.push(item); used.add(id); }
+        if (item) { ordered.push(item); used.add(id); globalClaimed.add(id); }
       }
       // Append any items in section.items not in saved order (new items)
       for (const item of section.items) {
-        if (!used.has(item.id)) ordered.push(item);
+        if (!used.has(item.id) && !globalClaimed.has(item.id)) {
+          ordered.push(item);
+          globalClaimed.add(item.id);
+        }
       }
       section.items = ordered;
     }
@@ -447,7 +442,9 @@ export function Sidebar() {
         {sections.map((section) => {
           // Hide empty sections (e.g., Modifications with no installed mods)
           if (section.items.length === 0) return null;
-          const colorKey = skin === "futuristic" ? "futuristic" : (section.accentColor || "amber");
+          // With Tailwind v4 color remap, amber classes auto-transform per skin.
+          // Only the modifications section keeps its own accent when using classic skin.
+          const colorKey = skin === "classic" ? (section.accentColor || "amber") : "amber";
           const colors = SECTION_COLORS[colorKey];
           return (
           <div
