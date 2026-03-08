@@ -434,12 +434,12 @@ export function Sidebar() {
 
   return (
     <aside className={cn(
-      "sticky top-16 h-[calc(100vh-4rem)] border-r border-border shrink-0 transition-all duration-300 flex flex-col",
+      "h-full border-r border-border shrink-0 transition-all duration-300 flex flex-col",
       "bg-card/50 backdrop-blur-xl",
       collapsed ? "w-[52px]" : "w-56"
     )}>
       {/* Sections */}
-      <nav className="flex-1 overflow-y-auto overflow-x-hidden py-2 scrollbar-thin">
+      <nav className="flex-1 overflow-y-auto overflow-x-hidden py-1 scrollbar-thin">
         {sections.map((section) => {
           // Hide empty sections (e.g., Modifications with no installed mods)
           if (section.items.length === 0) return null;
@@ -476,7 +476,7 @@ export function Sidebar() {
           >
             {/* Section header */}
             {!collapsed && (
-              <div className="flex items-center gap-1 px-3 pt-3 pb-1 group cursor-grab active:cursor-grabbing">
+              <div className="flex items-center gap-1 px-3 pt-2 pb-0.5 group cursor-grab active:cursor-grabbing">
                 <GripVertical className="h-3 w-3 text-muted-foreground/20 group-hover:text-muted-foreground/60 transition-colors shrink-0" />
                 <span className={cn("text-[10px] font-semibold uppercase tracking-wider", colors.headerText)}>
                   {section.label}

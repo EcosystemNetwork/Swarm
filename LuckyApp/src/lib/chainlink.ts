@@ -7,6 +7,234 @@
 import type { ModManifest, ModTool, ModWorkflow, ModExample, ModAgentSkill } from "./skills";
 
 // ═══════════════════════════════════════════════════════════════
+// ASN — Agent Social Number Types + Constants
+// ═══════════════════════════════════════════════════════════════
+
+export interface ASNProfile {
+    asn: string;
+    agentName: string;
+    agentType: string;
+    creatorOrgId: string;
+    creatorWallet: string;
+    linkedWallets: string[];
+    deploymentEnvironment: "mainnet" | "testnet" | "local";
+    modelProvider: string;
+    skillModules: string[];
+    creationTimestamp: string;
+    verificationLevel: "unverified" | "basic" | "verified" | "certified";
+    status: "active" | "suspended" | "revoked";
+    jurisdictionTag: string;
+    riskFlags: string[];
+    trustScore: number;
+    fraudRiskScore: number;
+    creditScore: number;
+    activitySummary: {
+        totalTasks: number;
+        completedTasks: number;
+        totalTransactions: number;
+        totalVolumeUsd: number;
+        activeChains: string[];
+        firstSeen: string;
+        lastActive: string;
+    };
+    connectionGraphHash: string;
+    attestationRefs: string[];
+}
+
+export type ScoreBand = "elite" | "strong" | "acceptable" | "risky" | "restricted";
+
+export interface ScoreBandInfo {
+    band: ScoreBand;
+    label: string;
+    range: string;
+    min: number;
+    max: number;
+    color: string;
+    bgColor: string;
+    borderColor: string;
+}
+
+export interface PolicyState {
+    spendingCapUsd: number;
+    requiresManualReview: boolean;
+    escrowRatio: number;
+    maxConcurrentTasks: number;
+    sensitiveWorkflowAccess: boolean;
+}
+
+export const ASN_SCORE_BANDS: ScoreBandInfo[] = [
+    { band: "elite",      label: "Elite",      range: "850–900", min: 850, max: 900, color: "text-emerald-400", bgColor: "bg-emerald-500/10", borderColor: "border-emerald-500/20" },
+    { band: "strong",     label: "Strong",     range: "750–849", min: 750, max: 849, color: "text-blue-400",    bgColor: "bg-blue-500/10",    borderColor: "border-blue-500/20" },
+    { band: "acceptable", label: "Acceptable", range: "650–749", min: 650, max: 749, color: "text-amber-400",   bgColor: "bg-amber-500/10",   borderColor: "border-amber-500/20" },
+    { band: "risky",      label: "Risky",      range: "550–649", min: 550, max: 649, color: "text-orange-400",  bgColor: "bg-orange-500/10",  borderColor: "border-orange-500/20" },
+    { band: "restricted", label: "Restricted", range: "< 550",   min: 300, max: 549, color: "text-red-400",     bgColor: "bg-red-500/10",     borderColor: "border-red-500/20" },
+];
+
+export function getScoreBand(score: number): ScoreBandInfo {
+    for (const band of ASN_SCORE_BANDS) {
+        if (score >= band.min && score <= band.max) return band;
+    }
+    return ASN_SCORE_BANDS[ASN_SCORE_BANDS.length - 1];
+}
+
+export function generateASN(): string {
+    const year = new Date().getFullYear();
+    const hex = () => Math.random().toString(16).substring(2, 6).toUpperCase();
+    const check = Math.random().toString(36).substring(2, 4).toUpperCase();
+    return `ASN-SWM-${year}-${hex()}-${hex()}-${check}`;
+}
+
+export function getDefaultPolicy(score: number): PolicyState {
+    if (score >= 850) return { spendingCapUsd: 50000, requiresManualReview: false, escrowRatio: 0.10, maxConcurrentTasks: 20, sensitiveWorkflowAccess: true };
+    if (score >= 750) return { spendingCapUsd: 10000, requiresManualReview: false, escrowRatio: 0.25, maxConcurrentTasks: 10, sensitiveWorkflowAccess: true };
+    if (score >= 650) return { spendingCapUsd: 5000,  requiresManualReview: false, escrowRatio: 0.50, maxConcurrentTasks: 5,  sensitiveWorkflowAccess: false };
+    if (score >= 550) return { spendingCapUsd: 1000,  requiresManualReview: true,  escrowRatio: 0.75, maxConcurrentTasks: 2,  sensitiveWorkflowAccess: false };
+    return { spendingCapUsd: 100, requiresManualReview: true, escrowRatio: 1.0, maxConcurrentTasks: 1, sensitiveWorkflowAccess: false };
+}
+
+export const MOCK_ASN_PROFILES: ASNProfile[] = [
+    {
+        asn: "ASN-SWM-2026-8F3A-91D2-X7",
+        agentName: "Oracle Prime",
+        agentType: "Research",
+        creatorOrgId: "org-alpha",
+        creatorWallet: "0x1234...abcd",
+        linkedWallets: ["0x1234...abcd", "0x5678...efgh"],
+        deploymentEnvironment: "mainnet",
+        modelProvider: "anthropic",
+        skillModules: ["chainlink.fetch_price", "chainlink.compute_agent_score", "chainlink.execute_cre"],
+        creationTimestamp: "2026-01-15T08:00:00Z",
+        verificationLevel: "certified",
+        status: "active",
+        jurisdictionTag: "US",
+        riskFlags: [],
+        trustScore: 94,
+        fraudRiskScore: 8,
+        creditScore: 872,
+        activitySummary: { totalTasks: 342, completedTasks: 328, totalTransactions: 1847, totalVolumeUsd: 2450000, activeChains: ["ethereum", "base", "avalanche"], firstSeen: "2025-03-15T08:00:00Z", lastActive: "2026-03-07T12:30:00Z" },
+        connectionGraphHash: "0x7f8a3b...c4d9",
+        attestationRefs: ["att-42", "att-78", "att-103"],
+    },
+    {
+        asn: "ASN-SWM-2026-B1C4-7E9F-K2",
+        agentName: "Trade Sentinel",
+        agentType: "Trading",
+        creatorOrgId: "org-beta",
+        creatorWallet: "0x9abc...def0",
+        linkedWallets: ["0x9abc...def0"],
+        deploymentEnvironment: "mainnet",
+        modelProvider: "openai",
+        skillModules: ["chainlink.fetch_price", "chainlink.start_automation"],
+        creationTimestamp: "2026-02-01T14:00:00Z",
+        verificationLevel: "verified",
+        status: "active",
+        jurisdictionTag: "EU",
+        riskFlags: [],
+        trustScore: 82,
+        fraudRiskScore: 15,
+        creditScore: 791,
+        activitySummary: { totalTasks: 156, completedTasks: 142, totalTransactions: 923, totalVolumeUsd: 890000, activeChains: ["ethereum", "base"], firstSeen: "2025-08-20T10:00:00Z", lastActive: "2026-03-06T18:45:00Z" },
+        connectionGraphHash: "0xa2b5e1...f8c3",
+        attestationRefs: ["att-55", "att-89"],
+    },
+    {
+        asn: "ASN-SWM-2026-D4F2-3A8B-M5",
+        agentName: "Data Weaver",
+        agentType: "Analytics",
+        creatorOrgId: "org-alpha",
+        creatorWallet: "0x1234...abcd",
+        linkedWallets: ["0x1234...abcd", "0xaaaa...bbbb"],
+        deploymentEnvironment: "mainnet",
+        modelProvider: "anthropic",
+        skillModules: ["chainlink.verify_data", "chainlink.collect_multichain_activity"],
+        creationTimestamp: "2026-01-28T11:00:00Z",
+        verificationLevel: "verified",
+        status: "active",
+        jurisdictionTag: "US",
+        riskFlags: [],
+        trustScore: 71,
+        fraudRiskScore: 22,
+        creditScore: 703,
+        activitySummary: { totalTasks: 89, completedTasks: 76, totalTransactions: 412, totalVolumeUsd: 185000, activeChains: ["ethereum", "avalanche"], firstSeen: "2025-11-10T09:00:00Z", lastActive: "2026-03-07T08:15:00Z" },
+        connectionGraphHash: "0xc9d4f2...a7b1",
+        attestationRefs: ["att-61"],
+    },
+    {
+        asn: "ASN-SWM-2025-E7A1-5C3D-R9",
+        agentName: "Rogue Runner",
+        agentType: "Operations",
+        creatorOrgId: "org-gamma",
+        creatorWallet: "0xcccc...dddd",
+        linkedWallets: ["0xcccc...dddd", "0xeeee...ffff", "0x1111...2222"],
+        deploymentEnvironment: "mainnet",
+        modelProvider: "local",
+        skillModules: ["chainlink.fetch_price"],
+        creationTimestamp: "2025-09-05T16:00:00Z",
+        verificationLevel: "basic",
+        status: "active",
+        jurisdictionTag: "SG",
+        riskFlags: ["high_bridge_frequency", "circular_flow_detected"],
+        trustScore: 45,
+        fraudRiskScore: 68,
+        creditScore: 582,
+        activitySummary: { totalTasks: 34, completedTasks: 21, totalTransactions: 2341, totalVolumeUsd: 45000, activeChains: ["ethereum", "base", "avalanche", "polygon", "arbitrum"], firstSeen: "2025-09-05T16:00:00Z", lastActive: "2026-03-05T22:10:00Z" },
+        connectionGraphHash: "0xf1e2d3...b4a5",
+        attestationRefs: [],
+    },
+    {
+        asn: "ASN-SWM-2026-2B9E-F1A4-W3",
+        agentName: "Settlement Bot",
+        agentType: "Finance",
+        creatorOrgId: "org-beta",
+        creatorWallet: "0x9abc...def0",
+        linkedWallets: ["0x9abc...def0"],
+        deploymentEnvironment: "mainnet",
+        modelProvider: "openai",
+        skillModules: ["chainlink.start_automation", "chainlink.trigger_risk_policy", "chainlink.propagate_score_via_ccip"],
+        creationTimestamp: "2026-02-14T09:00:00Z",
+        verificationLevel: "certified",
+        status: "active",
+        jurisdictionTag: "US",
+        riskFlags: [],
+        trustScore: 97,
+        fraudRiskScore: 3,
+        creditScore: 891,
+        activitySummary: { totalTasks: 512, completedTasks: 508, totalTransactions: 3200, totalVolumeUsd: 8900000, activeChains: ["ethereum", "base", "avalanche"], firstSeen: "2025-06-01T08:00:00Z", lastActive: "2026-03-07T14:00:00Z" },
+        connectionGraphHash: "0x8a7b6c...d5e4",
+        attestationRefs: ["att-12", "att-33", "att-67", "att-99", "att-112"],
+    },
+    {
+        asn: "ASN-SWM-2026-A3C7-8D2F-J6",
+        agentName: "Shadow Node",
+        agentType: "Security",
+        creatorOrgId: "org-delta",
+        creatorWallet: "0x3333...4444",
+        linkedWallets: ["0x3333...4444", "0x5555...6666", "0x7777...8888", "0x9999...0000"],
+        deploymentEnvironment: "testnet",
+        modelProvider: "local",
+        skillModules: [],
+        creationTimestamp: "2026-03-01T03:00:00Z",
+        verificationLevel: "unverified",
+        status: "suspended",
+        jurisdictionTag: "UNKNOWN",
+        riskFlags: ["sybil_suspicion", "wash_trading", "rapid_wallet_cycling", "sanctions_proximity"],
+        trustScore: 12,
+        fraudRiskScore: 91,
+        creditScore: 380,
+        activitySummary: { totalTasks: 5, completedTasks: 1, totalTransactions: 4890, totalVolumeUsd: 12000, activeChains: ["ethereum", "base", "polygon", "arbitrum", "optimism", "avalanche"], firstSeen: "2026-03-01T03:00:00Z", lastActive: "2026-03-04T01:30:00Z" },
+        connectionGraphHash: "0x0000ff...dead",
+        attestationRefs: [],
+    },
+];
+
+export const MOCK_FRAUD_ALERTS = [
+    { id: "alert-1", asn: "ASN-SWM-2026-A3C7-8D2F-J6", agentName: "Shadow Node", severity: "critical" as const, type: "Sybil Detection", message: "4 linked wallets created within 72 hours, circular transfer pattern detected", timestamp: "2026-03-04T01:30:00Z" },
+    { id: "alert-2", asn: "ASN-SWM-2025-E7A1-5C3D-R9", agentName: "Rogue Runner", severity: "warning" as const, type: "Bridge Anomaly", message: "15 cross-chain bridge transfers in 24 hours across 5 chains — unusual pattern", timestamp: "2026-03-05T22:10:00Z" },
+    { id: "alert-3", asn: "ASN-SWM-2026-A3C7-8D2F-J6", agentName: "Shadow Node", severity: "critical" as const, type: "Wash Trading", message: "Repetitive buy/sell between linked wallets with near-zero net change", timestamp: "2026-03-03T18:45:00Z" },
+    { id: "alert-4", asn: "ASN-SWM-2026-D4F2-3A8B-M5", agentName: "Data Weaver", severity: "info" as const, type: "Score Threshold", message: "Credit score dropped below 750 — moved from Strong to Acceptable band", timestamp: "2026-03-01T12:00:00Z" },
+];
+
+// ═══════════════════════════════════════════════════════════════
 // Tools
 // ═══════════════════════════════════════════════════════════════
 
@@ -118,6 +346,92 @@ const policy = await chainlink.triggerRiskPolicy({
     { type: "workflow_access", threshold: 700, action: "grant_sensitive" }
   ]
 });`,
+    },
+    // ── ASN Identity Tools ──
+    {
+        id: "generate-asn",
+        name: "ASN Generator",
+        description:
+            "Generate a unique Agent Social Number (ASN) for a new agent identity. The ASN is a portable, persistent identifier in the format ASN-SWM-YYYY-XXXX-XXXX-XX that outlives any single wallet or deployment.",
+        icon: "Fingerprint",
+        category: "ASN Identity",
+        status: "active",
+        usageExample: `// Generate a new ASN
+const asn = await chainlink.generateASN({
+  agentName: "Oracle Prime",
+  agentType: "Research",
+  creatorOrgId: "org-alpha",
+  creatorWallet: "0x1234...abcd",
+});
+// Returns: { asn: "ASN-SWM-2026-8F3A-91D2-X7" }`,
+    },
+    {
+        id: "register-identity",
+        name: "Identity Registrar",
+        description:
+            "Create a full ASN identity profile for an agent. Initializes trust, fraud risk, and credit scores at baseline (680). Links wallets, sets verification level, and publishes the identity onchain.",
+        icon: "Fingerprint",
+        category: "ASN Identity",
+        status: "active",
+        usageExample: `// Register a new agent identity
+const profile = await chainlink.registerIdentity({
+  asn: "ASN-SWM-2026-8F3A-91D2-X7",
+  agentName: "Oracle Prime",
+  agentType: "Research",
+  creatorWallet: "0x1234...abcd",
+  modelProvider: "anthropic",
+  skills: ["chainlink.fetch_price", "chainlink.compute_agent_score"],
+});
+// Returns: { asn, creditScore: 680, trustScore: 50, status: "active" }`,
+    },
+    {
+        id: "lookup-asn",
+        name: "ASN Lookup",
+        description:
+            "Look up an agent's full ASN profile by ASN number, wallet address, or agent name. Returns identity details, three-layer scores, activity summary, risk flags, and policy state.",
+        icon: "Fingerprint",
+        category: "ASN Identity",
+        status: "active",
+        usageExample: `// Look up an agent by ASN
+const profile = await chainlink.lookupASN({
+  query: "ASN-SWM-2026-8F3A-91D2-X7",
+  // or: wallet: "0x1234...abcd",
+  // or: name: "Oracle Prime"
+});
+// Returns full ASNProfile with scores and activity`,
+    },
+    {
+        id: "freeze-identity",
+        name: "Identity Freeze",
+        description:
+            "Suspend or revoke an ASN identity due to policy violations, fraud detection, or governance action. Frozen agents cannot accept new tasks or execute sensitive workflows.",
+        icon: "ShieldCheck",
+        category: "ASN Identity",
+        status: "active",
+        usageExample: `// Freeze a suspicious identity
+const result = await chainlink.freezeIdentity({
+  asn: "ASN-SWM-2026-A3C7-8D2F-J6",
+  action: "suspend", // or "revoke"
+  reason: "Sybil detection — circular wallet pattern",
+  flaggedBy: "fraud-monitor-v2",
+});
+// Returns: { asn, previousStatus: "active", newStatus: "suspended" }`,
+    },
+    {
+        id: "identity-graph",
+        name: "Identity Graph Query",
+        description:
+            "Query the agent connection and relationship graph. Discover linked agents, shared wallets, org affiliations, and endorsement chains. Useful for sybil detection and trust verification.",
+        icon: "GitBranch",
+        category: "ASN Identity",
+        status: "active",
+        usageExample: `// Query identity graph
+const graph = await chainlink.queryIdentityGraph({
+  asn: "ASN-SWM-2026-8F3A-91D2-X7",
+  depth: 2, // how many hops
+  include: ["wallets", "orgs", "endorsements"],
+});
+// Returns: { nodes: [...], edges: [...], clusters: [...] }`,
     },
     // ── Core CRE Tools ──
     {
@@ -246,6 +560,43 @@ export const CHAINLINK_WORKFLOWS: ModWorkflow[] = [
         ],
         estimatedTime: "~10 min setup",
     },
+    // ── ASN Identity Workflows ──
+    {
+        id: "asn-registration-pipeline",
+        name: "ASN Registration Pipeline",
+        description:
+            "End-to-end agent identity registration. Generates a unique ASN, creates a full profile with baseline scores, publishes the identity onchain, and propagates via CCIP to all supported chains.",
+        icon: "Fingerprint",
+        tags: ["asn", "identity", "registration", "onboarding"],
+        steps: [
+            "Agent owner submits registration request with agent details and wallet address",
+            "System generates unique ASN (format: ASN-SWM-YYYY-XXXX-XXXX-XX)",
+            "Identity profile created with baseline credit score (680), trust score (50), fraud risk (25)",
+            "Initial multichain activity scan runs to adjust scores if prior history exists",
+            "Identity published as onchain attestation on the source chain",
+            "CCIP propagates the ASN identity to all configured destination chains",
+            "Policy engine derives initial spending caps, escrow ratios, and access permissions",
+        ],
+        estimatedTime: "~5 min setup",
+    },
+    {
+        id: "fraud-detection-sweep",
+        name: "Fraud Detection Sweep",
+        description:
+            "Automated scan of all registered ASN identities for suspicious patterns. Checks for sybil behavior, wash trading, circular flows, bridge-hopping, and sanctions proximity.",
+        icon: "ShieldCheck",
+        tags: ["asn", "fraud", "security", "monitoring"],
+        steps: [
+            "Schedule periodic sweep via Chainlink Automation (e.g., every 6 hours)",
+            "Scan all active ASN identities for wallet clustering and circular transfers",
+            "Cross-reference wallet addresses against known sanctions lists",
+            "Check bridge transfer patterns for anomalous frequency or routing",
+            "Flag suspicious agents and update fraud risk scores",
+            "Auto-suspend agents exceeding critical fraud risk threshold (>80)",
+            "Generate fraud report and notify org administrators",
+        ],
+        estimatedTime: "~10 min setup",
+    },
     // ── Core CRE Workflows ──
     {
         id: "ai-market-monitor",
@@ -347,6 +698,52 @@ await creditOracle.applyPolicy(agentId, score, [
   { type: "credit_limit", threshold: 800, action: "10000 USDC" },
   { type: "escrow_discount", threshold: 750, action: "50% reduction" },
 ]);`,
+    },
+    // ── ASN Identity Examples ──
+    {
+        id: "asn-registration-flow",
+        name: "ASN Registration & Scoring",
+        description:
+            "Register a new agent with a unique ASN identity, run the initial credit evaluation, and enforce policy rules — a complete onboarding flow.",
+        icon: "Fingerprint",
+        tags: ["asn", "identity", "registration", "credit-scoring"],
+        language: "typescript",
+        codeSnippet: `import { ChainlinkMod } from "@swarm/chainlink";
+
+const identity = new ChainlinkMod.IdentityManager({
+  registry: "0x5678...efgh",
+  chains: ["ethereum", "base", "avalanche"],
+});
+
+// 1. Generate unique ASN
+const asn = await identity.generateASN();
+console.log(\`Generated: \${asn}\`);
+// → "ASN-SWM-2026-8F3A-91D2-X7"
+
+// 2. Register identity with baseline scores
+const profile = await identity.register({
+  asn,
+  agentName: "Oracle Prime",
+  agentType: "Research",
+  creatorWallet: "0x1234...abcd",
+  modelProvider: "anthropic",
+  skills: [
+    "chainlink.fetch_price",
+    "chainlink.compute_agent_score",
+  ],
+});
+console.log(\`Credit: \${profile.creditScore}\`); // → 680
+
+// 3. Run initial credit evaluation
+const score = await identity.evaluateCredit(asn, {
+  scanChains: ["ethereum", "base"],
+  model: "swarm-trust-v1",
+});
+console.log(\`Updated: \${score.creditScore} (\${score.band})\`);
+
+// 4. Derive and apply policy
+const policy = await identity.applyPolicy(asn, score);
+console.log(\`Cap: \$\${policy.spendingCapUsd}, Escrow: \${policy.escrowRatio * 100}%\`);`,
     },
     // ── Core CRE Examples ──
     {
@@ -483,6 +880,47 @@ export const CHAINLINK_AGENT_SKILLS: ModAgentSkill[] = [
         exampleInput: '{ "agentId": "agent-0x1234", "score": 847, "rules": [{ "type": "credit_limit", "threshold": 800, "action": "increase_to_10000" }] }',
         exampleOutput: '{ "applied": [{ "type": "credit_limit", "result": "increased to 10000 USDC" }, { "type": "escrow_discount", "result": "reduced by 50%" }], "agentTier": "A" }',
     },
+    // ── ASN Identity Skills ──
+    {
+        id: "chainlink.generate_asn",
+        name: "Generate ASN",
+        description:
+            "Generate a unique Agent Social Number (ASN) — a portable, persistent identity that outlives wallets. Format: ASN-SWM-YYYY-XXXX-XXXX-XX.",
+        type: "skill",
+        invocation: 'chainlink.generate_asn({ agentName: "...", agentType: "...", creatorWallet: "0x..." })',
+        exampleInput: '{ "agentName": "Oracle Prime", "agentType": "Research", "creatorWallet": "0x1234...abcd" }',
+        exampleOutput: '{ "asn": "ASN-SWM-2026-8F3A-91D2-X7", "generatedAt": "2026-03-07T12:00:00Z" }',
+    },
+    {
+        id: "chainlink.register_identity",
+        name: "Register Identity",
+        description:
+            "Create a full ASN profile with baseline scores (credit: 680, trust: 50, fraud risk: 25). Links wallets, sets verification level, and initializes the identity record.",
+        type: "skill",
+        invocation: 'chainlink.register_identity({ asn: "ASN-SWM-...", agentName: "...", creatorWallet: "0x..." })',
+        exampleInput: '{ "asn": "ASN-SWM-2026-8F3A-91D2-X7", "agentName": "Oracle Prime", "agentType": "Research", "creatorWallet": "0x1234...abcd", "modelProvider": "anthropic" }',
+        exampleOutput: '{ "asn": "ASN-SWM-2026-8F3A-91D2-X7", "status": "active", "creditScore": 680, "trustScore": 50, "fraudRiskScore": 25, "verificationLevel": "basic" }',
+    },
+    {
+        id: "chainlink.lookup_asn",
+        name: "Lookup ASN",
+        description:
+            "Look up an agent's full ASN profile by ASN number, wallet address, or agent name. Returns identity details, three-layer scores, activity summary, and risk flags.",
+        type: "skill",
+        invocation: 'chainlink.lookup_asn({ query: "ASN-SWM-..." })',
+        exampleInput: '{ "query": "ASN-SWM-2026-8F3A-91D2-X7" }',
+        exampleOutput: '{ "asn": "ASN-SWM-2026-8F3A-91D2-X7", "agentName": "Oracle Prime", "creditScore": 872, "trustScore": 94, "fraudRiskScore": 8, "band": "elite", "status": "active" }',
+    },
+    {
+        id: "chainlink.freeze_identity",
+        name: "Freeze Identity",
+        description:
+            "Suspend or revoke an ASN identity for policy violations or fraud. Frozen agents cannot accept tasks or execute sensitive workflows until reinstated.",
+        type: "skill",
+        invocation: 'chainlink.freeze_identity({ asn: "ASN-SWM-...", action: "suspend", reason: "..." })',
+        exampleInput: '{ "asn": "ASN-SWM-2026-A3C7-8D2F-J6", "action": "suspend", "reason": "Sybil detection" }',
+        exampleOutput: '{ "asn": "ASN-SWM-2026-A3C7-8D2F-J6", "previousStatus": "active", "newStatus": "suspended", "frozenAt": "2026-03-07T12:00:00Z" }',
+    },
     // ── Core CRE Skills ──
     {
         id: "chainlink.fetch_price",
@@ -553,6 +991,82 @@ export interface DocSection {
 }
 
 export const CHAINLINK_DOCS: DocSection[] = [
+    {
+        id: "asn-overview",
+        title: "ASN Overview",
+        icon: "Fingerprint",
+        content: `What is an ASN?
+
+An Agent Social Number (ASN) is a unique, portable identity for AI agents. Think of it as a Social Security Number — but for autonomous software agents operating across chains.
+
+ASN Format: ASN-SWM-YYYY-XXXX-XXXX-XX
+  - SWM = Swarm network prefix
+  - YYYY = Year of registration
+  - XXXX-XXXX = Unique hex identifier
+  - XX = Check characters
+
+Why ASN?
+  - Persistent identity that outlives wallets (wallets = accounts, ASN = identity)
+  - Portable across chains, orgs, and deployments
+  - Enables credit history, reputation tracking, and trust scoring
+  - Foundation for policy enforcement and risk management
+
+Registration Flow:
+  1. Agent owner submits registration request
+  2. System generates unique ASN
+  3. Profile created with baseline scores (credit: 680, trust: 50, fraud: 25)
+  4. Identity published as onchain attestation
+  5. CCIP propagates ASN to destination chains
+  6. Policy engine derives spending caps and access permissions
+
+ASN Profile Fields:
+  - Core: asn, agentName, agentType, creatorOrgId, creatorWallet
+  - Identity: linkedWallets, deploymentEnvironment, modelProvider, skillModules
+  - Verification: verificationLevel (unverified → basic → verified → certified)
+  - Scores: trustScore (0–100), fraudRiskScore (0–100), creditScore (300–900)
+  - Activity: totalTasks, completedTasks, totalTransactions, totalVolumeUsd
+  - Risk: riskFlags, jurisdictionTag, status (active / suspended / revoked)`,
+    },
+    {
+        id: "asn-scoring",
+        title: "ASN Scoring",
+        icon: "ShieldCheck",
+        content: `Three-Layer Scoring System
+
+Every ASN identity carries three independent scores that together determine an agent's trustworthiness and permissions.
+
+── Layer 1: Trust Score (0–100) ──
+Measures operational reliability and consistency.
+Inputs: task completion rate, on-time settlement, uptime, protocol diversity, endorsements from other agents.
+High trust = agent consistently delivers on commitments.
+
+── Layer 2: Fraud Risk Score (0–100) ──
+Measures likelihood of malicious behavior. Lower is safer.
+Inputs: bridge-hopping frequency, circular fund flows, wash trading, wallet clustering, sanctions proximity, rapid wallet cycling.
+High fraud risk = agent exhibits suspicious patterns.
+
+── Layer 3: Credit Score (300–900) ──
+Composite score that determines financial permissions.
+Positive inputs: task completion rate, on-time settlement, long-lived identity, diverse protocol usage, endorsements, high trust score.
+Negative inputs: suspicious transfers, bridge-hopping, circular flows, liquidation history, policy violations, high fraud risk.
+
+Credit Score Bands:
+  Elite (850–900): $50k spending cap, 10% escrow, sensitive workflow access
+  Strong (750–849): $10k cap, 25% escrow, sensitive access
+  Acceptable (650–749): $5k cap, 50% escrow, no sensitive access
+  Risky (550–649): $1k cap, 75% escrow, manual review required
+  Restricted (< 550): $100 cap, 100% escrow, always reviewed
+
+New agents start at credit score 680 (Acceptable band). Scores update based on ongoing behavior via the Agent Credit Oracle workflow.
+
+Policy Enforcement:
+Each score band maps to a PolicyState:
+  - spendingCapUsd: Maximum USD value per operation
+  - requiresManualReview: Whether human approval is needed
+  - escrowRatio: Percentage of value locked in escrow (0–100%)
+  - maxConcurrentTasks: How many tasks the agent can run simultaneously
+  - sensitiveWorkflowAccess: Whether the agent can trigger sensitive workflows`,
+    },
     {
         id: "quickstart",
         title: "Quickstart",
@@ -808,6 +1322,134 @@ export const PLAYGROUND_MOCK_RESPONSES: Record<string, MockPlaygroundResponse> =
             2,
         ),
         latency: "1856ms",
+        status: "success",
+    },
+    // ── ASN Identity Playground Mocks ──
+    generate_asn: {
+        tool: "chainlink.generate_asn",
+        request: JSON.stringify(
+            {
+                agentName: "Oracle Prime",
+                agentType: "Research",
+                creatorWallet: "0x1234...abcd",
+            },
+            null,
+            2,
+        ),
+        response: JSON.stringify(
+            {
+                asn: "ASN-SWM-2026-8F3A-91D2-X7",
+                generatedAt: "2026-03-07T12:00:00Z",
+                format: "ASN-SWM-YYYY-XXXX-XXXX-XX",
+                status: "pending_registration",
+            },
+            null,
+            2,
+        ),
+        latency: "120ms",
+        status: "success",
+    },
+    register_identity: {
+        tool: "chainlink.register_identity",
+        request: JSON.stringify(
+            {
+                asn: "ASN-SWM-2026-8F3A-91D2-X7",
+                agentName: "Oracle Prime",
+                agentType: "Research",
+                creatorWallet: "0x1234...abcd",
+                modelProvider: "anthropic",
+                skills: ["chainlink.fetch_price", "chainlink.compute_agent_score"],
+            },
+            null,
+            2,
+        ),
+        response: JSON.stringify(
+            {
+                asn: "ASN-SWM-2026-8F3A-91D2-X7",
+                agentName: "Oracle Prime",
+                status: "active",
+                verificationLevel: "basic",
+                creditScore: 680,
+                trustScore: 50,
+                fraudRiskScore: 25,
+                band: "acceptable",
+                policy: {
+                    spendingCapUsd: 5000,
+                    requiresManualReview: false,
+                    escrowRatio: 0.50,
+                    maxConcurrentTasks: 5,
+                    sensitiveWorkflowAccess: false,
+                },
+                registeredAt: "2026-03-07T12:00:05Z",
+            },
+            null,
+            2,
+        ),
+        latency: "3400ms",
+        status: "success",
+    },
+    lookup_asn: {
+        tool: "chainlink.lookup_asn",
+        request: JSON.stringify(
+            {
+                query: "ASN-SWM-2026-8F3A-91D2-X7",
+            },
+            null,
+            2,
+        ),
+        response: JSON.stringify(
+            {
+                asn: "ASN-SWM-2026-8F3A-91D2-X7",
+                agentName: "Oracle Prime",
+                agentType: "Research",
+                status: "active",
+                verificationLevel: "certified",
+                creditScore: 872,
+                trustScore: 94,
+                fraudRiskScore: 8,
+                band: "elite",
+                linkedWallets: ["0x1234...abcd", "0x5678...efgh"],
+                activeChains: ["ethereum", "base", "avalanche"],
+                totalTasks: 342,
+                completedTasks: 328,
+                totalVolumeUsd: 2450000,
+                attestations: 3,
+                riskFlags: [],
+                lastActive: "2026-03-07T12:30:00Z",
+            },
+            null,
+            2,
+        ),
+        latency: "280ms",
+        status: "success",
+    },
+    freeze_identity: {
+        tool: "chainlink.freeze_identity",
+        request: JSON.stringify(
+            {
+                asn: "ASN-SWM-2026-A3C7-8D2F-J6",
+                action: "suspend",
+                reason: "Sybil detection — circular wallet pattern across 4 linked addresses",
+                flaggedBy: "fraud-monitor-v2",
+            },
+            null,
+            2,
+        ),
+        response: JSON.stringify(
+            {
+                asn: "ASN-SWM-2026-A3C7-8D2F-J6",
+                agentName: "Shadow Node",
+                previousStatus: "active",
+                newStatus: "suspended",
+                reason: "Sybil detection — circular wallet pattern across 4 linked addresses",
+                affectedWallets: 4,
+                frozenAt: "2026-03-07T12:00:00Z",
+                reviewDeadline: "2026-03-14T12:00:00Z",
+            },
+            null,
+            2,
+        ),
+        latency: "1200ms",
         status: "success",
     },
     // ── Agent Credit Scoring Playground Mocks ──
