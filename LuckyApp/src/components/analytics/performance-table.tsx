@@ -95,8 +95,8 @@ export function PerformanceTable<T>({
 export function PnlDisplay({ value, currency = "$" }: { value: number; currency?: string }) {
   const isPositive = value >= 0;
   const sign = isPositive ? "+" : "-";
-  const abs = Math.abs(value).toLocaleString(undefined, { minimumFractionDigits: currency === "HBAR" ? 2 : 0, maximumFractionDigits: 2 });
-  const display = currency === "HBAR" ? `${sign}${abs} HBAR` : `${sign}$${abs}`;
+  const abs = Math.abs(value).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+  const display = `${sign}$${abs}`;
   return (
     <span className={cn("font-semibold", isPositive ? "text-amber-600 dark:text-amber-400" : "text-red-500")}>
       {display}

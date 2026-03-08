@@ -21,6 +21,7 @@ import {
 } from "firebase/firestore";
 import { db } from "./firebase";
 import { CHAINLINK_MANIFEST } from "./chainlink";
+import { HBAR_MANIFEST } from "./hbar";
 
 // ═══════════════════════════════════════════════════════════════
 // Types
@@ -262,6 +263,26 @@ export const SKILL_REGISTRY: Skill[] = [
             iconName: "Link",
         },
         modManifest: CHAINLINK_MANIFEST,
+    },
+    {
+        id: "hbar-onchain",
+        name: "HBAR",
+        description: "On-chain task board, agent registry, and treasury on Hedera. Post tasks with HBAR budgets, register agents, and track P&L.",
+        type: "mod",
+        source: "verified",
+        category: "Web3",
+        icon: "ℏ",
+        version: "1.0.0",
+        author: "Swarm Core",
+        tags: ["hedera", "hbar", "onchain", "contracts", "treasury"],
+        pricing: { model: "free" },
+        sidebarConfig: {
+            sectionId: "modifications",
+            label: "HBAR",
+            href: "/hbar",
+            iconName: "Coins",
+        },
+        modManifest: HBAR_MANIFEST,
     },
 
     // ── Plugins ──

@@ -19,6 +19,7 @@ import {
 /** Map iconName strings from sidebarConfig to lucide components */
 const ICON_MAP: Record<string, typeof LayoutDashboard> = {
   Link: LinkIcon,
+  Coins: Coins,
 };
 
 // ═══════════════════════════════════════════════════════════════
