@@ -97,6 +97,14 @@ export interface Agent {
   onChainTxHash?: string;
   /** On-chain registration status */
   onChainRegistered?: boolean;
+  /** On-chain registration tx hash (LINK / Sepolia) */
+  linkOnChainTxHash?: string;
+  /** On-chain registration status (LINK / Sepolia) */
+  linkOnChainRegistered?: boolean;
+  /** ASN on-chain registration tx hash (Sepolia) */
+  asnOnChainTxHash?: string;
+  /** ASN on-chain registration status */
+  asnOnChainRegistered?: boolean;
   /** Credit score (300-900) */
   creditScore?: number;
   /** Trust score (0-100) */

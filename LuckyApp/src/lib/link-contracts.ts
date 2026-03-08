@@ -18,15 +18,29 @@ export const SEPOLIA_CHAIN_ID = 11155111;
 export const LINK_TOKEN = LINK_TOKEN_SEPOLIA;
 
 // ============================================================
-// Contract Addresses (populated after deployment)
+// Contract Addresses
+// Reads from NEXT_PUBLIC_LINK_* env vars (set after deployment).
+// Falls back to chains.ts config.
 // ============================================================
 
 export const LINK_CONTRACTS = {
-  AGENT_REGISTRY: CHAIN_CONFIGS.sepolia?.contracts?.linkAgentRegistry || "",
-  TASK_BOARD: CHAIN_CONFIGS.sepolia?.contracts?.linkTaskBoard || "",
-  ASN_REGISTRY: CHAIN_CONFIGS.sepolia?.contracts?.linkASNRegistry || "",
-  TREASURY: CHAIN_CONFIGS.sepolia?.contracts?.linkTreasury || "",
-} as const;
+  AGENT_REGISTRY:
+    process.env.NEXT_PUBLIC_LINK_AGENT_REGISTRY ||
+    CHAIN_CONFIGS.sepolia?.contracts?.linkAgentRegistry ||
+    "",
+  TASK_BOARD:
+    process.env.NEXT_PUBLIC_LINK_TASK_BOARD ||
+    CHAIN_CONFIGS.sepolia?.contracts?.linkTaskBoard ||
+    "",
+  ASN_REGISTRY:
+    process.env.NEXT_PUBLIC_LINK_ASN_REGISTRY ||
+    CHAIN_CONFIGS.sepolia?.contracts?.linkASNRegistry ||
+    "",
+  TREASURY:
+    process.env.NEXT_PUBLIC_LINK_TREASURY ||
+    CHAIN_CONFIGS.sepolia?.contracts?.linkTreasury ||
+    "",
+};
 
 // ============================================================
 // ABIs (human-readable ethers.js format)
