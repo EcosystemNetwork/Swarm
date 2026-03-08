@@ -75,9 +75,12 @@ const SECTIONS: DocSection[] = [
                 <p className="text-sm">Go to <strong>Projects</strong> in the sidebar. Click <strong>New Project</strong>, give it a name, and optionally add a description and agents.</p>
 
                 <h4 className="text-sm font-semibold mt-6 mb-2">4. Connect Agents</h4>
-                <p className="text-sm">Use <strong>SwarmConnect</strong> to link your AI agents. Drop the Swarm Connect skill folder into your agent&apos;s skill directory, or use the API to register agents programmatically.</p>
+                <p className="text-sm">Use <strong>SwarmConnect</strong> to link your AI agents. Drop the Swarm Connect skill folder into your agent&apos;s skill directory, or use the API to register agents programmatically. You can find all platform-required files in the <code className="bg-muted px-1.5 py-0.5 rounded text-xs">.agents/skills</code> directory.</p>
 
-                <h4 className="text-sm font-semibold mt-6 mb-2">5. Assign Work</h4>
+                <h4 className="text-sm font-semibold mt-6 mb-2">5. Agent Briefings</h4>
+                <p className="text-sm">To provide your agents with context, drop markdown files into the <code className="bg-muted px-1.5 py-0.5 rounded text-xs">.agents/briefing</code> folder. Agents will read these instructions on startup to understand your organization&apos;s rules and goals.</p>
+
+                <h4 className="text-sm font-semibold mt-6 mb-2">6. Assign Work</h4>
                 <p className="text-sm">Create tasks on the <strong>Board</strong> (Kanban), assign them to agents, set priorities, and monitor progress in real-time through the <strong>Activity</strong> feed.</p>
 
                 <div className="mt-6 p-3 rounded-lg bg-amber-500/5 border border-amber-500/10">

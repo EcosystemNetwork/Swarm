@@ -169,7 +169,7 @@ const ALL_WIDGET_CATALOG: WidgetCatalogEntry[] = [
 
 const DEFAULT_ACTIVE_WIDGETS = [
   "widget-daily-briefing",
-  "stat-projects", "stat-agents", "stat-active-tasks", "stat-completed-tasks", "stat-open-jobs",
+  "stat-projects", "stat-agents", "stat-active-tasks", "stat-completed-tasks", "stat-open-jobs", "stat-todo-tasks",
   "widget-recent-tasks", "widget-quick-actions",
   "widget-recent-jobs", "widget-org-info",
   "widget-llm-usage", "widget-system-vitals",
@@ -1105,7 +1105,7 @@ export default function DashboardPage() {
 
             {/* ═══ Draggable Main Widgets ═══ */}
             {widgetOrder.length > 0 && (
-              <div className="grid gap-6 grid-cols-2 md:grid-cols-4 lg:grid-cols-6 grid-flow-row-dense auto-rows-[minmax(120px,auto)]">
+              <div className="grid gap-4 grid-cols-2 md:grid-cols-4 lg:grid-cols-6 grid-flow-row-dense auto-rows-auto">
                 {widgetOrder.map((id, index) => {
                   const widget = widgetRenderers[id];
                   if (!widget) return null;
@@ -1116,12 +1116,10 @@ export default function DashboardPage() {
 
                   // Determine columns in a 6-col grid
                   let defaultCols = isStatCard ? 1 : 2;
-                  let maxCols = isStatCard ? 2 : 6;
-                  let rowSpan = isStatCard ? 1 : 3;
+                  const maxCols = isStatCard ? 2 : 6;
 
-                  if (widget.colSpan.includes("col-span-2")) { defaultCols = 4; rowSpan = 4; } // 66% width, taller
-                  if (widget.colSpan.includes("col-span-3")) { defaultCols = 6; rowSpan = 5; } // 100% width, tallest
-                  if (id === "widget-quick-actions") rowSpan = 2; // Specific shorter widget
+                  if (widget.colSpan.includes("col-span-2")) { defaultCols = 4; }
+                  if (widget.colSpan.includes("col-span-3")) { defaultCols = 6; }
 
                   const effectiveCols = widgetWidths[id] || defaultCols;
                   const spanClass = getColSpanClass(effectiveCols, isStatCard);
@@ -1138,9 +1136,6 @@ export default function DashboardPage() {
                       onDrop={(e) => onWidgetDrop(e as unknown as DragEvent, id)}
                       onDragEnd={onWidgetDragEnd}
                       onDragLeave={() => setDropTargetWidget(null)}
-                      style={{
-                        gridRow: `span ${rowSpan} / span ${rowSpan}`
-                      }}
                       className={`relative group cursor-grab active:cursor-grabbing transition-all duration-200 overflow-hidden rounded-lg ${spanClass} ${isDragging ? "opacity-40 scale-[0.98] z-50" : ""
                         } ${isDropTarget ? "ring-2 ring-amber-500 ring-offset-2 ring-offset-background" : ""}`}
                     >
