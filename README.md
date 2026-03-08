@@ -178,7 +178,29 @@ Four Solidity contracts deployed to **Ethereum Sepolia** (LINK-based), deployed 
 ### Chainlink Integration
 
 - **Live Price Feeds** — `/api/chainlink/prices` reads real on-chain Chainlink oracles (ETH/USD, BTC/USD, LINK/USD, etc.) across Ethereum, Avalanche, Base, and Sepolia with 30-second caching
-- **CRE Workflow** *(Partial)* — Chainlink Runtime Environment workflow for monitoring agent fleet status every 10 minutes. Workflow defined and simulation-ready; not deployed to production CRE.
+- **CRE Workflow** — Chainlink Runtime Environment workflow for monitoring agent fleet status every 10 minutes. Combines offchain Swarm API data with onchain oracle reads via DON consensus. Simulation-ready via `cre workflow simulate`.
+
+#### Files That Use Chainlink
+
+| File | Purpose |
+|------|---------|
+| [`cre-workflow/index.ts`](cre-workflow/index.ts) | CRE workflow — fleet monitoring + Chainlink oracle reads via DON consensus |
+| [`cre-workflow/workflow.yaml`](cre-workflow/workflow.yaml) | CRE simulation and deployment config |
+| [`cre-workflow/config.json`](cre-workflow/config.json) | CRE workflow runtime config (org, agent, oracle address) |
+| [`cre-workflow/README.md`](cre-workflow/README.md) | CRE workflow documentation |
+| [`contracts/contracts/SwarmAgentRegistryLink.sol`](contracts/contracts/SwarmAgentRegistryLink.sol) | On-chain agent registry with LINK token (Sepolia) |
+| [`contracts/contracts/SwarmTaskBoardLink.sol`](contracts/contracts/SwarmTaskBoardLink.sol) | Task board with LINK escrow payments |
+| [`contracts/contracts/SwarmASNRegistry.sol`](contracts/contracts/SwarmASNRegistry.sol) | Agent Social Number identity + reputation registry |
+| [`contracts/contracts/SwarmTreasuryLink.sol`](contracts/contracts/SwarmTreasuryLink.sol) | LINK treasury with automated revenue splits |
+| [`contracts/scripts/deploy.ts`](contracts/scripts/deploy.ts) | Deployment script for LINK contracts |
+| [`LuckyApp/src/lib/chainlink.ts`](LuckyApp/src/lib/chainlink.ts) | Chainlink mod manifest — tools, workflows, credit scoring policies |
+| [`LuckyApp/src/lib/chainlink-service.ts`](LuckyApp/src/lib/chainlink-service.ts) | Price feed service + Chainlink workflow CRUD |
+| [`LuckyApp/src/app/api/chainlink/prices/route.ts`](LuckyApp/src/app/api/chainlink/prices/route.ts) | Live Chainlink oracle API endpoint |
+| [`LuckyApp/src/lib/link-contracts.ts`](LuckyApp/src/lib/link-contracts.ts) | LINK contract ABIs + interaction helpers |
+| [`LuckyApp/src/lib/chains.ts`](LuckyApp/src/lib/chains.ts) | Chain config with Chainlink oracle addresses |
+| [`LuckyApp/src/hooks/useLinkWrite.ts`](LuckyApp/src/hooks/useLinkWrite.ts) | React hook for LINK contract write transactions |
+| [`LuckyApp/src/hooks/useLinkData.ts`](LuckyApp/src/hooks/useLinkData.ts) | React hook for LINK contract read calls |
+| [`LuckyApp/src/app/(dashboard)/chainlink/page.tsx`](LuckyApp/src/app/(dashboard)/chainlink/page.tsx) | Chainlink dashboard UI page |
 
 ### Active Chat Monitoring
 - **Daemon Mode** — `swarm daemon` polls all channels every 30 seconds (configurable)
@@ -694,7 +716,7 @@ Swarm/
 - **Testnet only** — All smart contracts are deployed to Ethereum Sepolia (testnet). No mainnet deployments.
 - **Single-org focus** — While multi-tenant, there is no cross-org communication or federation.
 - **No CI/CD pipeline** — No GitHub Actions, no automated tests in the repo.
-- **Thirdweb social API workaround** — The app patches `fetch` to intercept failing requests to `social.thirdweb.com` and return empty 200 responses, preventing infinite retry loops from the Thirdweb SDK.
+- **Thirdweb social API workaround** — The app patches `fetch` with a circuit-breaker interceptor for `social.thirdweb.com`. After 3 consecutive failures, the circuit opens and returns clearly-marked degraded responses (`X-Swarm-Degraded` header, `_degraded` body flag) to prevent infinite retry loops from the Thirdweb SDK. See [`LuckyApp/src/lib/fetch-interceptor.ts`](LuckyApp/src/lib/fetch-interceptor.ts).
 
 ## Deployment
 

@@ -34,6 +34,8 @@ export default function LandingPage() {
   const [signingIn, setSigningIn] = useState(false);
   const [signError, setSignError] = useState<string | null>(null);
   const challengeStarted = useRef(false);
+  const accountRef = useRef(account);
+  accountRef.current = account;
 
   useEffect(() => setMounted(true), []);
 
@@ -48,7 +50,7 @@ export default function LandingPage() {
 
   // Trigger wallet challenge flow when wallet connects
   const startChallengeFlow = useCallback(async (address: string) => {
-    if (challengeStarted.current || signingIn || authenticated) return;
+    if (challengeStarted.current) return;
     challengeStarted.current = true;
     setSigningIn(true);
     setSignError(null);
@@ -57,10 +59,11 @@ export default function LandingPage() {
       // 1. Request nonce from server
       const { message } = await requestChallenge(address);
 
-      // 2. Sign the message with wallet (uses ethers via Thirdweb account)
-      if (!account) throw new Error("Wallet disconnected during signing");
+      // 2. Sign the message with wallet (read live ref, not stale closure)
+      const liveAccount = accountRef.current;
+      if (!liveAccount) throw new Error("Wallet disconnected during signing");
 
-      const signature = await account.signMessage({ message });
+      const signature = await liveAccount.signMessage({ message });
 
       // 3. Verify signature on server (creates session + sets cookie)
       const success = await verifyChallenge(address, signature, message);
@@ -72,26 +75,27 @@ export default function LandingPage() {
       // On success, the useEffect above will redirect to dashboard
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Sign-in failed";
-      // If user rejected the signature, don't show as error
       if (msg.includes("rejected") || msg.includes("denied") || msg.includes("cancelled")) {
-        setSignError(null);
+        // User rejected — don't auto-retry, let them click "Try again"
+        setSignError("Signature declined. Click below to try again.");
       } else {
         setSignError(msg);
       }
-      challengeStarted.current = false;
+      // Don't reset challengeStarted — prevents auto-retry loop.
+      // User must click "Try again" to re-trigger.
     } finally {
       setSigningIn(false);
     }
-  }, [account, authenticated, signingIn, requestChallenge, verifyChallenge]);
+  }, [requestChallenge, verifyChallenge]);
 
-  // When wallet connects, start challenge flow
+  // When wallet connects, start challenge flow (once)
   useEffect(() => {
-    if (account?.address && !authenticated && !signingIn && !challengeStarted.current) {
+    if (account?.address && !authenticated && !challengeStarted.current) {
       startChallengeFlow(account.address);
     }
-  }, [account?.address, authenticated, signingIn, startChallengeFlow]);
+  }, [account?.address, authenticated, startChallengeFlow]);
 
-  // Reset challenge started flag when wallet disconnects
+  // Reset when wallet disconnects so reconnecting works
   useEffect(() => {
     if (!account) {
       challengeStarted.current = false;
@@ -233,6 +237,7 @@ export default function LandingPage() {
                 <button
                   onClick={() => {
                     setSignError(null);
+                    challengeStarted.current = false;
                     if (account?.address) startChallengeFlow(account.address);
                   }}
                   className="mt-2 text-xs text-amber-400 hover:text-amber-300 underline"
