@@ -60,6 +60,10 @@ export function OrgProvider({ children }: { children: ReactNode }) {
   // Track the grace-period timer so we can cancel if wallet reconnects
   const disconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Track which address we last fetched for — prevents duplicate fetches
+  // when connectionStatus changes but address stays the same.
+  const lastFetchedAddress = useRef<string | null>(null);
+
   const fetchOrgs = useCallback(async (walletAddress: string) => {
     try {
       setError(null);
@@ -127,6 +131,7 @@ export function OrgProvider({ children }: { children: ReactNode }) {
       });
 
       // Refresh orgs to get the new one
+      lastFetchedAddress.current = null; // Force re-fetch
       await refreshOrgs();
 
       // Auto-select the new org
@@ -145,7 +150,9 @@ export function OrgProvider({ children }: { children: ReactNode }) {
     }
   }, [address, refreshOrgs, organizations]);
 
-  // Load orgs when wallet connects, debounce disconnects
+  // Load orgs when wallet connects, debounce disconnects.
+  // Only re-fetch when the address actually changes — ignore connectionStatus
+  // transitions that don't affect the address (e.g. 'connecting' → 'connected').
   useEffect(() => {
     if (address) {
       // Wallet (re-)connected — cancel any pending disconnect timer
@@ -153,7 +160,12 @@ export function OrgProvider({ children }: { children: ReactNode }) {
         clearTimeout(disconnectTimer.current);
         disconnectTimer.current = null;
       }
-      refreshOrgs();
+      // Only fetch if this is a new address (prevents duplicate fetches
+      // when connectionStatus changes but address stays the same)
+      if (address !== lastFetchedAddress.current) {
+        lastFetchedAddress.current = address;
+        refreshOrgs();
+      }
     } else if (connectionStatus === 'connecting' || connectionStatus === 'unknown') {
       // Wallet is actively reconnecting (AutoConnect, page reload) — don't clear state yet.
       // Cancel any existing timer since reconnection is in progress.
@@ -164,6 +176,7 @@ export function OrgProvider({ children }: { children: ReactNode }) {
     } else {
       // Wallet address is falsy AND status is definitively disconnected —
       // start grace period before clearing state.
+      lastFetchedAddress.current = null;
       if (!disconnectTimer.current) {
         disconnectTimer.current = setTimeout(() => {
           setOrganizations([]);
