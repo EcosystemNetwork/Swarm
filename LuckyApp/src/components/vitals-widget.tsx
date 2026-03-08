@@ -1,9 +1,11 @@
 /** Vitals Widget — 3 SVG circular gauges (CPU/RAM/Disk) with color-coded thresholds. */
 "use client";
 
+import { useState, useEffect } from "react";
 import { Cpu, HardDrive, MemoryStick, Server } from "lucide-react";
 import { Card } from "@/components/ui/card";
-import { vitalColor, vitalBg, fmtBytes } from "@/lib/vitals";
+import { vitalColor, vitalBg, fmtBytes, getLatestVitals } from "@/lib/vitals";
+import { useOrg } from "@/contexts/OrgContext";
 
 // ═══════════════════════════════════════════════════════════════
 // Circular Gauge
@@ -55,15 +57,43 @@ interface VitalsData {
     uptime?: string;
 }
 
+const DEMO_VITALS: VitalsData = {
+    cpu: { usage: 23, chip: "Apple M2" },
+    memory: { usedBytes: 12.4e9, totalBytes: 16e9, percent: 77 },
+    disk: { usedBytes: 234e9, totalBytes: 512e9, percent: 46 },
+    hostname: "swarm-node-01",
+    uptime: "14d 7h",
+};
+
 export function VitalsWidget({ data }: { data?: VitalsData | null }) {
-    // Demo data when no real data available
-    const vitals: VitalsData = data || {
-        cpu: { usage: 23, chip: "Apple M2" },
-        memory: { usedBytes: 12.4e9, totalBytes: 16e9, percent: 77 },
-        disk: { usedBytes: 234e9, totalBytes: 512e9, percent: 46 },
-        hostname: "swarm-node-01",
-        uptime: "14d 7h",
-    };
+    const { currentOrg } = useOrg();
+    const [fetched, setFetched] = useState<VitalsData | null>(null);
+
+    // Fetch real vitals when no data prop is provided
+    useEffect(() => {
+        if (data !== undefined || !currentOrg) return;
+        let cancelled = false;
+        getLatestVitals(currentOrg.id).then((v) => {
+            if (cancelled || !v) return;
+            setFetched({ cpu: v.cpu, memory: v.memory, disk: v.disk, hostname: v.hostname, uptime: v.uptime });
+        }).catch(() => {});
+        return () => { cancelled = true; };
+    }, [currentOrg, data]);
+
+    // Auto-refresh every 60s
+    useEffect(() => {
+        if (data !== undefined || !currentOrg) return;
+        const interval = setInterval(() => {
+            getLatestVitals(currentOrg.id).then((v) => {
+                if (!v) return;
+                setFetched({ cpu: v.cpu, memory: v.memory, disk: v.disk, hostname: v.hostname, uptime: v.uptime });
+            }).catch(() => {});
+        }, 60_000);
+        return () => clearInterval(interval);
+    }, [currentOrg, data]);
+
+    const vitals: VitalsData = data || fetched || DEMO_VITALS;
+    const isDemo = !data && !fetched;
 
     return (
         <Card className="p-4 bg-card/80 border-border overflow-hidden">
@@ -72,11 +102,16 @@ export function VitalsWidget({ data }: { data?: VitalsData | null }) {
                     <Server className="h-4 w-4 text-muted-foreground" />
                     <h3 className="text-sm font-semibold">System Vitals</h3>
                 </div>
-                {vitals.hostname && (
-                    <span className="text-[9px] text-muted-foreground font-mono truncate ml-2">
-                        {vitals.hostname} {vitals.uptime && `· ${vitals.uptime}`}
-                    </span>
-                )}
+                <div className="flex items-center gap-2">
+                    {isDemo && (
+                        <span className="text-[9px] text-muted-foreground/50 italic">Demo data</span>
+                    )}
+                    {vitals.hostname && (
+                        <span className="text-[9px] text-muted-foreground font-mono truncate ml-2">
+                            {vitals.hostname} {vitals.uptime && `· ${vitals.uptime}`}
+                        </span>
+                    )}
+                </div>
             </div>
             <div className="flex justify-around gap-2 overflow-hidden">
                 <CircularGauge

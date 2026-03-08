@@ -1,7 +1,7 @@
 /** Doctor — System health diagnostics across Infrastructure, Agents, and Security categories. */
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import {
     Stethoscope, CheckCircle, AlertTriangle, XCircle, RefreshCw, Loader2,
     Database, Wifi, Users, Clock, Shield, Server,
@@ -298,6 +298,19 @@ export default function DoctorPage() {
         }
     }, [currentOrg?.id, account?.address]);
 
+    // Auto-run on mount
+    useEffect(() => {
+        runChecks();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    // Auto-refresh every 60s after first run
+    useEffect(() => {
+        if (checks.length === 0) return;
+        const interval = setInterval(runChecks, 60_000);
+        return () => clearInterval(interval);
+    }, [runChecks, checks.length]);
+
     const healthy = checks.filter(c => c.status === "healthy").length;
     const warnings = checks.filter(c => c.status === "warning").length;
     const critical = checks.filter(c => c.status === "critical").length;
@@ -337,7 +350,7 @@ export default function DoctorPage() {
                 <div className="flex items-center gap-3">
                     {lastRun && (
                         <span className="text-[10px] text-muted-foreground">
-                            Last checked {lastRun.toLocaleTimeString()}
+                            Last checked {lastRun.toLocaleTimeString()} · refreshes every 60s
                         </span>
                     )}
                     <Button

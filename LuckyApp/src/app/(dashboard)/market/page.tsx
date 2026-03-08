@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useOrg } from "@/contexts/OrgContext";
 import { useActiveAccount } from "thirdweb/react";
 import {
@@ -346,6 +347,8 @@ export default function MarketPage() {
     const [userSubmissions, setUserSubmissions] = useState<CommunityMarketItem[]>([]);
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState("");
+    const [debouncedSearch, setDebouncedSearch] = useState("");
+    const [sortBy, setSortBy] = useState<"name" | "type">("name");
     const [category, setCategory] = useState("All");
     const [sourceFilter, setSourceFilter] = useState<"all" | "verified" | "community">("all");
     const [busyId, setBusyId] = useState<string | null>(null);
@@ -487,8 +490,14 @@ export default function MarketPage() {
         }
     };
 
-    // Reset category when switching tabs
-    useEffect(() => { setCategory("All"); setSearch(""); }, [tab]);
+    // Debounce search input
+    useEffect(() => {
+        const timer = setTimeout(() => setDebouncedSearch(search), 300);
+        return () => clearTimeout(timer);
+    }, [search]);
+
+    // Reset filters when switching tabs
+    useEffect(() => { setCategory("All"); setSearch(""); setSortBy("name"); }, [tab]);
 
     const inventoryMap = useMemo(() => new Map(inventory.map((i) => [i.skillId, i])), [inventory]);
     const subscriptionMap = useMemo(() => new Map(subscriptions.map((s) => [s.itemId, s])), [subscriptions]);
@@ -563,9 +572,9 @@ export default function MarketPage() {
             items = items.filter((s) => inventoryMap.has(s.id));
         }
 
-        // Search
-        if (search) {
-            const q = search.toLowerCase();
+        // Search (debounced)
+        if (debouncedSearch) {
+            const q = debouncedSearch.toLowerCase();
             items = items.filter((s) =>
                 s.name.toLowerCase().includes(q) ||
                 s.description.toLowerCase().includes(q) ||
@@ -583,8 +592,15 @@ export default function MarketPage() {
             items = items.filter((s) => s.source === sourceFilter);
         }
 
+        // Sort
+        items = [...items].sort((a, b) => {
+            if (sortBy === "name") return a.name.localeCompare(b.name);
+            if (sortBy === "type") return a.type.localeCompare(b.type);
+            return 0;
+        });
+
         return items;
-    }, [allItems, activeType, tab, search, category, sourceFilter, inventoryMap]);
+    }, [allItems, activeType, tab, debouncedSearch, category, sourceFilter, sortBy, inventoryMap]);
 
     // Categories for active tab (include community categories dynamically)
     const categories = useMemo(() => {
@@ -670,6 +686,15 @@ export default function MarketPage() {
                                 className="pl-9"
                             />
                         </div>
+                        <Select value={sortBy} onValueChange={(v) => setSortBy(v as "name" | "type")}>
+                            <SelectTrigger className="w-[130px] shrink-0">
+                                <SelectValue placeholder="Sort by" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="name">Name</SelectItem>
+                                <SelectItem value="type">Type</SelectItem>
+                            </SelectContent>
+                        </Select>
                         <div className="flex items-center gap-1 shrink-0">
                             {(["all", "verified", "community"] as const).map((s) => (
                                 <button
@@ -706,8 +731,22 @@ export default function MarketPage() {
 
                     {/* Items Grid */}
                     {loading ? (
-                        <div className="flex items-center justify-center py-20">
-                            <Loader2 className="h-6 w-6 animate-spin text-amber-500" />
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            {Array.from({ length: 6 }, (_, i) => (
+                                <Card key={i} className="p-4 bg-card/80 border-border">
+                                    <div className="flex items-start gap-3">
+                                        <div className="w-10 h-10 rounded-lg bg-muted/50 animate-pulse shrink-0" />
+                                        <div className="flex-1 space-y-2">
+                                            <div className="h-4 w-2/3 bg-muted/50 rounded animate-pulse" />
+                                            <div className="h-3 w-full bg-muted/30 rounded animate-pulse" />
+                                            <div className="flex gap-2 mt-1">
+                                                <div className="h-5 w-16 bg-muted/30 rounded-full animate-pulse" />
+                                                <div className="h-5 w-14 bg-muted/30 rounded-full animate-pulse" />
+                                            </div>
+                                        </div>
+                                    </div>
+                                </Card>
+                            ))}
                         </div>
                     ) : filteredItems.length > 0 ? (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">

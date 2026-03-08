@@ -481,6 +481,7 @@ export function Sidebar() {
   };
 
   return (
+    <TooltipProvider delayDuration={0}>
     <aside className={cn(
       "h-full border-r border-border shrink-0 transition-all duration-300 flex flex-col",
       "bg-card/50 backdrop-blur-xl",
@@ -570,31 +571,51 @@ export function Sidebar() {
                         isDropTarget && `before:absolute before:left-2 before:right-2 before:top-0 before:h-[2px] before:rounded-full ${colors.activeBar}`
                       )}
                     >
-                      <Link
-                        href={item.href}
-                        title={collapsed ? item.label : undefined}
-                        className={cn(
-                          "relative flex items-center gap-2.5 rounded-lg text-sm font-medium transition-all duration-200",
-                          collapsed ? "justify-center p-2" : "px-2.5 py-1.5",
-                          isActive
-                            ? `${colors.activeBg} ${colors.activeText} border ${colors.activeBorder}`
-                            : "text-muted-foreground hover:text-foreground hover:bg-muted/50 border border-transparent"
-                        )}
-                      >
-                        {isActive && (
-                          <span className={cn("absolute left-0 top-1/2 -translate-y-1/2 w-[2px] h-4 rounded-full", colors.activeBar)} />
-                        )}
-                        {!collapsed && (
+                      {collapsed ? (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Link
+                              href={item.href}
+                              className={cn(
+                                "relative flex items-center gap-2.5 rounded-lg text-sm font-medium transition-all duration-200",
+                                "justify-center p-2",
+                                isActive
+                                  ? `${colors.activeBg} ${colors.activeText} border ${colors.activeBorder}`
+                                  : "text-muted-foreground hover:text-foreground hover:bg-muted/50 border border-transparent"
+                              )}
+                            >
+                              {isActive && (
+                                <span className={cn("absolute left-0 top-1/2 -translate-y-1/2 w-[2px] h-4 rounded-full", colors.activeBar)} />
+                              )}
+                              <item.icon className="shrink-0 h-4.5 w-4.5" />
+                            </Link>
+                          </TooltipTrigger>
+                          <TooltipContent side="right" sideOffset={8}>{item.label}</TooltipContent>
+                        </Tooltip>
+                      ) : (
+                        <Link
+                          href={item.href}
+                          className={cn(
+                            "relative flex items-center gap-2.5 rounded-lg text-sm font-medium transition-all duration-200",
+                            "px-2.5 py-1.5",
+                            isActive
+                              ? `${colors.activeBg} ${colors.activeText} border ${colors.activeBorder}`
+                              : "text-muted-foreground hover:text-foreground hover:bg-muted/50 border border-transparent"
+                          )}
+                        >
+                          {isActive && (
+                            <span className={cn("absolute left-0 top-1/2 -translate-y-1/2 w-[2px] h-4 rounded-full", colors.activeBar)} />
+                          )}
                           <GripVertical className="h-2.5 w-2.5 text-muted-foreground/0 group-hover/item:text-muted-foreground/40 transition-colors shrink-0 cursor-grab active:cursor-grabbing" />
-                        )}
-                        <item.icon className={cn("shrink-0", collapsed ? "h-4.5 w-4.5" : "h-4 w-4")} />
-                        {!collapsed && <span className="truncate">{item.label}</span>}
-                        {!collapsed && item.badge && (
-                          <span className={cn("ml-auto text-[9px] px-1.5 py-0.5 rounded-full font-medium", colors.badgeBg, colors.badgeText)}>
-                            {item.badge}
-                          </span>
-                        )}
-                      </Link>
+                          <item.icon className="shrink-0 h-4 w-4" />
+                          <span className="truncate">{item.label}</span>
+                          {item.badge && (
+                            <span className={cn("ml-auto text-[9px] px-1.5 py-0.5 rounded-full font-medium", colors.badgeBg, colors.badgeText)}>
+                              {item.badge}
+                            </span>
+                          )}
+                        </Link>
+                      )}
                     </div>
                   );
                 })}
@@ -609,11 +630,10 @@ export function Sidebar() {
       <div className={cn("border-t border-border pt-1", collapsed ? "px-1" : "px-2")}>
         {PINNED_ITEMS.map((item) => {
           const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
-          return (
+          const linkContent = (
             <Link
               key={item.id}
               href={item.href}
-              title={collapsed ? item.label : undefined}
               className={cn(
                 "relative flex items-center gap-2.5 rounded-lg text-sm font-medium transition-all duration-200",
                 collapsed ? "justify-center p-2" : "px-2.5 py-1.5",
@@ -628,6 +648,14 @@ export function Sidebar() {
               <item.icon className={cn("shrink-0", collapsed ? "h-4.5 w-4.5" : "h-4 w-4")} />
               {!collapsed && <span className="truncate">{item.label}</span>}
             </Link>
+          );
+          return collapsed ? (
+            <Tooltip key={item.id}>
+              <TooltipTrigger asChild>{linkContent}</TooltipTrigger>
+              <TooltipContent side="right" sideOffset={8}>{item.label}</TooltipContent>
+            </Tooltip>
+          ) : (
+            <div key={item.id}>{linkContent}</div>
           );
         })}
       </div>
@@ -664,5 +692,6 @@ export function Sidebar() {
         </button>
       </div>
     </aside>
+    </TooltipProvider>
   );
 }
