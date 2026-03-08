@@ -24,23 +24,23 @@ export function StatCard({ title, value, icon, change, changeLabel, prefix }: St
   return (
     <div className="gradient-border-spin overflow-hidden rounded-xl">
       <SpotlightCard
-        className="p-6"
+        className="p-4"
         spotlightColor="rgba(255, 191, 0, 0.08)"
       >
-        <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center justify-between mb-1">
           <DecryptedText
             text={title}
             speed={40}
             maxIterations={8}
-            className="text-sm font-medium text-muted-foreground"
-            encryptedClassName="text-sm font-medium text-amber-500/50"
+            className="text-xs font-medium text-muted-foreground"
+            encryptedClassName="text-xs font-medium text-amber-500/50"
             animateOn="view"
             sequential
             revealDirection="start"
           />
-          <span className="text-2xl animate-icon-pulse">{icon}</span>
+          <span className="text-xl animate-icon-pulse">{icon}</span>
         </div>
-        <div className="text-2xl font-bold tracking-tight text-glow-gold">
+        <div className="text-xl font-bold tracking-tight text-glow-gold">
           {prefix}
           {isNumeric ? (
             <CountUp to={numericValue} duration={1.5} separator="," />
@@ -49,10 +49,10 @@ export function StatCard({ title, value, icon, change, changeLabel, prefix }: St
           )}
         </div>
         {hasChange && (
-          <div className="flex items-center gap-1 mt-2">
+          <div className="flex items-center gap-1 mt-1">
             <span
               className={cn(
-                "text-xs font-medium flex items-center gap-0.5",
+                "text-[10px] font-medium flex items-center gap-0.5",
                 isPositive ? "text-amber-600 dark:text-amber-400" : "text-red-500"
               )}
             >

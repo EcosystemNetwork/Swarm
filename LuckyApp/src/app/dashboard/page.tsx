@@ -1157,7 +1157,7 @@ export default function DashboardPage() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.6, ease: "easeOut" }}
-                className={`grid gap-4 md:grid-cols-2 ${statOrder.length <= 3 ? "lg:grid-cols-3" : statOrder.length <= 4 ? "lg:grid-cols-4" : "lg:grid-cols-5"}`}
+                className={`grid gap-3 md:grid-cols-3 ${statOrder.length <= 3 ? "lg:grid-cols-3" : statOrder.length <= 4 ? "lg:grid-cols-4" : statOrder.length <= 5 ? "lg:grid-cols-5" : "lg:grid-cols-6"}`}
               >
                 {statOrder.map((id, index) => {
                   const config = statCardConfigs[id];

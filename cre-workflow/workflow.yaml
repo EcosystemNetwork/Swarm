@@ -1,0 +1,28 @@
+# ==========================================================================
+# Swarm Agent Monitor — CRE Workflow Settings
+# ==========================================================================
+#
+# Monitors the Swarm multi-agent platform using Chainlink oracles.
+# Cron: every 10 minutes. Reads ETH/USD from Sepolia price feed.
+# No mainnet writes. Read-only oracle + HTTP fetch.
+#
+# Simulation:  cre workflow simulate --target local-simulation
+# Deploy:      cre workflow deploy --target production-testnet
+
+# ==========================================================================
+local-simulation:
+  user-workflow:
+    workflow-owner-address: ""
+    workflow-name: "swarm-agent-monitor"
+  workflow-artifacts:
+    workflow-path: "./index.ts"
+    config-path: "./config.json"
+
+# ==========================================================================
+production-testnet:
+  user-workflow:
+    workflow-owner-address: ""
+    workflow-name: "swarm-agent-monitor"
+  workflow-artifacts:
+    workflow-path: "./index.ts"
+    config-path: "./config.json"

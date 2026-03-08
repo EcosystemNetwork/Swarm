@@ -1,0 +1,20 @@
+{
+  "name": "@swarm-protocol/cre-workflow",
+  "version": "1.0.0",
+  "description": "Swarm Agent Monitor — Chainlink CRE workflow for monitoring the Swarm multi-agent platform",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "simulate": "cre workflow simulate --target local-simulation",
+    "deploy": "cre workflow deploy --target production-testnet",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@chainlink/cre-sdk": "latest",
+    "viem": "^2.0.0",
+    "zod": "^3.23.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.0"
+  }
+}

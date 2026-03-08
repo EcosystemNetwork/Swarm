@@ -2,7 +2,7 @@
 "use client";
 
 import { useState } from "react";
-import { Book, ChevronRight, Rocket, Users, FolderKanban, MessageSquare, Shield, Clock, BarChart3, Network, Brain, Package, Coins, Stethoscope, LayoutGrid, HardDrive, Map, Briefcase, Activity, Settings, Terminal, Zap, Lock, Globe, Code, ExternalLink } from "lucide-react";
+import { Book, ChevronRight, Rocket, Users, FolderKanban, MessageSquare, Shield, Clock, BarChart3, Network, Brain, Package, Coins, Stethoscope, LayoutGrid, HardDrive, Map, Briefcase, Activity, Settings, Terminal, Zap, Lock, Globe, Code, ExternalLink, Store, Palette } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 
@@ -361,6 +361,49 @@ const SECTIONS: DocSection[] = [
             </div>
         ),
     },
+    {
+        id: "creators-market",
+        title: "Creators & Marketplace",
+        icon: Store,
+        color: "text-emerald-400",
+        content: (
+            <div className="space-y-4">
+                <p className="text-sm">The Swarm Protocol features an open marketplace where creators can build, share, and monetize extensions that enhance the platform. Whether it&apos;s changing the look and feel or adding new functional capabilities, the entire platform is moddable.</p>
+
+                <h4 className="text-sm font-semibold mt-6 mb-2 flex items-center gap-2"><Palette className="w-4 h-4 text-emerald-400" /> Skins & Layouts</h4>
+                <p className="text-sm">Skins in the Swarm ecosystem are uniquely powerful. They do not just upgrade the color scheme; they empower users to redefine the <strong>entire layout of the frontend</strong>. You can shuffle elements, snap in completely new dashboard designs, format widgets uniquely, and completely redesign the user experience.</p>
+                <div className="bg-muted/20 rounded-lg p-3 font-mono text-xs mt-2">
+                    <p className="text-muted-foreground">// Example Skin Structure</p>
+                    <p>my-custom-skin/</p>
+                    <p>  ├── manifest.json</p>
+                    <p>  ├── theme.css</p>
+                    <p>  └── layouts/</p>
+                    <p>      ├── dashboard.tsx</p>
+                    <p>      └── commands.tsx</p>
+                </div>
+
+                <h4 className="text-sm font-semibold mt-6 mb-2">Mods, Plugins & Skills</h4>
+                <ul className="space-y-1 text-sm">
+                    <li>• <strong>Mods & Plugins</strong> — Alter platform functionality, introduce new interface widgets, or connect third-party enterprise tools.</li>
+                    <li>• <strong>Skills</strong> — Specialized capabilities distributed to individual agents (e.g., Code Execution, Data Scraping, Cryptography).</li>
+                </ul>
+
+                <h4 className="text-sm font-semibold mt-6 mb-2">Monetization & Licensing</h4>
+                <p className="text-sm">The decentralized marketplace offers unprecedented flexibility for creators. When you develop a skin, mod, plugin, or skill, you retain complete rights and can choose exactly how it is monetized:</p>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
+                    <div className="border border-border/50 bg-background/50 rounded p-3">
+                        <div className="font-semibold text-xs mb-1 text-blue-400">Recurring Licensing</div>
+                        <p className="text-xs text-muted-foreground">License your work to individual users or entire organizations on a monthly, yearly, or per-agent basis. You retain ownership while users pay to use your design or feature.</p>
+                    </div>
+                    <div className="border border-border/50 bg-background/50 rounded p-3">
+                        <div className="font-semibold text-xs mb-1 text-amber-400">Sell Complete Rights</div>
+                        <p className="text-xs text-muted-foreground">Transfer complete ownership of your creation for a lump-sum, one-time payment. The buyer gains full control over the code, design, and subsequent monetization.</p>
+                    </div>
+                </div>
+            </div>
+        ),
+    },
 ];
 
 // ═══════════════════════════════════════════════════════════════
@@ -396,8 +439,8 @@ export default function DocsPage() {
                             key={section.id}
                             onClick={() => setActiveSection(section.id)}
                             className={`w-full text-left flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-all ${activeSection === section.id
-                                    ? "bg-amber-500/10 text-amber-400 border border-amber-500/20"
-                                    : "text-muted-foreground hover:text-foreground hover:bg-muted/50 border border-transparent"
+                                ? "bg-amber-500/10 text-amber-400 border border-amber-500/20"
+                                : "text-muted-foreground hover:text-foreground hover:bg-muted/50 border border-transparent"
                                 }`}
                         >
                             <section.icon className={`h-3.5 w-3.5 shrink-0 ${activeSection === section.id ? section.color : ""}`} />

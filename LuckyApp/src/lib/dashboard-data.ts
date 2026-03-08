@@ -77,7 +77,7 @@ export function computeTaskVelocity(tasks: Task[], days = 14): TaskVelocityPoint
       if (b) b.created++;
     }
     if (task.status === "done") {
-      const completed = parseTimestamp((task as Record<string, unknown>).completedAt || task.updatedAt);
+      const completed = parseTimestamp((task as any).completedAt || (task as any).updatedAt);
       if (completed && completed.getTime() > cutoff) {
         const label = `${SHORT_DAYS[completed.getDay()]} ${completed.getMonth() + 1}/${completed.getDate()}`;
         const b = buckets.get(label);
