@@ -17,11 +17,11 @@ export interface SkinMeta {
 /** All known skins. Classic is builtin (always available). Others map to marketplace items. */
 export const SKINS: SkinMeta[] = [
   { id: "classic", name: "Classic", description: "Amber & gold — the original Swarm look", colors: ["#FFD700", "#FFA500", "#FF8C00"], builtin: true },
-  { id: "futuristic", name: "Futuristic", description: "Cyan & magenta — Arwes-inspired sci-fi", colors: ["#26dafd", "#fc26fa", "#be26fc"], marketId: "skin-futuristic" },
-  { id: "retro-terminal", name: "Retro Terminal", description: "CRT phosphor amber with scanlines & vignette", colors: ["#ff6a00", "#994400", "#331a00"], marketId: "skin-retro-terminal" },
-  { id: "cyberpunk", name: "Cyberpunk", description: "Neon pink & electric purple — Night City vibes", colors: ["#ff1493", "#8a2be2", "#c026d3"], marketId: "skin-cyberpunk" },
-  { id: "midnight", name: "Midnight", description: "Deep indigo & violet — refined elegance", colors: ["#6366f1", "#a855f7", "#818cf8"], marketId: "skin-midnight" },
-  { id: "hacker", name: "Hacker Green", description: "Green phosphor terminal — Matrix aesthetic", colors: ["#00ff41", "#00802b", "#003311"], marketId: "skin-hacker" },
+  { id: "futuristic", name: "Futuristic", description: "Cyan & magenta — Arwes-inspired sci-fi", colors: ["#26dafd", "#fc26fa", "#be26fc"], builtin: true, marketId: "skin-futuristic" },
+  { id: "retro-terminal", name: "Retro Terminal", description: "CRT phosphor amber with scanlines & vignette", colors: ["#ff6a00", "#994400", "#331a00"], builtin: true, marketId: "skin-retro-terminal" },
+  { id: "cyberpunk", name: "Cyberpunk", description: "Neon pink & electric purple — Night City vibes", colors: ["#ff1493", "#8a2be2", "#c026d3"], builtin: true, marketId: "skin-cyberpunk" },
+  { id: "midnight", name: "Midnight", description: "Deep indigo & violet — refined elegance", colors: ["#6366f1", "#a855f7", "#818cf8"], builtin: true, marketId: "skin-midnight" },
+  { id: "hacker", name: "Hacker Green", description: "Green phosphor terminal — Matrix aesthetic", colors: ["#00ff41", "#00802b", "#003311"], builtin: true, marketId: "skin-hacker" },
 ];
 
 const STORAGE_KEY = "swarm-skin";
