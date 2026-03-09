@@ -23,8 +23,6 @@ import {
   subscribeDegraded,
   getCircuitDiagnostics,
 } from '@/lib/fetch-interceptor';
-import { useThirdwebAuth } from '@/hooks/useThirdwebAuth';
-
 const client = createThirdwebClient({
   clientId: process.env.NEXT_PUBLIC_THIRDWEB_CLIENT_ID || '510999ec2be00a99e36ab07b36f15a72',
 });
@@ -99,7 +97,6 @@ function ReconnectingState() {
 }
 
 function DisconnectedState() {
-  const authConfig = useThirdwebAuth();
   return (
     <>
       <div className="p-3 rounded-full bg-muted">
@@ -111,7 +108,7 @@ function DisconnectedState() {
           Your wallet was disconnected.
         </p>
       </div>
-      <ConnectButton client={client} chains={WALLET_CHAINS} auth={authConfig} />
+      <ConnectButton client={client} chains={WALLET_CHAINS} />
       <Link
         href="/"
         className="text-xs text-muted-foreground hover:text-foreground transition-colors"

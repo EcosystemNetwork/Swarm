@@ -1,5 +1,5 @@
 /** Landing Page — Hero section with 3D Spline robots, wallet connect CTA, and feature showcase.
- *  Uses thirdweb's built-in ConnectButton auth prop for SIWE sign-in. */
+ *  SIWE sign-in is handled automatically by the global AutoSiwe component. */
 "use client";
 
 import { Button } from "@/components/ui/button";
@@ -13,7 +13,6 @@ import Image from "next/image";
 import { ArrowRight, Sun, Moon } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useSession } from "@/contexts/SessionContext";
-import { useThirdwebAuth } from "@/hooks/useThirdwebAuth";
 
 const Spline = lazy(() => import('@splinetool/react-spline'));
 
@@ -31,7 +30,6 @@ export default function LandingPage() {
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
   const { authenticated } = useSession();
-  const authConfig = useThirdwebAuth();
 
   useEffect(() => setMounted(true), []);
 
@@ -89,7 +87,7 @@ export default function LandingPage() {
                 {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
               </button>
             )}
-            <ConnectButton client={client} chains={WALLET_CHAINS} auth={authConfig} />
+            <ConnectButton client={client} chains={WALLET_CHAINS} />
           </div>
         </div>
       </header>
@@ -157,7 +155,7 @@ export default function LandingPage() {
             </p>
 
             <div className="flex flex-col sm:flex-row items-center justify-center gap-6 animate-in delay-300 pointer-events-auto">
-              <ConnectButton client={client} chains={WALLET_CHAINS} auth={authConfig} />
+              <ConnectButton client={client} chains={WALLET_CHAINS} />
               <Link href="/docs">
                 <Button variant="outline" size="lg" className="h-12 px-8 rounded-full border-white/10 hover:bg-white/5 group bg-black/20">
                   Read the Docs
@@ -173,7 +171,7 @@ export default function LandingPage() {
           <div className="max-w-4xl mx-auto px-6 text-center">
             <h2 className="text-4xl font-bold text-white mb-6 tracking-tight">Ready to orchestrate your fleet?</h2>
             <div className="flex justify-center">
-              <ConnectButton client={client} chains={WALLET_CHAINS} auth={authConfig} />
+              <ConnectButton client={client} chains={WALLET_CHAINS} />
             </div>
           </div>
         </section>

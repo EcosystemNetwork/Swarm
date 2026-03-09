@@ -18,8 +18,6 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { NotificationCenter } from '@/components/notification-center';
 import { useSkin, SKINS } from '@/contexts/SkinContext';
-import { useThirdwebAuth } from '@/hooks/useThirdwebAuth';
-
 const client = createThirdwebClient({
   clientId: process.env.NEXT_PUBLIC_THIRDWEB_CLIENT_ID || '510999ec2be00a99e36ab07b36f15a72',
 });
@@ -31,7 +29,6 @@ export function Header() {
   const isConnected = !!account;
   const { theme, setTheme } = useTheme();
   const { skin } = useSkin();
-  const authConfig = useThirdwebAuth();
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
   const { currentOrg, organizations, selectOrg, refreshOrgs } = useOrg();
@@ -169,7 +166,7 @@ export function Header() {
                 {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
               </button>
             )}
-            <ConnectButton client={client} chains={WALLET_CHAINS} auth={authConfig} />
+            <ConnectButton client={client} chains={WALLET_CHAINS} />
           </div>
         </div>
       </header>

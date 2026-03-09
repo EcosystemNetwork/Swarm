@@ -9,6 +9,7 @@ import SparkleTrail from "@/components/SparkleTrail";
 import { ThemeProvider } from "@/components/theme-provider";
 import { SkinProvider } from "@/contexts/SkinContext";
 import { CommandBar } from "@/components/command-bar";
+import { AutoSiwe } from "@/components/AutoSiwe";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 
@@ -37,6 +38,7 @@ export default function RootLayout({
           <SkinProvider>
           <Web3Provider>
             <SessionProvider>
+            <AutoSiwe />
             <OrgProvider>
               <SparkleTrail>
                 <CommandBar />
