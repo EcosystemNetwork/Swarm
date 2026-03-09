@@ -78,6 +78,22 @@ const wsState = new Map();
 // agentId → { timestamps: number[] }
 const rateLimits = new Map();
 
+// ── Heartbeat ───────────────────────────────────────────────────────────────
+const HEARTBEAT_INTERVAL_MS = 30_000; // ping every 30s
+
+setInterval(() => {
+  for (const [ws, state] of wsState) {
+    if (ws._pongPending) {
+      // Previous ping never got a pong — connection is dead
+      log("warn", "Heartbeat timeout — terminating connection", { agentId: state.agentId });
+      ws.terminate();
+      continue;
+    }
+    ws._pongPending = true;
+    ws.ping();
+  }
+}, HEARTBEAT_INTERVAL_MS);
+
 // ── Ed25519 Auth ────────────────────────────────────────────────────────────
 
 /**
@@ -215,9 +231,12 @@ async function getAgentChannels(agentId) {
     if (!agentSnap.exists()) return [];
     const agentData = agentSnap.data();
     const projectIds = agentData.projectIds || [];
-    if (projectIds.length === 0) return [];
+    const orgId = agentData.orgId || agentData.organizationId || "";
 
     const channels = [];
+    const seenIds = new Set();
+
+    // 1. Fetch project-specific channels
     for (let i = 0; i < projectIds.length; i += 10) {
       const batch = projectIds.slice(i, i + 10);
       const channelsQuery = query(
@@ -226,9 +245,30 @@ async function getAgentChannels(agentId) {
       );
       const snap = await getDocs(channelsQuery);
       for (const d of snap.docs) {
-        channels.push({ id: d.id, name: d.data().name || "Channel", projectId: d.data().projectId });
+        if (!seenIds.has(d.id)) {
+          seenIds.add(d.id);
+          channels.push({ id: d.id, name: d.data().name || "Channel", projectId: d.data().projectId });
+        }
       }
     }
+
+    // 2. Always include the org-wide "Agent Hub" channel so all agents
+    //    in the same org can communicate regardless of project assignment.
+    if (orgId) {
+      const hubQuery = query(
+        collection(db, "channels"),
+        where("orgId", "==", orgId),
+        where("name", "==", "Agent Hub")
+      );
+      const hubSnap = await getDocs(hubQuery);
+      for (const d of hubSnap.docs) {
+        if (!seenIds.has(d.id)) {
+          seenIds.add(d.id);
+          channels.push({ id: d.id, name: "Agent Hub", projectId: "org" });
+        }
+      }
+    }
+
     return channels;
   } catch (err) {
     log("error", "Failed to fetch agent channels", { agentId, error: err.message });
@@ -504,6 +544,12 @@ wss.on("connection", async (ws, _req) => {
     channels: channels.map(c => ({ id: c.id, name: c.name })),
     ts: Date.now(),
   }));
+
+  // ── Heartbeat pong handler ──────────────────────────────────────────────
+  ws._pongPending = false;
+  ws.on("pong", () => {
+    ws._pongPending = false;
+  });
 
   // ── Message Handler ─────────────────────────────────────────────────────
 

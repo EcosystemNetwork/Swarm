@@ -23,26 +23,26 @@ export function StatCard({ title, value, icon: IconOrEmoji, change, changeLabel,
   const isNumeric = !isNaN(numericValue) && isFinite(numericValue);
 
   return (
-    <div className="gradient-border-spin overflow-hidden rounded-xl">
-      <SpotlightCard className="p-4">
-        <div className="flex items-center justify-between mb-1">
+    <div className="gradient-border-spin overflow-hidden rounded-lg">
+      <SpotlightCard className="p-2.5">
+        <div className="flex items-center justify-between mb-0.5">
           <DecryptedText
             text={title}
             speed={40}
             maxIterations={8}
-            className="text-xs font-medium text-muted-foreground"
-            encryptedClassName="text-xs font-medium text-amber-500/50"
+            className="text-[10px] font-medium text-muted-foreground"
+            encryptedClassName="text-[10px] font-medium text-amber-500/50"
             animateOn="view"
             sequential
             revealDirection="start"
           />
           {typeof IconOrEmoji === "string" ? (
-            <span className="text-xl">{IconOrEmoji}</span>
+            <span className="text-base">{IconOrEmoji}</span>
           ) : (
-            <IconOrEmoji className="h-5 w-5 text-amber-400" />
+            <IconOrEmoji className="h-4 w-4 text-amber-400" />
           )}
         </div>
-        <div className="text-xl font-bold tracking-tight text-glow-gold">
+        <div className="text-lg font-bold tracking-tight text-glow-gold leading-tight">
           {prefix}
           {isNumeric ? (
             <CountUp to={numericValue} duration={1.5} separator="," />
@@ -51,7 +51,7 @@ export function StatCard({ title, value, icon: IconOrEmoji, change, changeLabel,
           )}
         </div>
         {hasChange && change !== 0 && (
-          <div className="flex items-center gap-1 mt-1">
+          <div className="flex items-center gap-1 mt-0.5">
             <span
               className={cn(
                 "text-[10px] font-medium flex items-center gap-0.5",
@@ -61,7 +61,7 @@ export function StatCard({ title, value, icon: IconOrEmoji, change, changeLabel,
               {isPositive ? "↑" : "↓"} {Math.abs(change).toFixed(1)}%
             </span>
             {changeLabel && (
-              <span className="text-xs text-muted-foreground">{changeLabel}</span>
+              <span className="text-[10px] text-muted-foreground">{changeLabel}</span>
             )}
           </div>
         )}

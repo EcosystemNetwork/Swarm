@@ -229,12 +229,12 @@ function formatRelativeTime(date: Date | null): string {
 
 function getColSpanClass(cols: number, isStat: boolean) {
   if (isStat) {
-    if (cols === 1) return "col-span-1 md:col-span-2 lg:col-span-1";
-    return "col-span-2 md:col-span-2 lg:col-span-2";
+    if (cols === 1) return "col-span-1 md:col-span-1 lg:col-span-1";
+    return "col-span-1 md:col-span-2 lg:col-span-2";
   }
 
   switch (cols) {
-    case 1: return "col-span-2 md:col-span-2 lg:col-span-1";
+    case 1: return "col-span-1 md:col-span-2 lg:col-span-1";
     case 2: return "col-span-2 md:col-span-2 lg:col-span-2";
     case 3: return "col-span-2 md:col-span-3 lg:col-span-3";
     case 4: return "col-span-2 md:col-span-4 lg:col-span-4";
@@ -568,15 +568,15 @@ export default function DashboardPage() {
       colSpan: "lg:col-span-2",
       render: () => (
         <SpotlightCard className="p-0 glass-card-enhanced h-full overflow-hidden">
-          <CardHeader className="flex flex-row items-center justify-between px-6 pt-6">
-            <CardTitle className="text-lg">
-              📋 <DecryptedText text="Recent Tasks" speed={30} maxIterations={6} animateOn="view" sequential className="text-lg font-semibold" encryptedClassName="text-lg font-semibold text-amber-500/40" />
+          <CardHeader className="flex flex-row items-center justify-between px-4 pt-4 pb-2">
+            <CardTitle className="text-sm">
+              📋 <DecryptedText text="Recent Tasks" speed={30} maxIterations={6} animateOn="view" sequential className="text-sm font-semibold" encryptedClassName="text-sm font-semibold text-amber-500/40" />
             </CardTitle>
-            <Link href="/missions" className="text-sm">
-              <ShinyText text="View all →" speed={3} color="#b5954a" shineColor="#FFD700" className="text-sm" />
+            <Link href="/missions" className="text-xs">
+              <ShinyText text="View all →" speed={3} color="#b5954a" shineColor="#FFD700" className="text-xs" />
             </Link>
           </CardHeader>
-          <CardContent className="space-y-3 px-6 pb-6">
+          <CardContent className="space-y-2 px-4 pb-4">
             {recentTasks.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
                 <p>No tasks yet</p>
@@ -612,15 +612,15 @@ export default function DashboardPage() {
       colSpan: "lg:col-span-2",
       render: () => (
         <SpotlightCard className="p-0 glass-card-enhanced h-full overflow-hidden">
-          <CardHeader className="flex flex-row items-center justify-between px-6 pt-6">
-            <CardTitle className="text-lg">
-              💼 <DecryptedText text="Recent Jobs" speed={30} maxIterations={6} animateOn="view" sequential className="text-lg font-semibold" encryptedClassName="text-lg font-semibold text-amber-500/40" />
+          <CardHeader className="flex flex-row items-center justify-between px-4 pt-4 pb-2">
+            <CardTitle className="text-sm">
+              💼 <DecryptedText text="Recent Jobs" speed={30} maxIterations={6} animateOn="view" sequential className="text-sm font-semibold" encryptedClassName="text-sm font-semibold text-amber-500/40" />
             </CardTitle>
-            <Link href="/jobs" className="text-sm">
-              <ShinyText text="View all →" speed={3} color="#b5954a" shineColor="#FFD700" className="text-sm" />
+            <Link href="/jobs" className="text-xs">
+              <ShinyText text="View all →" speed={3} color="#b5954a" shineColor="#FFD700" className="text-xs" />
             </Link>
           </CardHeader>
-          <CardContent className="space-y-3 px-6 pb-6">
+          <CardContent className="space-y-2 px-4 pb-4">
             {recentJobs.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
                 <p>No jobs posted yet</p>
@@ -657,12 +657,12 @@ export default function DashboardPage() {
       colSpan: "",
       render: () => (
         <SpotlightCard className="p-0 glass-card-enhanced h-full overflow-hidden">
-          <CardHeader>
-            <CardTitle className="text-lg">
-              ⚡ <DecryptedText text="Quick Actions" speed={30} maxIterations={6} animateOn="view" sequential className="text-lg font-semibold" encryptedClassName="text-lg font-semibold text-amber-500/40" />
+          <CardHeader className="px-4 pt-4 pb-2">
+            <CardTitle className="text-sm">
+              ⚡ <DecryptedText text="Quick Actions" speed={30} maxIterations={6} animateOn="view" sequential className="text-sm font-semibold" encryptedClassName="text-sm font-semibold text-amber-500/40" />
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3">
+          <CardContent className="space-y-1.5 px-4 pb-4">
             <Button asChild className="w-full btn-glow" variant="outline">
               <Link href="/swarms">📁 Create Project</Link>
             </Button>
@@ -687,12 +687,12 @@ export default function DashboardPage() {
       colSpan: "",
       render: () => (
         <SpotlightCard className="p-0 glass-card-enhanced h-full overflow-hidden">
-          <CardHeader>
-            <CardTitle className="text-lg">
-              🏢 <DecryptedText text="Organization" speed={30} maxIterations={6} animateOn="view" sequential className="text-lg font-semibold" encryptedClassName="text-lg font-semibold text-amber-500/40" />
+          <CardHeader className="px-4 pt-4 pb-2">
+            <CardTitle className="text-sm">
+              🏢 <DecryptedText text="Organization" speed={30} maxIterations={6} animateOn="view" sequential className="text-sm font-semibold" encryptedClassName="text-sm font-semibold text-amber-500/40" />
             </CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="px-4 pb-4">
             <div className="space-y-2">
               <div className="flex items-center gap-2">
                 {currentOrg?.logoUrl ? (
@@ -719,15 +719,15 @@ export default function DashboardPage() {
       colSpan: "lg:col-span-3",
       render: () => (
         <SpotlightCard className="p-0 glass-card-enhanced h-full overflow-hidden">
-          <CardHeader className="flex flex-row items-center justify-between px-6 pt-6">
-            <CardTitle className="text-lg">
-              📜 <DecryptedText text="Activity Feed" speed={30} maxIterations={6} animateOn="view" sequential className="text-lg font-semibold" encryptedClassName="text-lg font-semibold text-amber-500/40" />
+          <CardHeader className="flex flex-row items-center justify-between px-4 pt-4 pb-2">
+            <CardTitle className="text-sm">
+              📜 <DecryptedText text="Activity Feed" speed={30} maxIterations={6} animateOn="view" sequential className="text-sm font-semibold" encryptedClassName="text-sm font-semibold text-amber-500/40" />
             </CardTitle>
-            <Link href="/activity" className="text-sm">
-              <ShinyText text="View all →" speed={3} color="#b5954a" shineColor="#FFD700" className="text-sm" />
+            <Link href="/activity" className="text-xs">
+              <ShinyText text="View all →" speed={3} color="#b5954a" shineColor="#FFD700" className="text-xs" />
             </Link>
           </CardHeader>
-          <CardContent className="space-y-2 px-6 pb-6">
+          <CardContent className="space-y-1.5 px-4 pb-4">
             {activityFeed.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
                 <p>No activity yet</p>
@@ -775,12 +775,12 @@ export default function DashboardPage() {
         const total = agents.length;
         return (
           <SpotlightCard className="p-0 glass-card-enhanced h-full overflow-hidden">
-            <CardHeader>
-              <CardTitle className="text-lg">
-                🟢 <DecryptedText text="Agent Status" speed={30} maxIterations={6} animateOn="view" sequential className="text-lg font-semibold" encryptedClassName="text-lg font-semibold text-amber-500/40" />
+            <CardHeader className="px-4 pt-4 pb-2">
+              <CardTitle className="text-sm">
+                🟢 <DecryptedText text="Agent Status" speed={30} maxIterations={6} animateOn="view" sequential className="text-sm font-semibold" encryptedClassName="text-sm font-semibold text-amber-500/40" />
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-3 px-4 pb-4">
               {total === 0 ? (
                 <div className="text-center py-4 text-muted-foreground">
                   <p>No agents registered</p>
@@ -831,12 +831,12 @@ export default function DashboardPage() {
 
         return (
           <SpotlightCard className="p-0 glass-card-enhanced h-full overflow-hidden">
-            <CardHeader>
-              <CardTitle className="text-lg">
-                📈 <DecryptedText text="Task Breakdown" speed={30} maxIterations={6} animateOn="view" sequential className="text-lg font-semibold" encryptedClassName="text-lg font-semibold text-amber-500/40" />
+            <CardHeader className="px-4 pt-4 pb-2">
+              <CardTitle className="text-sm">
+                📈 <DecryptedText text="Task Breakdown" speed={30} maxIterations={6} animateOn="view" sequential className="text-sm font-semibold" encryptedClassName="text-sm font-semibold text-amber-500/40" />
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-3 px-4 pb-4">
               {total === 0 ? (
                 <div className="text-center py-4 text-muted-foreground">
                   <p>No tasks yet</p>
@@ -926,13 +926,13 @@ export default function DashboardPage() {
         if (!briefingAgent) {
           return (
             <SpotlightCard className="p-0 glass-card-enhanced h-full overflow-hidden">
-              <CardHeader>
-                <CardTitle className="text-lg">
-                  📋 <DecryptedText text="Daily Briefing" speed={30} maxIterations={6} animateOn="view" sequential className="text-lg font-semibold" encryptedClassName="text-lg font-semibold text-amber-500/40" />
+              <CardHeader className="px-4 pt-4 pb-2">
+                <CardTitle className="text-sm">
+                  📋 <DecryptedText text="Daily Briefing" speed={30} maxIterations={6} animateOn="view" sequential className="text-sm font-semibold" encryptedClassName="text-sm font-semibold text-amber-500/40" />
                 </CardTitle>
               </CardHeader>
-              <CardContent>
-                <div className="text-center py-6 space-y-3">
+              <CardContent className="px-4 pb-4">
+                <div className="text-center py-4 space-y-2">
                   <div className="text-4xl opacity-30">📋</div>
                   <p className="text-sm text-muted-foreground">No agent assigned to Daily Briefings</p>
                   <p className="text-xs text-muted-foreground/60">Equip an agent in the Swarm inventory to start receiving daily briefings.</p>
@@ -958,15 +958,15 @@ export default function DashboardPage() {
 
         return (
           <SpotlightCard className="p-0 glass-card-enhanced h-full overflow-hidden">
-            <CardHeader className="flex flex-row items-center justify-between px-6 pt-6">
-              <CardTitle className="text-lg">
-                📋 <DecryptedText text="Daily Briefing" speed={30} maxIterations={6} animateOn="view" sequential className="text-lg font-semibold" encryptedClassName="text-lg font-semibold text-amber-500/40" />
+            <CardHeader className="flex flex-row items-center justify-between px-4 pt-4 pb-2">
+              <CardTitle className="text-sm">
+                📋 <DecryptedText text="Daily Briefing" speed={30} maxIterations={6} animateOn="view" sequential className="text-sm font-semibold" encryptedClassName="text-sm font-semibold text-amber-500/40" />
               </CardTitle>
-              <Link href="/swarm" className="text-sm">
-                <ShinyText text="Swarm →" speed={3} color="#b5954a" shineColor="#FFD700" className="text-sm" />
+              <Link href="/swarm" className="text-xs">
+                <ShinyText text="Swarm →" speed={3} color="#b5954a" shineColor="#FFD700" className="text-xs" />
               </Link>
             </CardHeader>
-            <CardContent className="px-6 pb-6 space-y-4">
+            <CardContent className="px-4 pb-4 space-y-3">
               {/* Agent badge */}
               <div className="flex items-center gap-3 p-3 rounded-lg bg-amber-500/5 border border-amber-500/10">
                 <img
@@ -1124,53 +1124,32 @@ export default function DashboardPage() {
   /* ── Render ── */
 
   return (
-    <div className="space-y-1.5">
+    <div className="space-y-0.5">
       {/* Dashboard header */}
-      <div className="space-y-1.5">
-        <div className="flex items-end justify-between">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">{greeting}</h1>
-            <p className="text-muted-foreground mt-1">{currentOrg.name}</p>
-          </div>
-          <div className="flex items-center gap-3">
-            {lastUpdated && (
-              <span className="text-[10px] text-muted-foreground/60 tabular-nums">
-                Updated {formatRelativeTime(lastUpdated)}
-              </span>
-            )}
-            {dashTab === "overview" && (
-              <div className="flex items-center gap-2">
-                {isCustomized && (
-                  <Button variant="ghost" size="sm" onClick={resetLayout} className="text-muted-foreground hover:text-foreground gap-1.5">
-                    <RotateCcw className="w-3.5 h-3.5" /> Reset
-                  </Button>
-                )}
-                <Button variant="outline" size="sm" onClick={() => setShowCatalog(true)} className="gap-1.5">
-                  <Plus className="w-3.5 h-3.5" /> Widgets
-                </Button>
-              </div>
-            )}
-          </div>
+      <div className="flex items-end justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">{greeting}</h1>
+          <p className="text-muted-foreground text-sm">{currentOrg.name}</p>
         </div>
-
-        {/* Summary stats bar */}
-        {stats && (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-1">
-            {[
-              { label: "Agents Online", value: `${onlineAgents.length}/${agents.length}`, color: onlineAgents.length > 0 ? "text-emerald-400" : "text-muted-foreground" },
-              { label: "Active Tasks", value: String(stats.activeTasks), color: stats.activeTasks > 0 ? "text-amber-400" : "text-muted-foreground" },
-              { label: "Open Jobs", value: String(stats.openJobs), color: stats.openJobs > 0 ? "text-amber-400" : "text-muted-foreground" },
-              { label: "Completion", value: `${stats.taskCount > 0 ? Math.round((stats.completedTasks / stats.taskCount) * 100) : 0}%`, color: "text-emerald-400" },
-            ].map((item) => (
-              <div key={item.label} className="flex items-center gap-3 px-3 py-2 rounded-lg bg-card/50 border border-border">
-                <div className="flex-1 min-w-0">
-                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider">{item.label}</p>
-                  <p className={`text-lg font-bold tabular-nums ${item.color}`}>{item.value}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
+        <div className="flex items-center gap-3">
+          {lastUpdated && (
+            <span className="text-[10px] text-muted-foreground/60 tabular-nums">
+              Updated {formatRelativeTime(lastUpdated)}
+            </span>
+          )}
+          {dashTab === "overview" && (
+            <div className="flex items-center gap-2">
+              {isCustomized && (
+                <Button variant="ghost" size="sm" onClick={resetLayout} className="text-muted-foreground hover:text-foreground gap-1.5">
+                  <RotateCcw className="w-3.5 h-3.5" /> Reset
+                </Button>
+              )}
+              <Button variant="outline" size="sm" onClick={() => setShowCatalog(true)} className="gap-1.5">
+                <Plus className="w-3.5 h-3.5" /> Widgets
+              </Button>
+            </div>
+          )}
+        </div>
       </div>
 
       <Tabs value={dashTab} onValueChange={setDashTab}>
@@ -1180,11 +1159,11 @@ export default function DashboardPage() {
         </TabsList>
 
         <TabsContent value="overview">
-          <div className="space-y-1.5">
+          <div className="space-y-0.5">
 
             {/* ═══ Draggable Main Widgets ═══ */}
             {widgetOrder.length > 0 && (
-              <div className="grid gap-1 grid-cols-2 md:grid-cols-4 lg:grid-cols-6 grid-flow-row-dense auto-rows-auto">
+              <div className="grid gap-0.5 grid-cols-2 md:grid-cols-4 lg:grid-cols-6 grid-flow-row-dense auto-rows-auto">
                 {widgetOrder.map((id, index) => {
                   const widget = widgetRenderers[id];
                   if (!widget) return null;
