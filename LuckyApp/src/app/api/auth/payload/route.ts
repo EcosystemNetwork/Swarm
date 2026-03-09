@@ -4,9 +4,12 @@
  * Body: { address: string, chainId?: string }
  * Returns: LoginPayload (thirdweb format — domain, nonce, statement, etc.)
  *
+ * The domain is read from the request Host header so it matches the
+ * actual site the user is visiting (localhost, swarm-protocol.xyz, etc.)
+ *
  * Called by ConnectButton's auth.getLoginPayload callback.
  */
-import { thirdwebAuth } from "../thirdweb-auth";
+import { getThirdwebAuth, getDomainFromRequest } from "../thirdweb-auth";
 
 export async function POST(req: Request) {
   try {
@@ -20,7 +23,10 @@ export async function POST(req: Request) {
       );
     }
 
-    const payload = await thirdwebAuth.generatePayload({
+    const domain = getDomainFromRequest(req);
+    const auth = getThirdwebAuth(domain);
+
+    const payload = await auth.generatePayload({
       address,
       chainId: body.chainId ? Number(body.chainId) : undefined,
     });

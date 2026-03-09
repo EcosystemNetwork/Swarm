@@ -5,11 +5,12 @@
  * Returns: { success: true, session: { address, role } }
  * Sets: httpOnly cookie `swarm_session`
  *
+ * The domain is read from the request Host header to match what was
+ * used when generating the payload (works for localhost + production).
+ *
  * Called by ConnectButton's auth.doLogin callback.
- * Uses thirdweb's verifyPayload which handles both EOA and smart account
- * signatures (EIP-1271) automatically.
  */
-import { thirdwebAuth } from "../thirdweb-auth";
+import { getThirdwebAuth, getDomainFromRequest } from "../thirdweb-auth";
 import {
   resolveRole,
   createSession,
@@ -31,10 +32,13 @@ export async function POST(req: Request) {
     }
 
     // 1. Verify the signed payload using thirdweb auth
-    //    This checks: domain, statement, nonce, expiration, and signature
+    //    Domain is read from the request host to match the payload
+    const domain = getDomainFromRequest(req);
+    const auth = getThirdwebAuth(domain);
+
     let result;
     try {
-      result = await thirdwebAuth.verifyPayload({ payload, signature });
+      result = await auth.verifyPayload({ payload, signature });
     } catch (err) {
       console.error("[auth/verify] verifyPayload error:", err);
       return Response.json(
@@ -44,6 +48,7 @@ export async function POST(req: Request) {
     }
 
     if (!result.valid) {
+      console.warn("[auth/verify] Payload invalid:", result.error);
       return Response.json(
         { error: result.error || "Invalid signature" },
         { status: 401 }
@@ -100,7 +105,6 @@ export async function POST(req: Request) {
       await setSessionCookie(token);
     } catch (err) {
       console.error("[auth/verify] setSessionCookie error:", err);
-      // Cookie setting failed but session exists — still return success
     }
 
     return Response.json({
