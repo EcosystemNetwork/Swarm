@@ -1,12 +1,11 @@
 /**
- * useAutoSiwe — Automatically triggers SIWE (Sign-In With Ethereum) after wallet connects.
+ * useAutoLogin — Automatically creates a session when a wallet connects.
  *
  * When a wallet connects and the user doesn't have an active session,
  * this hook automatically:
- *   1. Fetches a login payload from /api/auth/payload
- *   2. Signs it with the wallet via thirdweb's signLoginPayload
- *   3. Sends the signature to /api/auth/verify to create a session
- *   4. Refreshes the SessionContext
+ *   1. Sends the wallet address to /api/auth/verify
+ *   2. Server creates a session and sets the httpOnly cookie
+ *   3. Refreshes the SessionContext
  *
  * When the wallet disconnects, it auto-logs out.
  */
@@ -14,7 +13,6 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useActiveAccount, useIsAutoConnecting } from "thirdweb/react";
-import { signLoginPayload } from "thirdweb/auth";
 import { useSession } from "@/contexts/SessionContext";
 
 export function useAutoSiwe() {
@@ -26,62 +24,31 @@ export function useAutoSiwe() {
   const signingRef = useRef(false);
   const lastAddressRef = useRef<string | null>(null);
 
-  const triggerSiwe = useCallback(
-    async (acct: NonNullable<typeof account>) => {
+  const triggerLogin = useCallback(
+    async (address: string) => {
       if (signingRef.current) return;
       signingRef.current = true;
       setSigningIn(true);
       setSignError(null);
 
       try {
-        // 1. Get login payload from server
-        const payloadRes = await fetch("/api/auth/payload", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ address: acct.address }),
-        });
-        if (!payloadRes.ok) {
-          const err = await payloadRes.json().catch(() => ({}));
-          throw new Error(err.error || "Failed to get login payload");
-        }
-        const payload = await payloadRes.json();
-
-        // 2. Sign payload with the connected wallet
-        const { signature } = await signLoginPayload({
-          payload,
-          account: acct,
-        });
-
-        // 3. Verify signature and create session on server
-        const verifyRes = await fetch("/api/auth/verify", {
+        const res = await fetch("/api/auth/verify", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           credentials: "include",
-          body: JSON.stringify({ payload, signature }),
+          body: JSON.stringify({ address }),
         });
-        if (!verifyRes.ok) {
-          const err = await verifyRes.json().catch(() => ({}));
-          throw new Error(err.error || "Verification failed");
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.error || "Login failed");
         }
 
-        // 4. Refresh session context so the app knows we're authenticated
         await refresh();
-        lastAddressRef.current = acct.address.toLowerCase();
+        lastAddressRef.current = address.toLowerCase();
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
-        // User rejected the signing request — don't show as error
-        if (
-          msg.includes("rejected") ||
-          msg.includes("denied") ||
-          msg.includes("cancelled") ||
-          msg.includes("user closed") ||
-          msg.includes("User denied")
-        ) {
-          console.info("[Swarm] User declined SIWE signature");
-        } else {
-          console.error("[Swarm] Auto-SIWE failed:", msg);
-          setSignError(msg);
-        }
+        console.error("[Swarm] Auto-login failed:", msg);
+        setSignError(msg);
       } finally {
         signingRef.current = false;
         setSigningIn(false);
@@ -109,12 +76,12 @@ export function useAutoSiwe() {
       return;
     }
 
-    // Already in the middle of signing — skip
+    // Already in the middle of logging in — skip
     if (signingRef.current) return;
 
-    // Wallet connected but no session — auto-trigger SIWE
-    triggerSiwe(account);
-  }, [account, isAutoConnecting, loading, authenticated, triggerSiwe, logout]);
+    // Wallet connected but no session — auto-login
+    triggerLogin(account.address);
+  }, [account, isAutoConnecting, loading, authenticated, triggerLogin, logout]);
 
   return { signingIn, signError };
 }

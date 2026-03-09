@@ -1,16 +1,10 @@
 /**
  * POST /api/auth/verify
- * Verifies a signed thirdweb SIWE login payload and creates a session.
- * Body: { payload: LoginPayload, signature: string }
+ * Creates a session for the given wallet address.
+ * Body: { address: string }
  * Returns: { success: true, session: { address, role } }
  * Sets: httpOnly cookie `swarm_session`
- *
- * The domain is read from the request Host header to match what was
- * used when generating the payload (works for localhost + production).
- *
- * Called by ConnectButton's auth.doLogin callback.
  */
-import { getThirdwebAuth, getDomainFromRequest } from "../thirdweb-auth";
 import {
   resolveRole,
   createSession,
@@ -22,42 +16,16 @@ import { getOrganizationsByWallet } from "@/lib/firestore";
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { payload, signature } = body;
+    const address = (body.address ?? body.payload?.address ?? "").trim();
 
-    if (!payload || !signature) {
+    if (!address || typeof address !== "string") {
       return Response.json(
-        { error: "payload and signature are required" },
+        { error: "address is required" },
         { status: 400 }
       );
     }
 
-    // 1. Verify the signed payload using thirdweb auth
-    //    Domain is read from the request host to match the payload
-    const domain = getDomainFromRequest(req);
-    const auth = getThirdwebAuth(domain);
-
-    let result;
-    try {
-      result = await auth.verifyPayload({ payload, signature });
-    } catch (err) {
-      console.error("[auth/verify] verifyPayload error:", err);
-      return Response.json(
-        { error: "Signature verification failed" },
-        { status: 401 }
-      );
-    }
-
-    if (!result.valid) {
-      console.warn("[auth/verify] Payload invalid:", result.error);
-      return Response.json(
-        { error: result.error || "Invalid signature" },
-        { status: 401 }
-      );
-    }
-
-    const address = result.payload.address;
-
-    // 2. Determine role based on org ownership
+    // 1. Determine role based on org ownership
     let orgs;
     try {
       orgs = await getOrganizationsByWallet(address);
@@ -77,7 +45,7 @@ export async function POST(req: Request) {
 
     const role = resolveRole(address, ownedOrgIds);
 
-    // 3. Create Firestore session + JWT
+    // 2. Create Firestore session + JWT
     let sessionId: string;
     try {
       sessionId = await createSession(address, role);
@@ -100,7 +68,7 @@ export async function POST(req: Request) {
       );
     }
 
-    // 4. Set httpOnly cookie
+    // 3. Set httpOnly cookie
     try {
       await setSessionCookie(token);
     } catch (err) {
