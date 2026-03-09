@@ -219,7 +219,7 @@ async function fetchWithRetry(
   }
 
   recordFailure(domain);
-  log('error', domain, `All ${MAX_RETRIES + 1} attempts failed`, {
+  log('warn', domain, `All ${MAX_RETRIES + 1} attempts failed — circuit breaker will handle`, {
     lastStatus: lastResponse?.status,
     lastError: lastError instanceof Error ? lastError.message : lastError ? String(lastError) : null,
   });

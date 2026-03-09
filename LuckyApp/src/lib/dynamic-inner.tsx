@@ -52,7 +52,7 @@ export function Web3ProviderInner({ children }: { children: React.ReactNode }) {
 
   return (
     <ThirdwebProvider>
-      <AutoConnect client={client} wallets={wallets} timeout={15_000} />
+      <AutoConnect client={client} wallets={wallets} timeout={5_000} />
       {children}
     </ThirdwebProvider>
   );

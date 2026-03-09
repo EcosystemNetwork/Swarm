@@ -12,12 +12,11 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
-import { useActiveAccount, useIsAutoConnecting } from "thirdweb/react";
+import { useActiveAccount } from "thirdweb/react";
 import { useSession } from "@/contexts/SessionContext";
 
 export function useAutoSiwe() {
   const account = useActiveAccount();
-  const isAutoConnecting = useIsAutoConnecting();
   const { authenticated, loading, refresh, logout } = useSession();
   const [signingIn, setSigningIn] = useState(false);
   const [signError, setSignError] = useState<string | null>(null);
@@ -30,7 +29,6 @@ export function useAutoSiwe() {
       signingRef.current = true;
       setSigningIn(true);
       setSignError(null);
-      console.log("[Swarm:autoLogin] Triggering login for", address);
 
       try {
         const res = await fetch("/api/auth/verify", {
@@ -44,12 +42,11 @@ export function useAutoSiwe() {
           throw new Error(err.error || "Login failed");
         }
 
-        console.log("[Swarm:autoLogin] Login succeeded, refreshing session");
         await refresh();
         lastAddressRef.current = address.toLowerCase();
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
-        console.error("[Swarm:autoLogin] Login failed:", msg);
+        console.error("[Swarm] Auto-login failed:", msg);
         setSignError(msg);
       } finally {
         signingRef.current = false;
@@ -60,24 +57,12 @@ export function useAutoSiwe() {
   );
 
   useEffect(() => {
-    console.log("[Swarm:autoLogin] State:", {
-      account: account?.address ?? null,
-      isAutoConnecting,
-      loading,
-      authenticated,
-      signing: signingRef.current,
-    });
-
-    // Wait for auto-connect and session loading to finish
-    if (isAutoConnecting || loading) {
-      console.log("[Swarm:autoLogin] Waiting —", { isAutoConnecting, loading });
-      return;
-    }
+    // Wait for session check to finish
+    if (loading) return;
 
     if (!account) {
       // Wallet disconnected — logout if we had a session
       if (lastAddressRef.current) {
-        console.log("[Swarm:autoLogin] Wallet disconnected, logging out");
         lastAddressRef.current = null;
         logout();
       }
@@ -94,9 +79,8 @@ export function useAutoSiwe() {
     if (signingRef.current) return;
 
     // Wallet connected but no session — auto-login
-    console.log("[Swarm:autoLogin] Wallet connected, not authenticated — triggering login");
     triggerLogin(account.address);
-  }, [account, isAutoConnecting, loading, authenticated, triggerLogin, logout]);
+  }, [account, loading, authenticated, triggerLogin, logout]);
 
   return { signingIn, signError };
 }
