@@ -576,9 +576,9 @@ export default function DashboardPage() {
               <ShinyText text="View all →" speed={3} color="#b5954a" shineColor="#FFD700" className="text-xs" />
             </Link>
           </CardHeader>
-          <CardContent className="space-y-2 px-4 pb-4">
+          <CardContent className="space-y-1.5 px-3 pb-3">
             {recentTasks.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
+              <div className="text-center py-4 text-muted-foreground">
                 <p>No tasks yet</p>
                 <Link href="/missions" className="text-amber-600 dark:text-amber-400 hover:underline text-sm">
                   Create your first task →
@@ -620,9 +620,9 @@ export default function DashboardPage() {
               <ShinyText text="View all →" speed={3} color="#b5954a" shineColor="#FFD700" className="text-xs" />
             </Link>
           </CardHeader>
-          <CardContent className="space-y-2 px-4 pb-4">
+          <CardContent className="space-y-1.5 px-3 pb-3">
             {recentJobs.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
+              <div className="text-center py-4 text-muted-foreground">
                 <p>No jobs posted yet</p>
                 <Link href="/jobs" className="text-amber-600 dark:text-amber-400 hover:underline text-sm">
                   Post your first job →
@@ -662,7 +662,7 @@ export default function DashboardPage() {
               ⚡ <DecryptedText text="Quick Actions" speed={30} maxIterations={6} animateOn="view" sequential className="text-sm font-semibold" encryptedClassName="text-sm font-semibold text-amber-500/40" />
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-1.5 px-4 pb-4">
+          <CardContent className="space-y-1 px-3 pb-3">
             <Button asChild className="w-full btn-glow" variant="outline">
               <Link href="/swarms">📁 Create Project</Link>
             </Button>
@@ -692,7 +692,7 @@ export default function DashboardPage() {
               🏢 <DecryptedText text="Organization" speed={30} maxIterations={6} animateOn="view" sequential className="text-sm font-semibold" encryptedClassName="text-sm font-semibold text-amber-500/40" />
             </CardTitle>
           </CardHeader>
-          <CardContent className="px-4 pb-4">
+          <CardContent className="px-3 pb-3">
             <div className="space-y-2">
               <div className="flex items-center gap-2">
                 {currentOrg?.logoUrl ? (
@@ -727,9 +727,9 @@ export default function DashboardPage() {
               <ShinyText text="View all →" speed={3} color="#b5954a" shineColor="#FFD700" className="text-xs" />
             </Link>
           </CardHeader>
-          <CardContent className="space-y-1.5 px-4 pb-4">
+          <CardContent className="space-y-1 px-3 pb-3">
             {activityFeed.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
+              <div className="text-center py-4 text-muted-foreground">
                 <p>No activity yet</p>
                 <p className="text-xs mt-1">Events will appear here as your swarm operates</p>
               </div>
@@ -775,12 +775,12 @@ export default function DashboardPage() {
         const total = agents.length;
         return (
           <SpotlightCard className="p-0 glass-card-enhanced h-full overflow-hidden">
-            <CardHeader className="px-4 pt-4 pb-2">
+            <CardHeader className="px-3 pt-3 pb-1">
               <CardTitle className="text-sm">
                 🟢 <DecryptedText text="Agent Status" speed={30} maxIterations={6} animateOn="view" sequential className="text-sm font-semibold" encryptedClassName="text-sm font-semibold text-amber-500/40" />
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-3 px-4 pb-4">
+            <CardContent className="space-y-2 px-3 pb-3">
               {total === 0 ? (
                 <div className="text-center py-4 text-muted-foreground">
                   <p>No agents registered</p>
@@ -831,12 +831,12 @@ export default function DashboardPage() {
 
         return (
           <SpotlightCard className="p-0 glass-card-enhanced h-full overflow-hidden">
-            <CardHeader className="px-4 pt-4 pb-2">
+            <CardHeader className="px-3 pt-3 pb-1">
               <CardTitle className="text-sm">
                 📈 <DecryptedText text="Task Breakdown" speed={30} maxIterations={6} animateOn="view" sequential className="text-sm font-semibold" encryptedClassName="text-sm font-semibold text-amber-500/40" />
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-3 px-4 pb-4">
+            <CardContent className="space-y-2 px-3 pb-3">
               {total === 0 ? (
                 <div className="text-center py-4 text-muted-foreground">
                   <p>No tasks yet</p>
@@ -926,12 +926,12 @@ export default function DashboardPage() {
         if (!briefingAgent) {
           return (
             <SpotlightCard className="p-0 glass-card-enhanced h-full overflow-hidden">
-              <CardHeader className="px-4 pt-4 pb-2">
+              <CardHeader className="px-3 pt-3 pb-1">
                 <CardTitle className="text-sm">
                   📋 <DecryptedText text="Daily Briefing" speed={30} maxIterations={6} animateOn="view" sequential className="text-sm font-semibold" encryptedClassName="text-sm font-semibold text-amber-500/40" />
                 </CardTitle>
               </CardHeader>
-              <CardContent className="px-4 pb-4">
+              <CardContent className="px-3 pb-3">
                 <div className="text-center py-4 space-y-2">
                   <div className="text-4xl opacity-30">📋</div>
                   <p className="text-sm text-muted-foreground">No agent assigned to Daily Briefings</p>
@@ -958,7 +958,7 @@ export default function DashboardPage() {
 
         return (
           <SpotlightCard className="p-0 glass-card-enhanced h-full overflow-hidden">
-            <CardHeader className="flex flex-row items-center justify-between px-4 pt-4 pb-2">
+            <CardHeader className="flex flex-row items-center justify-between px-3 pt-3 pb-1">
               <CardTitle className="text-sm">
                 📋 <DecryptedText text="Daily Briefing" speed={30} maxIterations={6} animateOn="view" sequential className="text-sm font-semibold" encryptedClassName="text-sm font-semibold text-amber-500/40" />
               </CardTitle>
@@ -966,7 +966,7 @@ export default function DashboardPage() {
                 <ShinyText text="Swarm →" speed={3} color="#b5954a" shineColor="#FFD700" className="text-xs" />
               </Link>
             </CardHeader>
-            <CardContent className="px-4 pb-4 space-y-3">
+            <CardContent className="px-3 pb-3 space-y-2">
               {/* Agent badge */}
               <div className="flex items-center gap-3 p-3 rounded-lg bg-amber-500/5 border border-amber-500/10">
                 <img
@@ -1053,10 +1053,10 @@ export default function DashboardPage() {
 
   if (!currentOrg) {
     return (
-      <div className="space-y-1.5">
+      <div className="space-y-1">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
-          <p className="text-muted-foreground mt-1">No organization selected</p>
+          <h1 className="text-xl font-bold tracking-tight leading-tight">Dashboard</h1>
+          <p className="text-muted-foreground text-xs">No organization selected</p>
         </div>
       </div>
     );
@@ -1064,10 +1064,10 @@ export default function DashboardPage() {
 
   if (loading) {
     return (
-      <div className="space-y-1.5">
+      <div className="space-y-1">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">{greeting}</h1>
-          <p className="text-muted-foreground mt-1">{currentOrg.name}</p>
+          <h1 className="text-xl font-bold tracking-tight leading-tight">{greeting}</h1>
+          <p className="text-muted-foreground text-xs">{currentOrg.name}</p>
         </div>
         {/* Skeleton grid matching widget layout */}
         <div className="grid gap-1 grid-cols-2 md:grid-cols-4 lg:grid-cols-6 grid-flow-row-dense auto-rows-auto">
@@ -1089,12 +1089,12 @@ export default function DashboardPage() {
 
   if (error) {
     return (
-      <div className="space-y-1.5">
+      <div className="space-y-1">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">{greeting}</h1>
-          <p className="text-muted-foreground mt-1">{currentOrg.name}</p>
+          <h1 className="text-xl font-bold tracking-tight leading-tight">{greeting}</h1>
+          <p className="text-muted-foreground text-xs">{currentOrg.name}</p>
         </div>
-        <div className="flex items-center justify-center py-16">
+        <div className="flex items-center justify-center py-8">
           <div className="text-center max-w-sm">
             <div className="p-3 rounded-full bg-red-500/10 inline-flex mb-4">
               <X className="h-6 w-6 text-red-400" />
@@ -1124,12 +1124,12 @@ export default function DashboardPage() {
   /* ── Render ── */
 
   return (
-    <div className="space-y-0.5">
+    <div className="space-y-1">
       {/* Dashboard header */}
-      <div className="flex items-end justify-between">
+      <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">{greeting}</h1>
-          <p className="text-muted-foreground text-sm">{currentOrg.name}</p>
+          <h1 className="text-xl font-bold tracking-tight leading-tight">{greeting}</h1>
+          <p className="text-muted-foreground text-xs">{currentOrg.name}</p>
         </div>
         <div className="flex items-center gap-3">
           {lastUpdated && (
@@ -1158,12 +1158,12 @@ export default function DashboardPage() {
           <TabsTrigger value="swarm">Agent Map</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="overview">
-          <div className="space-y-0.5">
+        <TabsContent value="overview" className="mt-1">
+          <div>
 
             {/* ═══ Draggable Main Widgets ═══ */}
             {widgetOrder.length > 0 && (
-              <div className="grid gap-0.5 grid-cols-2 md:grid-cols-4 lg:grid-cols-6 grid-flow-row-dense auto-rows-auto">
+              <div className="grid gap-1 grid-cols-2 md:grid-cols-4 lg:grid-cols-6 grid-flow-row-dense auto-rows-auto">
                 {widgetOrder.map((id, index) => {
                   const widget = widgetRenderers[id];
                   if (!widget) return null;
@@ -1176,7 +1176,7 @@ export default function DashboardPage() {
                   let defaultCols = isStatCard ? 1 : 2;
                   const maxCols = isStatCard ? 2 : 6;
 
-                  if (widget.colSpan.includes("col-span-2")) { defaultCols = 4; }
+                  if (widget.colSpan.includes("col-span-2")) { defaultCols = 3; }
                   if (widget.colSpan.includes("col-span-3")) { defaultCols = 6; }
 
                   const effectiveCols = widgetWidths[id] || defaultCols;
@@ -1223,7 +1223,7 @@ export default function DashboardPage() {
 
             {/* Empty state */}
             {widgetOrder.length === 0 && (
-              <div className="text-center py-16 text-muted-foreground">
+              <div className="text-center py-8 text-muted-foreground">
                 <div className="text-5xl mb-4">📊</div>
                 <p className="text-lg font-medium mb-2">No widgets on your dashboard</p>
                 <p className="text-sm mb-4">Add some widgets to customize your view</p>

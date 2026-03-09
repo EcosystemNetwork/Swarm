@@ -72,7 +72,7 @@ function TabsContent({
 }: React.HTMLAttributes<HTMLDivElement> & { value: string }) {
   const ctx = React.useContext(TabsContext);
   if (ctx.value !== value) return null;
-  return <div className={cn("mt-4", className)} {...props} />;
+  return <div className={cn("mt-1", className)} {...props} />;
 }
 
 export { Tabs, TabsList, TabsTrigger, TabsContent };
