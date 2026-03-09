@@ -143,9 +143,12 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         body: JSON.stringify({ address, signature, message }),
       });
 
-      if (!res.ok) return false;
+      const data = await res.json().catch(() => ({ error: "Unknown error" }));
 
-      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || `Verification failed (${res.status})`);
+      }
+
       if (data.success) {
         // Refresh session state from server
         await fetchSession();

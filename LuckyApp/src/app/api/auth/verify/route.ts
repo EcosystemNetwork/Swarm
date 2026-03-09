@@ -4,9 +4,14 @@
  * Body: { address: string, signature: string, message: string }
  * Returns: { success: true, session: { address, role } }
  * Sets: httpOnly cookie `swarm_session`
+ *
+ * Uses viem for signature verification — same library thirdweb v5 uses
+ * internally, ensuring compatibility across all wallet types (EOA,
+ * in-app, smart account).
  */
 import { NextRequest } from "next/server";
-import { verifyMessage, getAddress } from "ethers";
+import { verifyMessage } from "viem";
+import { getAddress } from "viem";
 import {
   consumeNonce,
   resolveRole,
@@ -45,27 +50,31 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 3. Recover signer address from signature
-    let recoveredAddress: string;
+    // 3. Verify signature using viem (matches thirdweb's signing)
+    const checksummed = getAddress(address);
+    let valid: boolean;
     try {
-      recoveredAddress = verifyMessage(message, signature);
-    } catch {
+      valid = await verifyMessage({
+        address: checksummed,
+        message,
+        signature: signature as `0x${string}`,
+      });
+    } catch (err) {
+      console.error("[auth/verify] Signature verification error:", err);
       return Response.json(
-        { error: "Invalid signature" },
+        { error: "Invalid signature format" },
         { status: 401 }
       );
     }
 
-    // 4. Verify recovered address matches claimed address
-    const checksummed = getAddress(address);
-    if (getAddress(recoveredAddress) !== checksummed) {
+    if (!valid) {
       return Response.json(
         { error: "Signature does not match the claimed address" },
         { status: 401 }
       );
     }
 
-    // 5. Determine role based on org ownership
+    // 4. Determine role based on org ownership
     const orgs = await getOrganizationsByWallet(checksummed);
     const ownedOrgIds = orgs
       .filter(
@@ -75,11 +84,11 @@ export async function POST(req: NextRequest) {
 
     const role = resolveRole(checksummed, ownedOrgIds);
 
-    // 6. Create Firestore session + JWT
+    // 5. Create Firestore session + JWT
     const sessionId = await createSession(checksummed, role);
     const token = await signSessionJWT(checksummed, sessionId, role);
 
-    // 7. Set httpOnly cookie
+    // 6. Set httpOnly cookie
     await setSessionCookie(token);
 
     return Response.json({
