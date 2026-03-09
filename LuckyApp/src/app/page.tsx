@@ -56,12 +56,18 @@ export default function LandingPage() {
     setSignError(null);
 
     try {
+      // 0. Verify wallet is fully connected before requesting nonce
+      const preCheck = accountRef.current;
+      if (!preCheck?.signMessage) {
+        throw new Error("Wallet not fully connected yet. Please try again.");
+      }
+
       // 1. Request nonce from server
       const { message } = await requestChallenge(address);
 
       // 2. Sign the message with wallet (read live ref, not stale closure)
       const liveAccount = accountRef.current;
-      if (!liveAccount) throw new Error("Wallet disconnected during signing");
+      if (!liveAccount?.signMessage) throw new Error("Wallet disconnected during signing");
 
       const signature = await liveAccount.signMessage({ message });
 
@@ -88,11 +94,22 @@ export default function LandingPage() {
     }
   }, [requestChallenge, verifyChallenge]);
 
-  // When wallet connects, start challenge flow (once)
+  // When wallet connects, start challenge flow (once).
+  // Debounce by 1.5s so thirdweb auto-connect can settle —
+  // auto-connect can flicker the account (appear → disappear → reappear)
+  // as it resolves wallets, especially Coinbase Wallet.
   useEffect(() => {
-    if (account?.address && !authenticated && !challengeStarted.current) {
-      startChallengeFlow(account.address);
-    }
+    if (!account?.address || authenticated || challengeStarted.current) return;
+
+    const timer = setTimeout(() => {
+      // Re-check after debounce: account might have disappeared during auto-connect flicker
+      const live = accountRef.current;
+      if (live?.address && !challengeStarted.current) {
+        startChallengeFlow(live.address);
+      }
+    }, 1500);
+
+    return () => clearTimeout(timer);
   }, [account?.address, authenticated, startChallengeFlow]);
 
   // Reset when wallet disconnects so reconnecting works

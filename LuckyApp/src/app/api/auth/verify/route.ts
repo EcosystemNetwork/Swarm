@@ -51,11 +51,20 @@ export async function POST(req: NextRequest) {
     }
 
     // 3. Verify signature using viem (matches thirdweb's signing)
-    const checksummed = getAddress(address);
+    let checksummed: string;
+    try {
+      checksummed = getAddress(address);
+    } catch {
+      return Response.json(
+        { error: "Invalid wallet address format" },
+        { status: 400 }
+      );
+    }
+
     let valid: boolean;
     try {
       valid = await verifyMessage({
-        address: checksummed,
+        address: checksummed as `0x${string}`,
         message,
         signature: signature as `0x${string}`,
       });
@@ -99,9 +108,10 @@ export async function POST(req: NextRequest) {
       },
     });
   } catch (err) {
-    console.error("[auth/verify] Error:", err);
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error("[auth/verify] Error:", msg, err);
     return Response.json(
-      { error: "Authentication failed" },
+      { error: `Authentication failed: ${msg}` },
       { status: 500 }
     );
   }
