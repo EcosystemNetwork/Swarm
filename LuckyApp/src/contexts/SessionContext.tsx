@@ -146,6 +146,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       const data = await res.json().catch(() => ({ error: "Unknown error" }));
 
       if (!res.ok) {
+        console.error("[Swarm] /api/auth/verify failed:", res.status, data);
         throw new Error(data.error || `Verification failed (${res.status})`);
       }
 

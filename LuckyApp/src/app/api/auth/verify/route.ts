@@ -34,7 +34,17 @@ export async function POST(req: NextRequest) {
     }
 
     // 1. Verify the nonce hasn't expired and exists
-    const storedNonce = await consumeNonce(address);
+    let storedNonce: string | null;
+    try {
+      storedNonce = await consumeNonce(address);
+    } catch (err) {
+      console.error("[auth/verify] consumeNonce error:", err);
+      return Response.json(
+        { error: "Failed to validate nonce. Please try again." },
+        { status: 500 }
+      );
+    }
+
     if (!storedNonce) {
       return Response.json(
         { error: "Nonce expired or invalid. Request a new challenge." },
@@ -84,7 +94,17 @@ export async function POST(req: NextRequest) {
     }
 
     // 4. Determine role based on org ownership
-    const orgs = await getOrganizationsByWallet(checksummed);
+    let orgs;
+    try {
+      orgs = await getOrganizationsByWallet(checksummed);
+    } catch (err) {
+      console.error("[auth/verify] getOrganizationsByWallet error:", err);
+      return Response.json(
+        { error: "Failed to load organizations. Please try again." },
+        { status: 500 }
+      );
+    }
+
     const ownedOrgIds = orgs
       .filter(
         (o) => o.ownerAddress.toLowerCase() === checksummed.toLowerCase()
@@ -94,11 +114,36 @@ export async function POST(req: NextRequest) {
     const role = resolveRole(checksummed, ownedOrgIds);
 
     // 5. Create Firestore session + JWT
-    const sessionId = await createSession(checksummed, role);
-    const token = await signSessionJWT(checksummed, sessionId, role);
+    let sessionId: string;
+    try {
+      sessionId = await createSession(checksummed, role);
+    } catch (err) {
+      console.error("[auth/verify] createSession error:", err);
+      return Response.json(
+        { error: "Failed to create session. Please try again." },
+        { status: 500 }
+      );
+    }
+
+    let token: string;
+    try {
+      token = await signSessionJWT(checksummed, sessionId, role);
+    } catch (err) {
+      console.error("[auth/verify] signSessionJWT error:", err);
+      return Response.json(
+        { error: "Failed to sign session token. Check SESSION_SECRET." },
+        { status: 500 }
+      );
+    }
 
     // 6. Set httpOnly cookie
-    await setSessionCookie(token);
+    try {
+      await setSessionCookie(token);
+    } catch (err) {
+      console.error("[auth/verify] setSessionCookie error:", err);
+      // Cookie setting failed but session exists — return success anyway
+      // so the client can retry with a session refresh
+    }
 
     return Response.json({
       success: true,
@@ -109,7 +154,7 @@ export async function POST(req: NextRequest) {
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    console.error("[auth/verify] Error:", msg, err);
+    console.error("[auth/verify] Unhandled error:", msg, err);
     return Response.json(
       { error: `Authentication failed: ${msg}` },
       { status: 500 }

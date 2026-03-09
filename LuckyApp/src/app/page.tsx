@@ -56,10 +56,15 @@ export default function LandingPage() {
     setSignError(null);
 
     try {
-      // 0. Verify wallet is fully connected before requesting nonce
+      // 0. Verify wallet is fully connected and can actually sign
       const preCheck = accountRef.current;
-      if (!preCheck?.signMessage) {
+      if (!preCheck?.signMessage || !preCheck?.address) {
         throw new Error("Wallet not fully connected yet. Please try again.");
+      }
+
+      // Double-check the address matches what we expect
+      if (preCheck.address.toLowerCase() !== address.toLowerCase()) {
+        throw new Error("Wallet address changed during connection. Please try again.");
       }
 
       // 1. Request nonce from server
@@ -81,23 +86,23 @@ export default function LandingPage() {
       // On success, the useEffect above will redirect to dashboard
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Sign-in failed";
+      console.error("[Swarm] Challenge flow error:", msg);
       if (msg.includes("rejected") || msg.includes("denied") || msg.includes("cancelled")) {
-        // User rejected — don't auto-retry, let them click "Try again"
         setSignError("Signature declined. Click below to try again.");
       } else {
         setSignError(msg);
       }
-      // Don't reset challengeStarted — prevents auto-retry loop.
-      // User must click "Try again" to re-trigger.
+      challengeStarted.current = false;
     } finally {
       setSigningIn(false);
     }
   }, [requestChallenge, verifyChallenge]);
 
   // When wallet connects, start challenge flow (once).
-  // Debounce by 1.5s so thirdweb auto-connect can settle —
-  // auto-connect can flicker the account (appear → disappear → reappear)
-  // as it resolves wallets, especially Coinbase Wallet.
+  // Debounce by 3s so thirdweb auto-connect can fully settle —
+  // auto-connect flickers the account (appear → disappear → reappear)
+  // as it resolves wallets, especially Coinbase Wallet SDK which throws
+  // "connect() before enable()" during initialization.
   useEffect(() => {
     if (!account?.address || authenticated || challengeStarted.current) return;
 
@@ -107,7 +112,7 @@ export default function LandingPage() {
       if (live?.address && !challengeStarted.current) {
         startChallengeFlow(live.address);
       }
-    }, 1500);
+    }, 3000);
 
     return () => clearTimeout(timer);
   }, [account?.address, authenticated, startChallengeFlow]);
