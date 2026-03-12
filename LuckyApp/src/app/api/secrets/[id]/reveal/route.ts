@@ -1,0 +1,54 @@
+/**
+ * POST /api/secrets/:id/reveal
+ *
+ * Reveal (decrypt) a secret value.
+ * Body: { orgId, masterSecret }
+ */
+
+import { NextRequest } from "next/server";
+import { revealSecret } from "@/lib/secrets";
+
+export async function POST(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id: secretId } = await params;
+
+  let body: Record<string, unknown>;
+  try {
+    body = await request.json();
+  } catch {
+    return Response.json({ error: "Invalid JSON body" }, { status: 400 });
+  }
+
+  const { orgId, masterSecret } = body;
+
+  if (!orgId || !masterSecret) {
+    return Response.json(
+      { error: "orgId and masterSecret are required" },
+      { status: 400 }
+    );
+  }
+
+  try {
+    const decryptedValue = await revealSecret(
+      secretId,
+      orgId as string,
+      masterSecret as string
+    );
+
+    return Response.json({
+      ok: true,
+      value: decryptedValue,
+    });
+  } catch (err) {
+    console.error("Reveal secret error:", err);
+    return Response.json(
+      {
+        error:
+          err instanceof Error ? err.message : "Failed to reveal secret",
+      },
+      { status: 500 }
+    );
+  }
+}

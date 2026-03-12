@@ -157,6 +157,34 @@ async function verifyEd25519(agentId, message, signatureBase64) {
   }
 }
 
+/**
+ * Check if IP address is whitelisted in Tailscale devices
+ */
+async function checkTailscaleWhitelist(orgId, ip) {
+  if (!orgId || !ip) return false;
+
+  try {
+    // Normalize IP (remove ::ffff: prefix if present)
+    const normalizedIP = ip.startsWith("::ffff:") ? ip.substring(7) : ip;
+
+    const q = query(
+      collection(db, "tailscaleDevices"),
+      where("orgId", "==", orgId),
+      where("status", "==", "active")
+    );
+
+    const snapshot = await getDocs(q);
+
+    return snapshot.docs.some((doc) => {
+      const device = doc.data();
+      return device.tailscaleIp === normalizedIP || device.publicIp === normalizedIP;
+    });
+  } catch (err) {
+    log("error", "Tailscale whitelist check failed", { orgId, ip, error: err.message });
+    return false;
+  }
+}
+
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
 function checkRateLimit(agentId) {
@@ -510,6 +538,24 @@ server.on("upgrade", async (req, socket, head) => {
     socket.write("HTTP/1.1 401 Unauthorized\r\n\r\n");
     socket.destroy();
     return;
+  }
+
+  // Tailscale IP whitelisting (if enabled)
+  const TAILSCALE_WHITELIST_MODE = optionalEnv("TAILSCALE_WHITELIST_MODE", "disabled");
+  if (TAILSCALE_WHITELIST_MODE !== "disabled") {
+    const clientIP = req.socket.remoteAddress || "";
+    const isWhitelisted = await checkTailscaleWhitelist(agentData.orgId, clientIP);
+
+    if (!isWhitelisted) {
+      if (TAILSCALE_WHITELIST_MODE === "enforce") {
+        log("warn", "WS upgrade rejected — IP not whitelisted", { agentId, clientIP });
+        socket.write("HTTP/1.1 403 Forbidden\r\n\r\n");
+        socket.destroy();
+        return;
+      } else if (TAILSCALE_WHITELIST_MODE === "warn") {
+        log("warn", "WS connection from non-whitelisted IP", { agentId, clientIP });
+      }
+    }
   }
 
   // Check max connections per agent
