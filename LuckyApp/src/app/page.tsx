@@ -34,19 +34,21 @@ function LandingPageContent() {
 
   useEffect(() => setMounted(true), []);
 
+  // Extract redirect URL early to avoid dependency issues
+  const redirectUrl = searchParams.get('redirect') || '/dashboard';
+
   // If already authenticated, redirect to dashboard
   useEffect(() => {
     debug.log("[Swarm:Landing] Auth state changed:", authenticated);
     if (authenticated) {
-      const redirect = searchParams.get('redirect') || '/dashboard';
-      debug.log("[Swarm:Landing] Authenticated! Redirecting to:", redirect);
+      debug.log("[Swarm:Landing] Authenticated! Redirecting to:", redirectUrl);
       const timer = setTimeout(() => {
         debug.log("[Swarm:Landing] Executing redirect...");
-        router.push(redirect);
+        router.push(redirectUrl);
       }, 300);
       return () => clearTimeout(timer);
     }
-  }, [authenticated, router, searchParams]);
+  }, [authenticated, router, redirectUrl]);
 
   const handleRobotLoad = (index: number) => (spline: any) => {
     canvasRefs.current[index] = spline.canvas ?? spline._canvas ?? null;
