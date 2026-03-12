@@ -44,15 +44,19 @@ export function useAutoSiwe() {
           body: JSON.stringify({ address }),
         });
         debug.log("[Swarm:autoLogin] Response status:", res.status);
+
         if (!res.ok) {
           const err = await res.json().catch(() => ({}));
           debug.error("[Swarm:autoLogin] Verify failed:", err);
           throw new Error(err.error || "Login failed");
         }
 
-        debug.log("[Swarm:autoLogin] Refreshing session...");
+        const data = await res.json();
+        debug.log("[Swarm:autoLogin] ✅ Verify succeeded:", data);
+
+        debug.log("[Swarm:autoLogin] 🔄 Refreshing session...");
         await refresh();
-        debug.log("[Swarm:autoLogin] Session refreshed successfully");
+        debug.log("[Swarm:autoLogin] ✅ Session refreshed successfully");
         lastAddressRef.current = address.toLowerCase();
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);

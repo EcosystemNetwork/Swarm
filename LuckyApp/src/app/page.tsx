@@ -36,19 +36,33 @@ function LandingPageContent() {
 
   // Extract redirect URL early to avoid dependency issues
   const redirectUrl = searchParams.get('redirect') || '/dashboard';
+  const [redirecting, setRedirecting] = useState(false);
 
   // If already authenticated, redirect to dashboard
   useEffect(() => {
-    debug.log("[Swarm:Landing] Auth state changed:", authenticated);
-    if (authenticated) {
-      debug.log("[Swarm:Landing] Authenticated! Redirecting to:", redirectUrl);
-      const timer = setTimeout(() => {
-        debug.log("[Swarm:Landing] Executing redirect...");
-        router.push(redirectUrl);
-      }, 300);
-      return () => clearTimeout(timer);
+    debug.log("[Swarm:Landing] Auth state changed:", {
+      authenticated,
+      redirectUrl,
+      redirecting,
+    });
+
+    if (authenticated && !redirecting) {
+      debug.log("[Swarm:Landing] ✅ Authenticated! Starting redirect to:", redirectUrl);
+      setRedirecting(true);
+
+      // Immediate redirect without delay
+      debug.log("[Swarm:Landing] 🚀 Executing router.push to:", redirectUrl);
+      router.push(redirectUrl);
+
+      // Fallback: force redirect with window.location after 500ms if router.push fails
+      const fallbackTimer = setTimeout(() => {
+        debug.log("[Swarm:Landing] ⚠️ Fallback redirect via window.location");
+        window.location.href = redirectUrl;
+      }, 500);
+
+      return () => clearTimeout(fallbackTimer);
     }
-  }, [authenticated, router, redirectUrl]);
+  }, [authenticated, router, redirectUrl, redirecting]);
 
   const handleRobotLoad = (index: number) => (spline: any) => {
     canvasRefs.current[index] = spline.canvas ?? spline._canvas ?? null;
@@ -76,6 +90,22 @@ function LandingPageContent() {
     window.addEventListener('mousemove', handleMouseMove);
     return () => window.removeEventListener('mousemove', handleMouseMove);
   }, []);
+
+  // Show redirecting overlay when authenticated
+  if (authenticated && redirecting) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-black">
+        <div className="text-center">
+          <div className="mb-4 text-amber-500 text-xl animate-pulse">
+            Redirecting to dashboard...
+          </div>
+          <div className="text-muted-foreground text-sm">
+            If you are not redirected, <a href="/dashboard" className="text-amber-500 underline">click here</a>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col min-h-screen overflow-x-hidden">
