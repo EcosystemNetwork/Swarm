@@ -1,5 +1,5 @@
 /**
- * POST /api/agents/:parentId/delegate/:childId
+ * POST /api/agents/:id/delegate/:childId
  *
  * Delegate a task from parent agent to child agent.
  * Body: { orgId, taskId?, reason? }
@@ -10,9 +10,9 @@ import { delegateTask } from "@/lib/agent-hierarchy";
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: Promise<{ parentId: string; childId: string }> }
+  { params }: { params: Promise<{ id: string; childId: string }> }
 ) {
-  const { parentId, childId } = await params;
+  const { id: parentId, childId } = await params;
 
   let body: Record<string, unknown>;
   try {

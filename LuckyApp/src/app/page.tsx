@@ -24,7 +24,7 @@ const client = createThirdwebClient({
 // 3 robots — centered, wider spread, faster load
 const ROBOT_COUNT = 3;
 
-export default function LandingPage() {
+function LandingPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const canvasRefs = useRef<(HTMLCanvasElement | null)[]>([]);
@@ -193,5 +193,17 @@ export default function LandingPage() {
         </p>
       </footer>
     </div>
+  );
+}
+
+export default function LandingPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex min-h-screen items-center justify-center bg-black">
+        <div className="text-amber-500 text-xl">Loading...</div>
+      </div>
+    }>
+      <LandingPageContent />
+    </Suspense>
   );
 }
