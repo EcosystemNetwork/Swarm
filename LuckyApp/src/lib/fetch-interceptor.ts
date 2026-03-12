@@ -170,7 +170,12 @@ export function getCircuitDiagnostics(): Record<string, {
 
 type LogLevel = 'info' | 'warn' | 'error';
 
+const isDev = typeof process !== 'undefined' && process.env.NODE_ENV === 'development';
+
 function log(level: LogLevel, domain: string, msg: string, extra?: Record<string, unknown>) {
+  // Only log errors in production, all logs in development
+  if (!isDev && level !== 'error') return;
+
   const prefix = '[Swarm:fetch]';
   const ctx = extra ? ` ${JSON.stringify(extra)}` : '';
   const line = `${prefix} [${domain}] ${msg}${ctx}`;

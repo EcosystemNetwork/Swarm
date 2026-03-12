@@ -13,6 +13,7 @@ import Image from "next/image";
 import { ArrowRight, Sun, Moon } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useSession } from "@/contexts/SessionContext";
+import { debug } from "@/lib/debug";
 
 const Spline = lazy(() => import('@splinetool/react-spline'));
 
@@ -35,12 +36,12 @@ export default function LandingPage() {
 
   // If already authenticated, redirect to dashboard
   useEffect(() => {
-    console.log("[Swarm:Landing] Auth state changed:", authenticated);
+    debug.log("[Swarm:Landing] Auth state changed:", authenticated);
     if (authenticated) {
       const redirect = searchParams.get('redirect') || '/dashboard';
-      console.log("[Swarm:Landing] Authenticated! Redirecting to:", redirect);
+      debug.log("[Swarm:Landing] Authenticated! Redirecting to:", redirect);
       const timer = setTimeout(() => {
-        console.log("[Swarm:Landing] Executing redirect...");
+        debug.log("[Swarm:Landing] Executing redirect...");
         router.push(redirect);
       }, 300);
       return () => clearTimeout(timer);

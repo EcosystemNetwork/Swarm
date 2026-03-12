@@ -19,6 +19,7 @@ import {
   useRef,
   type ReactNode,
 } from "react";
+import { debug } from "@/lib/debug";
 
 export type UserRole = "operator" | "org_admin" | "platform_admin";
 
@@ -74,16 +75,16 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   // Debug: log session state changes
   useEffect(() => {
-    console.log("[Swarm:Session] State updated:", session);
+    debug.log("[Swarm:Session] State updated:", session);
   }, [session]);
 
   const fetchSession = useCallback(async () => {
-    console.log("[Swarm:Session] Fetching session...");
+    debug.log("[Swarm:Session] Fetching session...");
     try {
       const res = await fetch("/api/auth/session", { credentials: "include" });
-      console.log("[Swarm:Session] Session response:", res.status);
+      debug.log("[Swarm:Session] Session response:", res.status);
       if (!res.ok) {
-        console.log("[Swarm:Session] Not authenticated");
+        debug.log("[Swarm:Session] Not authenticated");
         setSession({
           authenticated: false,
           address: null,
@@ -94,17 +95,17 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       }
 
       const data = await res.json();
-      console.log("[Swarm:Session] Session data:", data);
+      debug.log("[Swarm:Session] Session data:", data);
       const newSession = {
         authenticated: data.authenticated ?? false,
         address: data.address ?? null,
         role: data.role ?? null,
         sessionId: data.sessionId ?? null,
       };
-      console.log("[Swarm:Session] Setting session state to:", newSession);
+      debug.log("[Swarm:Session] Setting session state to:", newSession);
       setSession(newSession);
     } catch (err) {
-      console.error("[Swarm:Session] Fetch error:", err);
+      debug.error("[Swarm:Session] Fetch error:", err);
       setSession({
         authenticated: false,
         address: null,
@@ -113,7 +114,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       });
     } finally {
       setLoading(false);
-      console.log("[Swarm:Session] Loading complete");
+      debug.log("[Swarm:Session] Loading complete");
     }
   }, []);
 
@@ -159,7 +160,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       const data = await res.json().catch(() => ({ error: "Unknown error" }));
 
       if (!res.ok) {
-        console.error("[Swarm] /api/auth/verify failed:", res.status, data);
+        debug.error("[Swarm] /api/auth/verify failed:", res.status, data);
         throw new Error(data.error || `Verification failed (${res.status})`);
       }
 

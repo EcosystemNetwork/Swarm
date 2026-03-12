@@ -14,6 +14,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useActiveAccount } from "thirdweb/react";
 import { useSession } from "@/contexts/SessionContext";
+import { debug } from "@/lib/debug";
 
 export function useAutoSiwe() {
   const account = useActiveAccount();
@@ -25,9 +26,9 @@ export function useAutoSiwe() {
 
   const triggerLogin = useCallback(
     async (address: string) => {
-      console.log("[Swarm:autoLogin] triggerLogin called for", address);
+      debug.log("[Swarm:autoLogin] triggerLogin called for", address);
       if (signingRef.current) {
-        console.log("[Swarm:autoLogin] Already signing in, skipping");
+        debug.log("[Swarm:autoLogin] Already signing in, skipping");
         return;
       }
       signingRef.current = true;
@@ -35,39 +36,39 @@ export function useAutoSiwe() {
       setSignError(null);
 
       try {
-        console.log("[Swarm:autoLogin] POSTing to /api/auth/verify");
+        debug.log("[Swarm:autoLogin] POSTing to /api/auth/verify");
         const res = await fetch("/api/auth/verify", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           credentials: "include",
           body: JSON.stringify({ address }),
         });
-        console.log("[Swarm:autoLogin] Response status:", res.status);
+        debug.log("[Swarm:autoLogin] Response status:", res.status);
         if (!res.ok) {
           const err = await res.json().catch(() => ({}));
-          console.error("[Swarm:autoLogin] Verify failed:", err);
+          debug.error("[Swarm:autoLogin] Verify failed:", err);
           throw new Error(err.error || "Login failed");
         }
 
-        console.log("[Swarm:autoLogin] Refreshing session...");
+        debug.log("[Swarm:autoLogin] Refreshing session...");
         await refresh();
-        console.log("[Swarm:autoLogin] Session refreshed successfully");
+        debug.log("[Swarm:autoLogin] Session refreshed successfully");
         lastAddressRef.current = address.toLowerCase();
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
-        console.error("[Swarm:autoLogin] Error:", msg, err);
+        debug.error("[Swarm:autoLogin] Error:", msg, err);
         setSignError(msg);
       } finally {
         signingRef.current = false;
         setSigningIn(false);
-        console.log("[Swarm:autoLogin] triggerLogin complete");
+        debug.log("[Swarm:autoLogin] triggerLogin complete");
       }
     },
     [refresh]
   );
 
   useEffect(() => {
-    console.log("[Swarm:autoLogin] Effect fired —", {
+    debug.log("[Swarm:autoLogin] Effect fired —", {
       account: account?.address ?? null,
       loading,
       authenticated,
@@ -76,15 +77,15 @@ export function useAutoSiwe() {
 
     // Wait for session check to finish
     if (loading) {
-      console.log("[Swarm:autoLogin] Still loading, waiting...");
+      debug.log("[Swarm:autoLogin] Still loading, waiting...");
       return;
     }
 
     if (!account) {
-      console.log("[Swarm:autoLogin] No account connected");
+      debug.log("[Swarm:autoLogin] No account connected");
       // Wallet disconnected — logout if we had a session
       if (lastAddressRef.current) {
-        console.log("[Swarm:autoLogin] Logging out due to wallet disconnect");
+        debug.log("[Swarm:autoLogin] Logging out due to wallet disconnect");
         lastAddressRef.current = null;
         logout();
       }
@@ -93,19 +94,19 @@ export function useAutoSiwe() {
 
     // Already authenticated with this address — nothing to do
     if (authenticated) {
-      console.log("[Swarm:autoLogin] Already authenticated");
+      debug.log("[Swarm:autoLogin] Already authenticated");
       lastAddressRef.current = account.address.toLowerCase();
       return;
     }
 
     // Already in the middle of logging in — skip
     if (signingRef.current) {
-      console.log("[Swarm:autoLogin] Already in progress");
+      debug.log("[Swarm:autoLogin] Already in progress");
       return;
     }
 
     // Wallet connected but no session — auto-login
-    console.log("[Swarm:autoLogin] Triggering auto-login for", account.address);
+    debug.log("[Swarm:autoLogin] Triggering auto-login for", account.address);
     triggerLogin(account.address);
   }, [account, loading, authenticated, triggerLogin, logout]);
 

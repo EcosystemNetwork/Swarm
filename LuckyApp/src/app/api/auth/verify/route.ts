@@ -12,9 +12,36 @@ import {
   setSessionCookie,
 } from "@/lib/session";
 import { getOrganizationsByWallet } from "@/lib/firestore";
+import { getCachedOrgs, cacheOrgs } from "@/lib/org-cache";
+import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 
 export async function POST(req: Request) {
   try {
+    // Rate limiting: 10 login attempts per IP per minute
+    const clientIp = getClientIp(req);
+    const rateLimit = checkRateLimit(clientIp, {
+      max: 10,
+      windowMs: 60 * 1000, // 1 minute
+    });
+
+    if (!rateLimit.allowed) {
+      return Response.json(
+        {
+          error: "Too many login attempts. Please try again later.",
+          retryAfter: Math.ceil((rateLimit.resetTime - Date.now()) / 1000),
+        },
+        {
+          status: 429,
+          headers: {
+            "Retry-After": String(Math.ceil((rateLimit.resetTime - Date.now()) / 1000)),
+            "X-RateLimit-Limit": "10",
+            "X-RateLimit-Remaining": "0",
+            "X-RateLimit-Reset": String(Math.ceil(rateLimit.resetTime / 1000)),
+          },
+        }
+      );
+    }
+
     const body = await req.json();
     const address = (body.address ?? body.payload?.address ?? "").trim();
 
@@ -28,7 +55,14 @@ export async function POST(req: Request) {
     // 1. Determine role based on org ownership
     let orgs;
     try {
-      orgs = await getOrganizationsByWallet(address);
+      // Check cache first
+      orgs = getCachedOrgs(address);
+      if (!orgs) {
+        // Cache miss - fetch from Firestore
+        orgs = await getOrganizationsByWallet(address);
+        // Cache the result
+        cacheOrgs(address, orgs);
+      }
     } catch (err) {
       console.error("[auth/verify] getOrganizationsByWallet error:", err);
       return Response.json(
