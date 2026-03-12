@@ -46,6 +46,10 @@ export interface CronJob {
     priority?: "low" | "medium" | "high";
     /** Is this job active? */
     enabled: boolean;
+    /** Is this job paused? (paused jobs won't execute even if enabled) */
+    paused?: boolean;
+    /** Stagger delay between agent executions (ms) */
+    staggerDelayMs?: number;
     /** Created by wallet address */
     createdBy: string;
     createdAt: Date | null;
@@ -84,6 +88,8 @@ export interface CronJobUpdateInput {
     agentIds?: string[];
     priority?: "low" | "medium" | "high";
     enabled?: boolean;
+    paused?: boolean;
+    staggerDelayMs?: number;
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -97,6 +103,7 @@ export const SCHEDULE_PRESETS: { label: string; value: string; type: ScheduleTyp
     { label: "Every 6 hours", value: "0 */6 * * *", type: "interval", icon: "🕕" },
     { label: "Daily at 9 AM", value: "0 9 * * *", type: "daily", icon: "☀️" },
     { label: "Daily at 6 PM", value: "0 18 * * *", type: "daily", icon: "🌅" },
+    { label: "Daily Standup Report (9 AM)", value: "0 9 * * *", type: "daily", icon: "📊" },
     { label: "Weekly — Mon 9 AM", value: "0 9 * * 1", type: "weekly", icon: "📅" },
     { label: "Monthly — 1st 9 AM", value: "0 9 1 * *", type: "monthly", icon: "📆" },
 ];

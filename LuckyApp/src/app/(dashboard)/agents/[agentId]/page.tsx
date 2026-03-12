@@ -153,6 +153,11 @@ function AgentDetailPage() {
   const [showDelete, setShowDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
+  // Pause/Resume state
+  const [showPause, setShowPause] = useState(false);
+  const [pauseReason, setPauseReason] = useState('');
+  const [pausing, setPausing] = useState(false);
+
   // On-chain registration state
   const [showRegister, setShowRegister] = useState(false);
   const [registerName, setRegisterName] = useState('');
@@ -280,6 +285,52 @@ function AgentDetailPage() {
       console.error('Failed to delete agent:', err);
       setError(err instanceof Error ? err.message : 'Failed to delete agent');
       setDeleting(false);
+    }
+  };
+
+  const handlePauseConfirm = async () => {
+    if (!agent || !currentOrg) return;
+    try {
+      setPausing(true);
+      const res = await fetch(`/api/agents/${agentId}/pause`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          orgId: currentOrg.id,
+          pausedBy: currentOrg.ownerAddress,
+          reason: pauseReason,
+        }),
+      });
+      if (res.ok) {
+        setAgent({ ...agent, status: 'paused', pausedAt: new Date(), pausedBy: currentOrg.ownerAddress, pauseReason });
+        setShowPause(false);
+        setPauseReason('');
+      }
+    } catch (err) {
+      console.error('Failed to pause agent:', err);
+      setError(err instanceof Error ? err.message : 'Failed to pause agent');
+    } finally {
+      setPausing(false);
+    }
+  };
+
+  const handleResumeConfirm = async () => {
+    if (!agent || !currentOrg) return;
+    try {
+      setPausing(true);
+      const res = await fetch(`/api/agents/${agentId}/resume`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orgId: currentOrg.id }),
+      });
+      if (res.ok) {
+        setAgent({ ...agent, status: 'online', pausedAt: undefined, pausedBy: undefined, pauseReason: undefined });
+      }
+    } catch (err) {
+      console.error('Failed to resume agent:', err);
+      setError(err instanceof Error ? err.message : 'Failed to resume agent');
+    } finally {
+      setPausing(false);
     }
   };
 
@@ -454,12 +505,31 @@ function AgentDetailPage() {
           <div className="flex gap-2 flex-shrink-0">
             <Button
               onClick={handleStatusToggle}
-              disabled={updating}
+              disabled={updating || agent.status === 'paused'}
               variant={agent.status === 'online' ? 'outline' : 'default'}
               className={agent.status === 'online' ? 'hover:bg-red-50 hover:border-red-300 hover:text-red-600' : 'bg-emerald-600 hover:bg-green-700'}
             >
               {updating ? 'Updating...' : agent.status === 'online' ? 'Set Offline' : 'Set Online'}
             </Button>
+            {agent.status === 'paused' ? (
+              <Button
+                variant="outline"
+                className="border-green-300 text-green-600 hover:bg-green-50 hover:text-green-700"
+                onClick={handleResumeConfirm}
+                disabled={pausing}
+              >
+                {pausing ? 'Resuming...' : '▶️ Resume'}
+              </Button>
+            ) : (
+              <Button
+                variant="outline"
+                className="border-orange-300 text-orange-600 hover:bg-orange-50 hover:text-orange-700"
+                onClick={() => setShowPause(true)}
+                disabled={agent.status === 'offline'}
+              >
+                ⏸️ Pause
+              </Button>
+            )}
             <Button variant="outline" onClick={handleEditOpen}>
               ✏️ Edit
             </Button>
@@ -1208,6 +1278,33 @@ function AgentDetailPage() {
             <Button variant="outline" onClick={() => setShowDelete(false)} disabled={deleting}>Cancel</Button>
             <Button onClick={handleDeleteConfirm} disabled={deleting} className="bg-red-600 hover:bg-red-700 text-white">
               {deleting ? 'Removing...' : '🗑️ Remove'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Pause Agent Dialog */}
+      <Dialog open={showPause} onOpenChange={setShowPause}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Pause Agent</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground mb-4">
+            Pausing <strong>{agent?.name}</strong> will prevent it from processing messages until resumed.
+          </p>
+          <div>
+            <label className="text-sm font-medium mb-1 block">Reason (optional)</label>
+            <Textarea
+              value={pauseReason}
+              onChange={(e) => setPauseReason(e.target.value)}
+              placeholder="e.g., Maintenance, testing, cost limits..."
+              rows={3}
+            />
+          </div>
+          <div className="flex gap-2 justify-end mt-4">
+            <Button variant="outline" onClick={() => { setShowPause(false); setPauseReason(''); }} disabled={pausing}>Cancel</Button>
+            <Button onClick={handlePauseConfirm} disabled={pausing} className="bg-orange-600 hover:bg-orange-700 text-white">
+              {pausing ? 'Pausing...' : '⏸️ Pause Agent'}
             </Button>
           </div>
         </DialogContent>

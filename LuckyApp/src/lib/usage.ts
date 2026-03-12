@@ -72,7 +72,7 @@ export interface DailyCost {
 // Model Pricing (per 1M tokens)
 // ═══════════════════════════════════════════════════════════════
 
-const MODEL_PRICING: Record<string, { input: number; output: number }> = {
+export const MODEL_PRICING: Record<string, { input: number; output: number }> = {
     "gpt-4o": { input: 2.50, output: 10.00 },
     "gpt-4o-mini": { input: 0.15, output: 0.60 },
     "gpt-4-turbo": { input: 10.00, output: 30.00 },

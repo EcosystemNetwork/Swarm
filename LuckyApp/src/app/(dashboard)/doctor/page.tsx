@@ -17,6 +17,8 @@ import { getAgentsByOrg } from "@/lib/firestore";
 import { getGateways } from "@/lib/gateways";
 import { getCronJobs } from "@/lib/cron";
 import { getLatestVitals } from "@/lib/vitals";
+import { DiagnosticCard } from "@/components/diagnostic-card";
+import type { DiagnosticRun } from "@/lib/diagnostics";
 
 // ═══════════════════════════════════════════════════════════════
 // Health Check Types
@@ -285,6 +287,10 @@ export default function DoctorPage() {
     const [running, setRunning] = useState(false);
     const [lastRun, setLastRun] = useState<Date | null>(null);
 
+    // Diagnostics state
+    const [diagnosticRuns, setDiagnosticRuns] = useState<DiagnosticRun[]>([]);
+    const [runningDiagnostics, setRunningDiagnostics] = useState(false);
+
     const runChecks = useCallback(async () => {
         setRunning(true);
         try {
@@ -297,6 +303,26 @@ export default function DoctorPage() {
             setRunning(false);
         }
     }, [currentOrg?.id, account?.address]);
+
+    const runDiagnosticChecks = useCallback(async () => {
+        if (!currentOrg?.id) return;
+        setRunningDiagnostics(true);
+        try {
+            const res = await fetch("/api/diagnostics/run", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ orgId: currentOrg.id }),
+            });
+            const data = await res.json();
+            if (data.ok && data.runs) {
+                setDiagnosticRuns(data.runs);
+            }
+        } catch (err) {
+            console.error("Failed to run diagnostics:", err);
+        } finally {
+            setRunningDiagnostics(false);
+        }
+    }, [currentOrg?.id]);
 
     // Auto-run on mount
     useEffect(() => {
@@ -419,6 +445,45 @@ export default function DoctorPage() {
                             </div>
                         </div>
                     ))}
+
+                    {/* Advanced Diagnostics with Auto-Fix */}
+                    <div className="mt-8 pt-6 border-t border-border">
+                        <div className="flex items-center justify-between mb-4">
+                            <div>
+                                <h2 className="text-lg font-semibold">Advanced Diagnostics</h2>
+                                <p className="text-xs text-muted-foreground">Deep system analysis with one-click auto-fix</p>
+                            </div>
+                            <Button
+                                onClick={runDiagnosticChecks}
+                                disabled={runningDiagnostics || !currentOrg}
+                                size="sm"
+                                variant="outline"
+                                className="gap-1.5"
+                            >
+                                {runningDiagnostics ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
+                                {runningDiagnostics ? "Scanning..." : "Run Deep Scan"}
+                            </Button>
+                        </div>
+
+                        {diagnosticRuns.length === 0 ? (
+                            <Card className="p-8 bg-card/80 border-border text-center">
+                                <AlertTriangle className="h-10 w-10 mx-auto text-muted-foreground/30 mb-3" />
+                                <h3 className="text-sm font-semibold mb-1">No deep diagnostics run yet</h3>
+                                <p className="text-xs text-muted-foreground">Click &quot;Run Deep Scan&quot; to check for stale agents, budget overruns, orphaned tasks, and more</p>
+                            </Card>
+                        ) : (
+                            <div className="space-y-3">
+                                {diagnosticRuns.map((run) => (
+                                    <DiagnosticCard
+                                        key={run.checkType}
+                                        run={run}
+                                        orgId={currentOrg?.id || ""}
+                                        onFixApplied={runDiagnosticChecks}
+                                    />
+                                ))}
+                            </div>
+                        )}
+                    </div>
                 </>
             )}
         </div>

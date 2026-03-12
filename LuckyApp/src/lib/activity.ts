@@ -38,7 +38,10 @@ export type ActivityEventType =
     | "cron.triggered"
     | "config.changed"
     | "member.joined"
-    | "member.left";
+    | "member.left"
+    | "agent_hierarchy_child_added"
+    | "agent_hierarchy_child_removed"
+    | "agent_hierarchy_task_delegated";
 
 export type ActivityActor = "agent" | "user" | "system" | "cron";
 

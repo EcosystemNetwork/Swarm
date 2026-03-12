@@ -22,6 +22,7 @@ import { db } from "./firebase";
 // ═══════════════════════════════════════════════════════════════
 
 export type MemoryType = "journal" | "long_term" | "workspace" | "vector";
+export type MemorySubtype = "working_md" | "daily_note" | "memory_md" | "session_log";
 
 export interface MemoryEntry {
     id: string;
@@ -34,6 +35,13 @@ export interface MemoryEntry {
     filePath?: string;
     sizeBytes?: number;
     tags?: string[];
+    subtype?: MemorySubtype;
+    structuredData?: {
+        date?: string;
+        template?: string;
+        sessionId?: string;
+        [key: string]: unknown;
+    };
     createdAt: Date | null;
     updatedAt: Date | null;
 }
