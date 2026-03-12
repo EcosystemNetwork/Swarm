@@ -84,6 +84,14 @@ export interface KanbanTask {
     subtasks: SubTask[];
     dueDate?: string;
     position: number;
+    /** Task IDs that block this task */
+    blockedBy?: string[];
+    /** Reason for blocking */
+    blockReason?: string;
+    /** When the task was blocked */
+    blockedAt?: Date | null;
+    /** Group/category (e.g., Engineering, Design, Marketing) */
+    group?: string;
     createdAt: Date | null;
     updatedAt: Date | null;
 }
@@ -100,6 +108,9 @@ export interface KanbanTaskInput {
     assigneeName?: string;
     subtasks?: SubTask[];
     dueDate?: string;
+    blockedBy?: string[];
+    blockReason?: string;
+    group?: string;
 }
 
 // ═══════════════════════════════════════════════════════════════

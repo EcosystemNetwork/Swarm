@@ -20,7 +20,7 @@ import { db } from "./firebase";
 // Types
 // ═══════════════════════════════════════════════════════════════
 
-export type AgentStatus = "online" | "offline" | "degraded";
+export type AgentStatus = "online" | "offline" | "degraded" | "paused";
 
 export interface AgentHeartbeat {
     agentId: string;
@@ -36,6 +36,7 @@ export const STATUS_CONFIG: Record<AgentStatus, { label: string; color: string; 
     online: { label: "Online", color: "text-emerald-400", dot: "bg-emerald-400" },
     offline: { label: "Offline", color: "text-red-400", dot: "bg-red-400" },
     degraded: { label: "Degraded", color: "text-amber-400", dot: "bg-amber-400" },
+    paused: { label: "Paused", color: "text-gray-400", dot: "bg-gray-400" },
 };
 
 // ═══════════════════════════════════════════════════════════════
@@ -98,4 +99,54 @@ export async function getHeartbeats(orgId: string): Promise<AgentHeartbeat[]> {
 export async function getStaleAgents(orgId: string): Promise<AgentHeartbeat[]> {
     const all = await getHeartbeats(orgId);
     return all.filter(a => a.status !== "online");
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Pause / Resume
+// ═══════════════════════════════════════════════════════════════
+
+/** Pause an agent (prevents message processing) */
+export async function pauseAgent(
+    orgId: string,
+    agentId: string,
+    pausedBy: string,
+    reason?: string
+): Promise<void> {
+    // Update agent status in agents collection
+    const agentRef = doc(db, "agents", agentId);
+    await setDoc(agentRef, {
+        status: "paused",
+        pausedAt: serverTimestamp(),
+        pausedBy,
+        pauseReason: reason || "",
+    }, { merge: true });
+
+    // Update heartbeat status
+    const heartbeatRef = doc(db, HEARTBEAT_COLLECTION, `${orgId}_${agentId}`);
+    await setDoc(heartbeatRef, {
+        status: "paused" as AgentStatus,
+        pausedAt: serverTimestamp(),
+    }, { merge: true });
+}
+
+/** Resume a paused agent */
+export async function resumeAgent(
+    orgId: string,
+    agentId: string
+): Promise<void> {
+    // Update agent status in agents collection
+    const agentRef = doc(db, "agents", agentId);
+    await setDoc(agentRef, {
+        status: "online",
+        pausedAt: null,
+        pausedBy: null,
+        pauseReason: null,
+    }, { merge: true });
+
+    // Update heartbeat status
+    const heartbeatRef = doc(db, HEARTBEAT_COLLECTION, `${orgId}_${agentId}`);
+    await setDoc(heartbeatRef, {
+        status: "online" as AgentStatus,
+        lastSeen: serverTimestamp(),
+    }, { merge: true });
 }

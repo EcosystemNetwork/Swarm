@@ -83,10 +83,16 @@ export interface Agent {
   type: 'Research' | 'Trading' | 'Operations' | 'Support' | 'Analytics' | 'Scout' | 'Security' | 'Creative' | 'Engineering' | 'DevOps' | 'Marketing' | 'Finance' | 'Data' | 'Coordinator' | 'Legal' | 'Communication';
   description: string;
   capabilities: string[];
-  status: 'online' | 'offline' | 'busy';
+  status: 'online' | 'offline' | 'busy' | 'paused';
   projectIds: string[];
   apiKey?: string;
   avatarUrl?: string;
+  /** When the agent was paused (if status is 'paused') */
+  pausedAt?: unknown;
+  /** Who paused the agent */
+  pausedBy?: string;
+  /** Reason for pausing */
+  pauseReason?: string;
   /** Short bio the agent writes about itself on connect */
   bio?: string;
   /** Skills/plugins the agent self-reports when connecting */
@@ -109,6 +115,20 @@ export interface Agent {
   creditScore?: number;
   /** Trust score (0-100) */
   trustScore?: number;
+  /** Parent agent ID (if this agent is a child) */
+  parentAgentId?: string;
+  /** Child agent IDs (if this agent is a parent) */
+  childAgentIds?: string[];
+  /** Hierarchy level (0 = root, 1 = first child, etc.) */
+  hierarchyLevel: number;
+  /** Can this agent delegate tasks to children? */
+  canDelegate: boolean;
+  /** SOUL configuration (YAML content) */
+  soulConfig?: string;
+  /** SOUL version identifier */
+  soulVersion?: string;
+  /** When SOUL was last updated */
+  soulUpdatedAt?: unknown;
   createdAt: unknown;
 }
 

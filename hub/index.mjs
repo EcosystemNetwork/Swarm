@@ -60,6 +60,11 @@ const RATE_LIMIT_MAX = parseInt(optionalEnv("RATE_LIMIT_MAX", "60"), 10);
 const MAX_CONNECTIONS_PER_AGENT = parseInt(optionalEnv("MAX_CONNECTIONS_PER_AGENT", "5"), 10);
 const AUTH_WINDOW_MS = parseInt(optionalEnv("AUTH_WINDOW_MS", String(5 * 60 * 1000)), 10);
 
+// Multi-region gateway configuration
+const HUB_REGION = optionalEnv("HUB_REGION", "us-east");
+const HUB_GATEWAY_ID = optionalEnv("HUB_GATEWAY_ID", "");
+const GATEWAY_HEARTBEAT_INTERVAL = parseInt(optionalEnv("GATEWAY_HEARTBEAT_INTERVAL_MS", "60000"), 10);
+
 // Firebase — loaded from environment, never hardcoded
 const FIREBASE_CONFIG = {
   apiKey: requireEnv("FIREBASE_API_KEY"),
@@ -102,7 +107,8 @@ setInterval(() => {
       continue;
     }
     ws._pongPending = true;
-    ws.ping();
+    // Send ping with request for vitals
+    ws.ping(JSON.stringify({ request_vitals: true }));
   }
 }, HEARTBEAT_INTERVAL_MS);
 
@@ -234,6 +240,18 @@ async function persistMessage(agentId, agentName, orgId, channelId, content) {
   } catch (err) {
     log("error", "Failed to persist message", { channelId, error: err.message });
     return null;
+  }
+}
+
+async function isAgentPaused(agentId) {
+  try {
+    const agentSnap = await getDoc(doc(db, "agents", agentId));
+    if (!agentSnap.exists()) return false;
+    const agentData = agentSnap.data();
+    return agentData.status === "paused";
+  } catch (err) {
+    log("error", "Failed to check agent pause status", { agentId, error: err.message });
+    return false; // Fail open — don't block if can't check
   }
 }
 
@@ -580,8 +598,35 @@ wss.on("connection", async (ws, _req) => {
 
   // ── Heartbeat pong handler ──────────────────────────────────────────────
   ws._pongPending = false;
-  ws.on("pong", () => {
+  ws.on("pong", async (data) => {
     ws._pongPending = false;
+
+    // Parse vitals from pong data if provided
+    if (data && data.length > 0) {
+      try {
+        const vitals = JSON.parse(data.toString());
+        if (vitals.cpu !== undefined && vitals.memory !== undefined && vitals.disk !== undefined) {
+          // Record vitals to Firestore
+          await addDoc(collection(db, "agentVitals"), {
+            orgId,
+            agentId,
+            agentName,
+            vitals: {
+              cpu: vitals.cpu,
+              memory: vitals.memory,
+              disk: vitals.disk,
+              memoryUsedMB: vitals.memoryUsedMB,
+              memoryTotalMB: vitals.memoryTotalMB,
+              diskUsedGB: vitals.diskUsedGB,
+              diskTotalGB: vitals.diskTotalGB,
+            },
+            timestamp: serverTimestamp(),
+          });
+        }
+      } catch (err) {
+        // Ignore vitals parsing errors
+      }
+    }
   });
 
   // ── Message Handler ─────────────────────────────────────────────────────
@@ -598,6 +643,13 @@ wss.on("connection", async (ws, _req) => {
     // Rate limit
     if (!checkRateLimit(agentId)) {
       ws.send(JSON.stringify({ error: "Rate limit exceeded", type: "error" }));
+      return;
+    }
+
+    // Check if agent is paused
+    const paused = await isAgentPaused(agentId);
+    if (paused) {
+      ws.send(JSON.stringify({ error: "Agent is paused", type: "error", code: "AGENT_PAUSED" }));
       return;
     }
 
@@ -769,9 +821,89 @@ wss.on("connection", async (ws, _req) => {
   });
 });
 
+// ── Gateway Heartbeat ───────────────────────────────────────────────────────
+
+/**
+ * Report gateway metrics to Firestore (if HUB_GATEWAY_ID is configured)
+ */
+async function reportGatewayHeartbeat() {
+  if (!HUB_GATEWAY_ID) {
+    return; // Heartbeat disabled (gateway not registered)
+  }
+
+  try {
+    // Calculate metrics
+    const activeConnections = connectedAgents.size;
+    const totalAgents = Array.from(connectedAgents.values()).reduce(
+      (sum, list) => sum + list.length,
+      0
+    );
+
+    // Calculate average latency (simplified - use ping times if available)
+    const avgLatencyMs = 50; // Placeholder - would need to track actual ping times
+
+    // Calculate requests per minute (simplified)
+    const requestsPerMinute = 0; // Placeholder - would need to track request counts
+
+    // Calculate error rate (simplified)
+    const errorRate = 0; // Placeholder - would need to track error counts
+
+    // Get system metrics
+    const cpuUsage = process.cpuUsage();
+    const memUsage = process.memoryUsage();
+
+    const metrics = {
+      activeConnections: totalAgents,
+      avgLatencyMs,
+      requestsPerMinute,
+      errorRate,
+      uptime: 99.9, // Placeholder - would track actual uptime
+    };
+
+    const capacity = {
+      maxConnections: 1000, // Configurable
+      cpuUsage: 0, // Would calculate from cpuUsage
+      memoryUsage: Math.round((memUsage.heapUsed / memUsage.heapTotal) * 100),
+    };
+
+    // Update Firestore
+    const gatewayRef = doc(db, "gateways", HUB_GATEWAY_ID);
+    const gatewayDoc = await getDoc(gatewayRef);
+
+    if (gatewayDoc.exists()) {
+      await gatewayDoc.ref.update({
+        metrics,
+        capacity,
+        lastHeartbeat: serverTimestamp(),
+        status: "connected",
+        agentsConnected: totalAgents,
+      });
+
+      log("debug", "Gateway heartbeat sent", {
+        gatewayId: HUB_GATEWAY_ID,
+        region: HUB_REGION,
+        activeConnections: totalAgents
+      });
+    }
+  } catch (err) {
+    log("error", "Gateway heartbeat failed", { error: err.message });
+  }
+}
+
 // ── Start ───────────────────────────────────────────────────────────────────
 server.listen(PORT, () => {
   log("info", `Swarm Hub (Ed25519) listening on port ${PORT}`);
+  log("info", `Region: ${HUB_REGION}`);
+  if (HUB_GATEWAY_ID) {
+    log("info", `Gateway ID: ${HUB_GATEWAY_ID}`);
+  }
   log("info", `Health: http://localhost:${PORT}/health`);
   log("info", `WebSocket: ws://localhost:${PORT}/ws/agents/{agentId}?sig=...&ts=...`);
+
+  // Start gateway heartbeat
+  if (HUB_GATEWAY_ID) {
+    reportGatewayHeartbeat(); // Initial heartbeat
+    setInterval(reportGatewayHeartbeat, GATEWAY_HEARTBEAT_INTERVAL);
+    log("info", `Gateway heartbeat enabled (interval: ${GATEWAY_HEARTBEAT_INTERVAL}ms)`);
+  }
 });
