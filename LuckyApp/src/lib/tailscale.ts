@@ -147,17 +147,19 @@ export async function registerTailscaleDevice(
   const ref = await addDoc(collection(db, "tailscaleDevices"), device);
 
   // Log activity
-  await logActivity(
+  await logActivity({
     orgId,
-    registeredBy,
-    registeredBy,
-    "config.changed",
-    {
+    eventType: "config.changed",
+    actorType: "user",
+    actorId: registeredBy,
+    actorName: registeredBy,
+    description: `Tailscale device "${deviceData.deviceName}" registered`,
+    metadata: {
       action: "tailscale_device_registered",
       deviceName: deviceData.deviceName,
       tailscaleIp: deviceData.tailscaleIp,
-    }
-  );
+    },
+  });
 
   return ref.id;
 }
@@ -267,10 +269,18 @@ export async function revokeTailscaleDevice(
   });
 
   // Log activity
-  await logActivity(orgId, revokedBy, revokedBy, "config.changed", {
-    action: "tailscale_device_revoked",
-    deviceName: device.deviceName,
-    tailscaleIp: device.tailscaleIp,
+  await logActivity({
+    orgId,
+    eventType: "config.changed",
+    actorType: "user",
+    actorId: revokedBy,
+    actorName: revokedBy,
+    description: `Tailscale device "${device.deviceName}" revoked`,
+    metadata: {
+      action: "tailscale_device_revoked",
+      deviceName: device.deviceName,
+      tailscaleIp: device.tailscaleIp,
+    },
   });
 }
 
@@ -297,9 +307,17 @@ export async function deleteTailscaleDevice(
   await deleteDoc(doc(db, "tailscaleDevices", deviceId));
 
   // Log activity
-  await logActivity(orgId, deletedBy, deletedBy, "config.changed", {
-    action: "tailscale_device_deleted",
-    deviceName: device.deviceName,
-    tailscaleIp: device.tailscaleIp,
+  await logActivity({
+    orgId,
+    eventType: "config.changed",
+    actorType: "user",
+    actorId: deletedBy,
+    actorName: deletedBy,
+    description: `Tailscale device "${device.deviceName}" deleted`,
+    metadata: {
+      action: "tailscale_device_deleted",
+      deviceName: device.deviceName,
+      tailscaleIp: device.tailscaleIp,
+    },
   });
 }

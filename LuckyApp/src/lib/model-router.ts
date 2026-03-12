@@ -416,7 +416,7 @@ export async function getRoutingStats(orgId: string, daysBack: number = 7): Prom
       timestamp: data.timestamp?.toDate() || null,
     };
     decisions.push(decision);
-    totalSavings += decision.costSavings;
+    totalSavings += decision.costSavings ?? 0;
     if (decision.reason !== "primary") {
       fallbackCount++;
     }

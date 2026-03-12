@@ -153,7 +153,7 @@ function renderMarkdown(markdown: string): string {
 
   // Unordered lists
   html = html.replace(/^\s*[-*]\s+(.*)$/gim, '<li class="ml-4">$1</li>');
-  html = html.replace(/(<li.*<\/li>)/s, '<ul class="list-disc my-2">$1</ul>');
+  html = html.replace(/(<li[\s\S]*<\/li>)/, '<ul class="list-disc my-2">$1</ul>');
 
   // Checkboxes
   html = html.replace(/- \[ \]/g, '<input type="checkbox" disabled class="mr-2">');

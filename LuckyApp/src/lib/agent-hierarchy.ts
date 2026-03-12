@@ -112,17 +112,20 @@ export async function addChildAgent(
   });
 
   // Log activity
-  await logActivity(
+  await logActivity({
     orgId,
-    parentAgentId,
-    parent.name,
-    "agent_hierarchy_child_added",
-    {
-      childAgentId,
-      childAgentName: child.name,
+    eventType: "agent_hierarchy_child_added" as any,
+    actorType: "agent",
+    actorId: parentAgentId,
+    actorName: parent.name,
+    targetType: "agent",
+    targetId: childAgentId,
+    targetName: child.name,
+    description: `${parent.name} added ${child.name} as a child agent at level ${newHierarchyLevel}`,
+    metadata: {
       hierarchyLevel: newHierarchyLevel,
-    }
-  );
+    },
+  });
 }
 
 /**
@@ -159,16 +162,18 @@ export async function removeChildAgent(
   });
 
   // Log activity
-  await logActivity(
+  await logActivity({
     orgId,
-    parentAgentId,
-    parent.name,
-    "agent_hierarchy_child_removed",
-    {
-      childAgentId,
-      childAgentName: child.name,
-    }
-  );
+    eventType: "agent_hierarchy_child_removed" as any,
+    actorType: "agent",
+    actorId: parentAgentId,
+    actorName: parent.name,
+    targetType: "agent",
+    targetId: childAgentId,
+    targetName: child.name,
+    description: `${parent.name} removed ${child.name} as a child agent`,
+    metadata: {},
+  });
 }
 
 /**
@@ -391,19 +396,22 @@ export async function delegateTask(
   await setDoc(delegationRef, delegationData);
 
   // Log activity
-  await logActivity(
+  await logActivity({
     orgId,
-    parentAgentId,
-    parent.name,
-    "agent_hierarchy_task_delegated",
-    {
-      childAgentId,
-      childAgentName: child.name,
+    eventType: "agent_hierarchy_task_delegated" as any,
+    actorType: "agent",
+    actorId: parentAgentId,
+    actorName: parent.name,
+    targetType: "agent",
+    targetId: childAgentId,
+    targetName: child.name,
+    description: `${parent.name} delegated task "${taskTitle || "Untitled"}" to ${child.name}${reason ? `: ${reason}` : ""}`,
+    metadata: {
       taskId: taskId || null,
       taskTitle: taskTitle || null,
       reason: reason || null,
-    }
-  );
+    },
+  });
 
   return delegationRef.id;
 }

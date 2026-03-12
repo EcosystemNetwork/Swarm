@@ -434,6 +434,8 @@ export default function AgentsPage() {
         creditScore: 680,
         trustScore: 50,
         onChainRegistered: false,
+        hierarchyLevel: 0,
+        canDelegate: true,
         createdAt: new Date(),
       });
 

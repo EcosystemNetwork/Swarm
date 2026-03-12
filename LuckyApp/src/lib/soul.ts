@@ -132,7 +132,7 @@ export function parseYAML(yamlContent: string): SOULConfig {
       }
     }
 
-    return config as SOULConfig;
+    return config as unknown as SOULConfig;
   } catch (error) {
     throw new Error(
       `YAML parsing failed: ${error instanceof Error ? error.message : "Unknown error"}`
@@ -484,14 +484,16 @@ export async function updateAgentSOUL(
   });
 
   // Log activity
-  await logActivity(
+  await logActivity({
     orgId,
-    agentId,
-    agent.name,
-    "config.changed",
-    {
+    eventType: "config.changed",
+    actorType: "agent",
+    actorId: agentId,
+    actorName: agent.name,
+    description: `SOUL config updated to version ${version}`,
+    metadata: {
       configType: "soul",
       version,
-    }
-  );
+    },
+  });
 }

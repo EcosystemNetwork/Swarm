@@ -11,10 +11,11 @@ import { completeAssignment, getAgentWorkMode } from "@/lib/assignments";
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const assignmentId = params.id;
+    const { id } = await params;
+    const assignmentId = id;
     const url = request.nextUrl;
 
     // Extract Ed25519 auth params

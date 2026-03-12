@@ -199,11 +199,19 @@ export async function getCronJob(id: string): Promise<CronJob | null> {
         scheduleLabel: data.scheduleLabel,
         targetChannelId: data.targetChannelId,
         agentIds: data.agentIds || [],
+        priority: data.priority,
         enabled: data.enabled ?? true,
-        lastRun: data.lastRun,
-        lastRunSuccess: data.lastRunSuccess,
-        createdAt: data.createdAt,
-        updatedAt: data.updatedAt,
+        paused: data.paused,
+        staggerDelayMs: data.staggerDelayMs,
+        createdBy: data.createdBy || "",
+        lastRun: data.lastRun ? {
+            time: data.lastRun.time?.toDate() || new Date(),
+            success: data.lastRun.success ?? false,
+            error: data.lastRun.error,
+            durationMs: data.lastRun.durationMs,
+        } : undefined,
+        createdAt: data.createdAt?.toDate() || null,
+        updatedAt: data.updatedAt?.toDate() || null,
     };
 }
 

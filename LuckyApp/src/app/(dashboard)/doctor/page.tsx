@@ -473,14 +473,14 @@ export default function DoctorPage() {
                             </Card>
                         ) : (
                             <div className="space-y-3">
-                                {diagnosticRuns.map((run) => (
-                                    <DiagnosticCard
-                                        key={run.checkType}
-                                        run={run}
-                                        orgId={currentOrg?.id || ""}
-                                        onFixApplied={runDiagnosticChecks}
-                                    />
-                                ))}
+                                {diagnosticRuns.flatMap((run) =>
+                                    run.issues.map((issue) => (
+                                        <DiagnosticCard
+                                            key={`${run.checkType}-${issue.targetId}`}
+                                            issue={issue}
+                                        />
+                                    ))
+                                )}
                             </div>
                         )}
                     </div>

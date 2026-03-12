@@ -11,9 +11,10 @@ import { resetCircuitBreaker, type ModelName } from "@/lib/model-router";
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { model: string } }
+  { params }: { params: Promise<{ model: string }> }
 ) {
-  const model = params.model as ModelName;
+  const { model: modelParam } = await params;
+  const model = modelParam as ModelName;
 
   if (!model) {
     return Response.json({ error: "Model name is required" }, { status: 400 });

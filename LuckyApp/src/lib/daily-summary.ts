@@ -24,7 +24,7 @@ import {
   Timestamp,
   serverTimestamp,
 } from "firebase/firestore";
-import { getActivityLog, type ActivityEvent } from "./activity";
+import { getActivityFeed, type ActivityEvent } from "./activity";
 import { getUsageRecords } from "./usage";
 
 // ═══════════════════════════════════════════════════════════════
@@ -133,12 +133,17 @@ async function getActivitiesForDate(
     return {
       id: d.id,
       orgId: data.orgId,
-      agentId: data.agentId,
-      agentName: data.agentName,
+      projectId: data.projectId,
       eventType: data.eventType,
-      details: data.details,
-      severity: data.severity,
-      timestamp: data.timestamp?.toDate() || null,
+      actorType: data.actorType || "agent",
+      actorId: data.actorId || data.agentId,
+      actorName: data.actorName || data.agentName,
+      targetType: data.targetType,
+      targetId: data.targetId,
+      targetName: data.targetName,
+      description: data.description || data.details || "",
+      metadata: data.metadata || data.details,
+      createdAt: data.createdAt?.toDate() || data.timestamp?.toDate() || null,
     } as ActivityEvent;
   });
 }
@@ -186,21 +191,20 @@ function aggregateSummaryData(
     const type = activity.eventType;
     activityCounts.set(type, (activityCounts.get(type) || 0) + 1);
 
-    if (type === "task_completed") tasksCompleted++;
-    if (type === "task_failed") tasksFailed++;
-    if (type === "message_posted") messagesPosted++;
+    if (type === "task.completed") tasksCompleted++;
+    if (type === "task.failed") tasksFailed++;
 
-    // Collect errors
-    if (activity.severity === "error") {
+    // Collect errors from failed tasks
+    if (type === "task.failed") {
       if (!errorCounts.has(type)) {
         errorCounts.set(type, []);
       }
-      errorCounts.get(type)!.push(activity.details || "Unknown error");
+      errorCounts.get(type)!.push(activity.description || "Unknown error");
     }
 
     // Highlight important events
-    if (["agent_registered", "cron_executed", "github_webhook_received"].includes(type)) {
-      highlights.push(`${type}: ${activity.details || ""}`.trim());
+    if (["cron.created", "cron.triggered", "skill.installed"].includes(type)) {
+      highlights.push(`${type}: ${activity.description || ""}`.trim());
     }
   }
 

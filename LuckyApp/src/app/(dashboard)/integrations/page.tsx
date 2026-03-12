@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useAuth } from "@/components/auth-provider";
+import { useOrg } from "@/contexts/OrgContext";
 import { Send, MessageSquare, Briefcase, Plus, Trash2, Link as LinkIcon } from "lucide-react";
 import {
   type PlatformConnection,
@@ -11,7 +11,7 @@ import {
 } from "@/lib/platform-bridge";
 
 export default function IntegrationsPage() {
-  const { user } = useAuth();
+  const { currentOrg } = useOrg();
   const [connections, setConnections] = useState<PlatformConnection[]>([]);
   const [loading, setLoading] = useState(true);
   const [showConnect, setShowConnect] = useState<"telegram" | "discord" | "slack" | null>(null);
@@ -19,15 +19,16 @@ export default function IntegrationsPage() {
   const [connecting, setConnecting] = useState(false);
 
   useEffect(() => {
-    if (!user?.orgId) return;
+    if (!currentOrg?.id) return;
     fetchConnections();
-  }, [user?.orgId]);
+  }, [currentOrg?.id]);
 
   async function fetchConnections() {
-    if (!user?.orgId) return;
+    if (!currentOrg?.id) return;
     setLoading(true);
     try {
-      const conns = await getAllPlatformConnections(user.orgId);
+      // TODO: masterSecret should be fetched securely or this should use an API endpoint
+      const conns = await getAllPlatformConnections(currentOrg.id, "");
       setConnections(conns);
     } catch (err) {
       console.error("Failed to fetch connections:", err);
@@ -37,14 +38,14 @@ export default function IntegrationsPage() {
   }
 
   async function handleConnect(platform: "telegram" | "discord" | "slack") {
-    if (!user?.orgId || !formData.token) return;
+    if (!currentOrg?.id || !formData.token) return;
     setConnecting(true);
     try {
       const res = await fetch(`/api/platforms/${platform}/connect`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          orgId: user.orgId,
+          orgId: currentOrg.id,
           token: formData.token,
           webhookUrl: formData.webhookUrl || undefined,
         }),

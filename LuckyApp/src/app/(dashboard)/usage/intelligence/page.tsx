@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useAuth } from "@/components/auth-provider";
+import { useOrg } from "@/contexts/OrgContext";
 import { CostProjectionChart } from "@/components/cost-projection-chart";
 import { BudgetBurnGauge } from "@/components/budget-burn-gauge";
 import {
@@ -29,7 +29,7 @@ interface IntelligenceData {
 }
 
 export default function CostIntelligencePage() {
-  const { user } = useAuth();
+  const { currentOrg } = useOrg();
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<IntelligenceData | null>(null);
   const [historical, setHistorical] = useState<DailyCost[]>([]);
@@ -39,24 +39,24 @@ export default function CostIntelligencePage() {
   const [creatingAlert, setCreatingAlert] = useState(false);
 
   useEffect(() => {
-    if (!user?.orgId) return;
+    if (!currentOrg?.id) return;
     fetchData();
     fetchAlerts();
-  }, [user?.orgId]);
+  }, [currentOrg?.id]);
 
   async function fetchData() {
-    if (!user?.orgId) return;
+    if (!currentOrg?.id) return;
     setLoading(true);
     try {
       // Fetch intelligence data
-      const res = await fetch(`/api/usage/intelligence?orgId=${user.orgId}&daysBack=30&daysToPredict=7`);
+      const res = await fetch(`/api/usage/intelligence?orgId=${currentOrg.id}&daysBack=30&daysToPredict=7`);
       const json = await res.json();
       if (json.ok) {
         setData(json.data);
       }
 
       // Fetch historical data for chart
-      const records = await getUsageRecords(user.orgId, 30);
+      const records = await getUsageRecords(currentOrg.id, 30);
       const daily = aggregateDaily(records);
       setHistorical(daily);
     } catch (err) {
@@ -67,9 +67,9 @@ export default function CostIntelligencePage() {
   }
 
   async function fetchAlerts() {
-    if (!user?.orgId) return;
+    if (!currentOrg?.id) return;
     try {
-      const res = await fetch(`/api/usage/alerts?orgId=${user.orgId}`);
+      const res = await fetch(`/api/usage/alerts?orgId=${currentOrg.id}`);
       const json = await res.json();
       if (json.ok) {
         setAlerts(json.alerts);
@@ -80,14 +80,14 @@ export default function CostIntelligencePage() {
   }
 
   async function createAlert() {
-    if (!user?.orgId || !newAlertThreshold) return;
+    if (!currentOrg?.id || !newAlertThreshold) return;
     setCreatingAlert(true);
     try {
       const res = await fetch("/api/usage/alerts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          orgId: user.orgId,
+          orgId: currentOrg.id,
           alertType: newAlertType,
           threshold: parseFloat(newAlertThreshold),
         }),

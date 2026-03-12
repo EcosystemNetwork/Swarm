@@ -1,13 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useAuth } from "@/components/auth-provider";
+import { useOrg } from "@/contexts/OrgContext";
 import { SummaryCard } from "@/components/summary-card";
 import { type DailySummary } from "@/lib/daily-summary";
 import { Calendar, RefreshCw, Download, Filter } from "lucide-react";
 
 export default function SummariesPage() {
-  const { user } = useAuth();
+  const { currentOrg } = useOrg();
   const [summaries, setSummaries] = useState<DailySummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
@@ -16,16 +16,16 @@ export default function SummariesPage() {
   const [agents, setAgents] = useState<Array<{ id: string; name: string }>>([]);
 
   useEffect(() => {
-    if (!user?.orgId) return;
+    if (!currentOrg?.id) return;
     fetchSummaries();
     fetchAgents();
-  }, [user?.orgId]);
+  }, [currentOrg?.id]);
 
   async function fetchSummaries() {
-    if (!user?.orgId) return;
+    if (!currentOrg?.id) return;
     setLoading(true);
     try {
-      const res = await fetch(`/api/summaries?orgId=${user.orgId}&limit=50`);
+      const res = await fetch(`/api/summaries?orgId=${currentOrg.id}&limit=50`);
       const json = await res.json();
       if (json.ok) {
         setSummaries(json.summaries);
@@ -38,9 +38,9 @@ export default function SummariesPage() {
   }
 
   async function fetchAgents() {
-    if (!user?.orgId) return;
+    if (!currentOrg?.id) return;
     try {
-      const res = await fetch(`/api/agents?orgId=${user.orgId}`);
+      const res = await fetch(`/api/agents?orgId=${currentOrg.id}`);
       const json = await res.json();
       if (json.ok) {
         setAgents(json.agents.map((a: any) => ({ id: a.id, name: a.agentName })));
@@ -51,14 +51,14 @@ export default function SummariesPage() {
   }
 
   async function generateSummary(agentId: string, agentName: string) {
-    if (!user?.orgId) return;
+    if (!currentOrg?.id) return;
     setGenerating(true);
     try {
       const res = await fetch("/api/summaries/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          orgId: user.orgId,
+          orgId: currentOrg.id,
           agentId,
           agentName,
         }),
@@ -75,7 +75,7 @@ export default function SummariesPage() {
   }
 
   async function generateAllSummaries() {
-    if (!user?.orgId || agents.length === 0) return;
+    if (!currentOrg?.id || agents.length === 0) return;
     setGenerating(true);
     try {
       // Generate summaries for all agents in parallel
@@ -85,7 +85,7 @@ export default function SummariesPage() {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              orgId: user.orgId,
+              orgId: currentOrg.id,
               agentId: agent.id,
               agentName: agent.name,
             }),

@@ -122,9 +122,9 @@ export function ModelRouterWidget({ orgId, daysBack = 7 }: ModelRouterWidgetProp
                     <span className={`text-xs ${reasonColors[decision.reason] || "text-zinc-400"}`}>
                       {reasonLabels[decision.reason] || decision.reason}
                     </span>
-                    {decision.costSavings > 0 && (
+                    {(decision.costSavings ?? 0) > 0 && (
                       <span className="text-xs text-green-400">
-                        Saved ${decision.costSavings.toFixed(4)}
+                        Saved ${(decision.costSavings ?? 0).toFixed(4)}
                       </span>
                     )}
                   </div>

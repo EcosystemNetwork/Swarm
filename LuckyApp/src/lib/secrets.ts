@@ -207,9 +207,17 @@ export async function storeSecret(
   const ref = await addDoc(collection(db, "secrets"), secretData);
 
   // Log activity
-  await logActivity(orgId, createdBy, createdBy, "config.changed", {
-    action: "secret_created",
-    key,
+  await logActivity({
+    orgId,
+    eventType: "config.changed",
+    actorType: "user",
+    actorId: createdBy,
+    actorName: createdBy,
+    description: `Secret "${key}" created`,
+    metadata: {
+      action: "secret_created",
+      key,
+    },
   });
 
   return ref.id;
@@ -309,8 +317,16 @@ export async function deleteSecret(
   await deleteDoc(doc(db, "secrets", secretId));
 
   // Log activity
-  await logActivity(orgId, deletedBy, deletedBy, "config.changed", {
-    action: "secret_deleted",
-    key: secret.key,
+  await logActivity({
+    orgId,
+    eventType: "config.changed",
+    actorType: "user",
+    actorId: deletedBy,
+    actorName: deletedBy,
+    description: `Secret "${secret.key}" deleted`,
+    metadata: {
+      action: "secret_deleted",
+      key: secret.key,
+    },
   });
 }
