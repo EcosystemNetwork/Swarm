@@ -223,8 +223,13 @@ export const CHAIN_CONFIGS: Record<string, ChainConfig> = {
 /** All enabled chains */
 export const ENABLED_CHAINS = Object.values(CHAIN_CONFIGS).filter((c) => c.enabled);
 
-/** Thirdweb chain objects for wallet ConnectButton */
-export const WALLET_CHAINS: Chain[] = ENABLED_CHAINS.map((c) => c.thirdwebChain);
+/** Thirdweb chain objects for wallet ConnectButton - only use well-supported chains to avoid chainId errors */
+export const WALLET_CHAINS: Chain[] = [
+  ethereum,
+  base,
+  avalanche,
+  sepoliaChain,
+];
 
 /** Get chain config by EVM chain ID */
 export function getChainById(chainId: number): ChainConfig | undefined {
