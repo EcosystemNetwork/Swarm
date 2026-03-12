@@ -72,6 +72,11 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const fetchedRef = useRef(false);
 
+  // Debug: log session state changes
+  useEffect(() => {
+    console.log("[Swarm:Session] State updated:", session);
+  }, [session]);
+
   const fetchSession = useCallback(async () => {
     console.log("[Swarm:Session] Fetching session...");
     try {
@@ -90,12 +95,14 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
       const data = await res.json();
       console.log("[Swarm:Session] Session data:", data);
-      setSession({
+      const newSession = {
         authenticated: data.authenticated ?? false,
         address: data.address ?? null,
         role: data.role ?? null,
         sessionId: data.sessionId ?? null,
-      });
+      };
+      console.log("[Swarm:Session] Setting session state to:", newSession);
+      setSession(newSession);
     } catch (err) {
       console.error("[Swarm:Session] Fetch error:", err);
       setSession({

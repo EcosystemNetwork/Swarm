@@ -35,9 +35,14 @@ export default function LandingPage() {
 
   // If already authenticated, redirect to dashboard
   useEffect(() => {
+    console.log("[Swarm:Landing] Auth state changed:", authenticated);
     if (authenticated) {
       const redirect = searchParams.get('redirect') || '/dashboard';
-      const timer = setTimeout(() => router.push(redirect), 300);
+      console.log("[Swarm:Landing] Authenticated! Redirecting to:", redirect);
+      const timer = setTimeout(() => {
+        console.log("[Swarm:Landing] Executing redirect...");
+        router.push(redirect);
+      }, 300);
       return () => clearTimeout(timer);
     }
   }, [authenticated, router, searchParams]);
