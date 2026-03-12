@@ -9,6 +9,7 @@
 import {
     collection,
     doc,
+    getDoc,
     addDoc,
     updateDoc,
     deleteDoc,
@@ -176,6 +177,34 @@ export async function deleteCronJob(id: string): Promise<void> {
 /** Toggle a cron job enabled/disabled */
 export async function toggleCronJob(id: string, enabled: boolean): Promise<void> {
     await updateCronJob(id, { enabled });
+}
+
+/** Get a single cron job by ID */
+export async function getCronJob(id: string): Promise<CronJob | null> {
+    const docRef = doc(db, CRON_COLLECTION, id);
+    const docSnap = await getDoc(docRef);
+
+    if (!docSnap.exists()) {
+        return null;
+    }
+
+    const data = docSnap.data();
+    return {
+        id: docSnap.id,
+        orgId: data.orgId,
+        projectId: data.projectId,
+        name: data.name,
+        message: data.message,
+        schedule: data.schedule,
+        scheduleLabel: data.scheduleLabel,
+        targetChannelId: data.targetChannelId,
+        agentIds: data.agentIds || [],
+        enabled: data.enabled ?? true,
+        lastRun: data.lastRun,
+        lastRunSuccess: data.lastRunSuccess,
+        createdAt: data.createdAt,
+        updatedAt: data.updatedAt,
+    };
 }
 
 /** Get all cron jobs for an org */

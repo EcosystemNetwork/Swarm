@@ -11,7 +11,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { ethers } from "ethers";
 import {
-  HEDERA_RPC_URL,
   CONTRACTS,
   TASK_BOARD_ABI,
   AGENT_REGISTRY_ABI,
@@ -22,6 +21,8 @@ import {
   type TreasuryPnL,
 } from "@/lib/swarm-contracts";
 
+// Hedera Testnet RPC URL
+const HEDERA_RPC_URL = "https://testnet.hashio.io/api";
 const POLL_INTERVAL = 30_000; // 30s — individual fetches can take 10-20s
 
 interface SwarmData {
