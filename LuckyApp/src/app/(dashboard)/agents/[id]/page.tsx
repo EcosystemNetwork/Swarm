@@ -124,7 +124,7 @@ export default function AgentDetailPageWrapper() {
 function AgentDetailPage() {
   const params = useParams();
   const router = useRouter();
-  const agentId = params.agentId as string;
+  const agentId = params.id as string;
   const { currentOrg } = useOrg();
   const swarm = useSwarmData();
   const swarmWrite = useSwarmWrite();
