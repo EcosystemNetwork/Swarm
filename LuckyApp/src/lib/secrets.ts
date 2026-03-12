@@ -23,6 +23,38 @@ import { logActivity } from "./activity";
 import crypto from "crypto";
 
 // ═══════════════════════════════════════════════════════════════
+// Rate Limiting
+// ═══════════════════════════════════════════════════════════════
+
+interface RateLimitEntry {
+  count: number;
+  resetAt: number;
+}
+
+// In-memory rate limiter (in production, use Redis or similar)
+const rateLimits = new Map<string, RateLimitEntry>();
+
+const RATE_LIMIT_WINDOW_MS = 60 * 1000; // 1 minute
+const RATE_LIMIT_MAX_REVEALS = 10; // Max 10 reveals per minute per org
+
+function checkRateLimit(orgId: string): boolean {
+  const now = Date.now();
+  const entry = rateLimits.get(orgId);
+
+  if (!entry || now > entry.resetAt) {
+    rateLimits.set(orgId, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
+    return true;
+  }
+
+  if (entry.count >= RATE_LIMIT_MAX_REVEALS) {
+    return false;
+  }
+
+  entry.count++;
+  return true;
+}
+
+// ═══════════════════════════════════════════════════════════════
 // Types
 // ═══════════════════════════════════════════════════════════════
 
@@ -46,15 +78,21 @@ export interface Secret {
 // ═══════════════════════════════════════════════════════════════
 
 /**
- * Derive encryption key from organization secret
- * In production, use a proper key management service (KMS)
+ * Derive encryption key from organization secret using PBKDF2
+ * Uses 100,000 iterations for strong key derivation
  */
-function deriveKey(orgId: string, masterSecret: string): string {
-  // Simple key derivation - in production, use PBKDF2 or similar
-  const combined = `${orgId}:${masterSecret}`;
-  const hash = crypto.createHash("sha256");
-  hash.update(combined);
-  return hash.digest("hex");
+function deriveKey(orgId: string, masterSecret: string): Buffer {
+  // Use orgId as salt (deterministic for same org)
+  const salt = crypto.createHash("sha256").update(orgId).digest();
+
+  // PBKDF2 with 100,000 iterations (OWASP recommended minimum)
+  return crypto.pbkdf2Sync(
+    masterSecret,
+    salt,
+    100000, // iterations
+    32, // key length (256 bits)
+    "sha256"
+  );
 }
 
 /**
@@ -66,12 +104,12 @@ export function encryptValue(
   orgId: string,
   masterSecret: string
 ): { encryptedValue: string; iv: string } {
-  const key = deriveKey(orgId, masterSecret);
+  const key = deriveKey(orgId, masterSecret); // Now returns Buffer
   const iv = crypto.randomBytes(16);
 
   const cipher = crypto.createCipheriv(
     "aes-256-gcm",
-    Buffer.from(key, "hex"),
+    key, // Already a Buffer
     iv
   );
 
@@ -96,7 +134,7 @@ export function decryptValue(
   orgId: string,
   masterSecret: string
 ): string {
-  const key = deriveKey(orgId, masterSecret);
+  const key = deriveKey(orgId, masterSecret); // Now returns Buffer
 
   // Extract auth tag (last 32 hex chars = 16 bytes)
   const authTag = Buffer.from(encryptedValue.slice(-32), "hex");
@@ -104,7 +142,7 @@ export function decryptValue(
 
   const decipher = crypto.createDecipheriv(
     "aes-256-gcm",
-    Buffer.from(key, "hex"),
+    key, // Already a Buffer
     Buffer.from(iv, "hex")
   );
 
@@ -212,6 +250,13 @@ export async function revealSecret(
   orgId: string,
   masterSecret: string
 ): Promise<string> {
+  // Rate limiting check
+  if (!checkRateLimit(orgId)) {
+    throw new Error(
+      `Rate limit exceeded: Maximum ${RATE_LIMIT_MAX_REVEALS} secret reveals per minute`
+    );
+  }
+
   const secretDoc = await getDoc(doc(db, "secrets", secretId));
 
   if (!secretDoc.exists()) {

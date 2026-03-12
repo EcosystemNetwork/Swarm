@@ -313,10 +313,35 @@ export function verifyDiscordSignature(
   timestamp: string,
   body: string
 ): boolean {
-  // Discord uses Ed25519 signatures for webhook verification
-  // In production, use a library like tweetnacl for verification
-  // For now, we'll skip signature verification (SECURITY WARNING)
-  return true;
+  try {
+    // Discord uses Ed25519 signatures for webhook verification
+    // Message format: timestamp + body
+    const message = timestamp + body;
+
+    // Convert hex strings to buffers
+    const signatureBuffer = Buffer.from(signature, "hex");
+    const publicKeyBuffer = Buffer.from(publicKey, "hex");
+
+    // Verify using Node.js crypto (supports Ed25519)
+    const crypto = require("crypto");
+    const key = crypto.createPublicKey({
+      key: publicKeyBuffer,
+      format: "der",
+      type: "spki",
+    });
+
+    const isValid = crypto.verify(
+      null, // Ed25519 doesn't use a hash algorithm
+      Buffer.from(message, "utf8"),
+      key,
+      signatureBuffer
+    );
+
+    return isValid;
+  } catch (err) {
+    console.error("Discord signature verification failed:", err);
+    return false;
+  }
 }
 
 // Discord channel types

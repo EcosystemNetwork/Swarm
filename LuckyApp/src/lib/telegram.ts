@@ -384,8 +384,17 @@ export function verifyTelegramWebhook(
   requestToken?: string
 ): boolean {
   if (!requestToken) return false;
-  return crypto.timingSafeEqual(
-    Buffer.from(secretToken),
-    Buffer.from(requestToken)
-  );
+
+  // Ensure equal lengths before comparison to prevent timing attacks
+  if (secretToken.length !== requestToken.length) return false;
+
+  try {
+    return crypto.timingSafeEqual(
+      Buffer.from(secretToken),
+      Buffer.from(requestToken)
+    );
+  } catch (err) {
+    // timingSafeEqual can throw if buffers have different lengths
+    return false;
+  }
 }

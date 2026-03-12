@@ -262,7 +262,14 @@ async function persistMessage(agentId, agentName, orgId, channelId, content) {
       content,
       metadata: { channelId, messageId: ref.id, verified: true, source: "websocket" },
       createdAt: serverTimestamp(),
-    }).catch(() => { }); // non-blocking
+    }).catch((err) => {
+      // Log dual-write failure (non-blocking)
+      log("warn", "Failed to dual-write to agentComms", {
+        channelId,
+        messageId: ref.id,
+        error: err.message,
+      });
+    });
 
     return ref.id;
   } catch (err) {
@@ -510,6 +517,15 @@ server.on("upgrade", async (req, socket, head) => {
   }
 
   const agentId = pathParts[2];
+
+  // Validate agentId format (alphanumeric, hyphens, underscores, max 128 chars)
+  if (!/^[a-zA-Z0-9_-]{1,128}$/.test(agentId)) {
+    log("warn", "WS upgrade rejected — invalid agentId format", { agentId });
+    socket.write("HTTP/1.1 400 Bad Request\r\n\r\n");
+    socket.destroy();
+    return;
+  }
+
   const sig = url.searchParams.get("sig");
   const ts = url.searchParams.get("ts");
   const sinceParam = url.searchParams.get("since") || "0";
@@ -721,6 +737,11 @@ wss.on("connection", async (ws, _req) => {
     if (type === "message" && channelId && content) {
       const messageId = await persistMessage(agentId, agentName, orgId, channelId, content);
 
+      // Warn if persistence failed
+      if (!messageId) {
+        log("warn", "Message persistence failed, using fallback ID", { agentId, channelId });
+      }
+
       const outgoing = {
         type: "message",
         channelId,
@@ -879,11 +900,11 @@ async function reportGatewayHeartbeat() {
 
   try {
     // Calculate metrics
-    const activeConnections = connectedAgents.size;
-    const totalAgents = Array.from(connectedAgents.values()).reduce(
-      (sum, list) => sum + list.length,
-      0
-    );
+    const totalAgentConnections = agentConnections.size;
+    let activeConnections = 0;
+    for (const conns of agentConnections.values()) {
+      activeConnections += conns.size;
+    }
 
     // Calculate average latency (simplified - use ping times if available)
     const avgLatencyMs = 50; // Placeholder - would need to track actual ping times
@@ -899,7 +920,7 @@ async function reportGatewayHeartbeat() {
     const memUsage = process.memoryUsage();
 
     const metrics = {
-      activeConnections: totalAgents,
+      activeConnections,
       avgLatencyMs,
       requestsPerMinute,
       errorRate,
@@ -922,7 +943,7 @@ async function reportGatewayHeartbeat() {
         capacity,
         lastHeartbeat: serverTimestamp(),
         status: "connected",
-        agentsConnected: totalAgents,
+        agentsConnected: totalAgentConnections,
       });
 
       log("debug", "Gateway heartbeat sent", {

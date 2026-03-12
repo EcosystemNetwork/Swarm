@@ -24,7 +24,6 @@ import {
 } from "firebase/firestore";
 import { getHeartbeats } from "./heartbeat";
 import { getActiveAlerts } from "./vitals-collector";
-import { resumeAgent } from "./heartbeat";
 
 // ═══════════════════════════════════════════════════════════════
 // Types

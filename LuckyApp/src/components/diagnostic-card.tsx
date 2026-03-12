@@ -13,15 +13,18 @@ export function DiagnosticCard({ issue, onFix }: DiagnosticCardProps) {
   const [fixing, setFixing] = useState(false);
   const [fixed, setFixed] = useState(false);
 
+  const [error, setError] = useState<string | null>(null);
+
   const handleFix = async () => {
     if (!onFix || !issue.autoFixable) return;
     setFixing(true);
+    setError(null);
     try {
       await onFix(issue);
       setFixed(true);
     } catch (err) {
       console.error("Failed to fix issue:", err);
-      alert("Failed to apply auto-fix");
+      setError(err instanceof Error ? err.message : "Failed to apply auto-fix");
     } finally {
       setFixing(false);
     }
@@ -63,6 +66,12 @@ export function DiagnosticCard({ issue, onFix }: DiagnosticCardProps) {
               <p className="text-xs text-green-400 mt-2 flex items-center space-x-1">
                 <CheckCircle className="w-3 h-3" />
                 <span>Auto-fix applied successfully</span>
+              </p>
+            )}
+            {error && (
+              <p className="text-xs text-red-400 mt-2 flex items-center space-x-1">
+                <AlertTriangle className="w-3 h-3" />
+                <span>{error}</span>
               </p>
             )}
           </div>

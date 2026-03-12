@@ -173,6 +173,7 @@ export async function removeChildAgent(
 
 /**
  * Check if adding a child would create a circular dependency
+ * Checks both ancestors (parent chain) and descendants (child chain)
  */
 export async function checkCircularDependency(
   orgId: string,
@@ -181,7 +182,17 @@ export async function checkCircularDependency(
 ): Promise<boolean> {
   // If child is an ancestor of parent, it would create a cycle
   const ancestors = await getAncestors(orgId, parentAgentId);
-  return ancestors.some((a) => a.id === childAgentId);
+  if (ancestors.some((a) => a.id === childAgentId)) {
+    return true;
+  }
+
+  // If parent is a descendant of child, it would also create a cycle
+  const descendants = await getDescendants(orgId, childAgentId);
+  if (descendants.some((d) => d.id === parentAgentId)) {
+    return true;
+  }
+
+  return false;
 }
 
 /**
@@ -216,28 +227,38 @@ export async function getAncestors(
 
 /**
  * Get all descendant agents (children, grandchildren, etc.)
+ * Optimized: Fetches all agents once, builds tree in memory
  */
 export async function getDescendants(
   orgId: string,
   agentId: string
 ): Promise<Agent[]> {
+  // Fetch all agents for the organization at once
+  const q = query(collection(db, "agents"), where("orgId", "==", orgId));
+  const snapshot = await getDocs(q);
+
+  const agentMap = new Map<string, Agent>();
+  snapshot.docs.forEach((doc) => {
+    agentMap.set(doc.id, { id: doc.id, ...doc.data() } as Agent);
+  });
+
+  // Build descendants list using BFS with in-memory data
   const descendants: Agent[] = [];
   const queue: string[] = [agentId];
+  const visited = new Set<string>();
 
   while (queue.length > 0) {
     const currentId = queue.shift()!;
-    const agentDoc = await getDoc(doc(db, "agents", currentId));
+    if (visited.has(currentId)) continue;
+    visited.add(currentId);
 
-    if (!agentDoc.exists()) continue;
-
-    const agent = { id: agentDoc.id, ...agentDoc.data() } as Agent;
-    if (agent.orgId !== orgId) continue;
+    const agent = agentMap.get(currentId);
+    if (!agent) continue;
 
     if (agent.childAgentIds && agent.childAgentIds.length > 0) {
       for (const childId of agent.childAgentIds) {
-        const childDoc = await getDoc(doc(db, "agents", childId));
-        if (childDoc.exists()) {
-          const child = { id: childDoc.id, ...childDoc.data() } as Agent;
+        const child = agentMap.get(childId);
+        if (child && !visited.has(childId)) {
           descendants.push(child);
           queue.push(childId);
         }

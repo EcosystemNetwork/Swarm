@@ -225,7 +225,14 @@ function linearRegression(dailyCosts: Array<{ date: string; costUsd: number }>):
     sumXX += x * x;
   });
 
-  const slope = (n * sumXY - sumX * sumY) / (n * sumXX - sumX * sumX);
+  const denominator = n * sumXX - sumX * sumX;
+
+  // Handle division by zero (all X values are the same)
+  if (denominator === 0) {
+    return { slope: 0, intercept: sumY / n };
+  }
+
+  const slope = (n * sumXY - sumX * sumY) / denominator;
   const intercept = (sumY - slope * sumX) / n;
 
   return { slope, intercept };
@@ -246,8 +253,9 @@ export async function detectAnomalies(
 
   const costs = dailyCosts.map((d) => d.costUsd);
   const mean = costs.reduce((sum, c) => sum + c, 0) / costs.length;
+  // Use sample standard deviation (N-1) for better variance estimation
   const stdDev = Math.sqrt(
-    costs.reduce((sum, c) => sum + Math.pow(c - mean, 2), 0) / costs.length
+    costs.reduce((sum, c) => sum + Math.pow(c - mean, 2), 0) / (costs.length - 1)
   );
 
   const anomalies: CostAnomaly[] = [];
