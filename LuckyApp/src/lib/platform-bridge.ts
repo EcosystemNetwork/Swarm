@@ -17,6 +17,7 @@ import {
   where,
   serverTimestamp,
 } from "firebase/firestore";
+import { encryptValue, decryptValue } from "./secrets";
 
 // ═══════════════════════════════════════════════════════════════
 // Types
@@ -28,8 +29,10 @@ export interface PlatformConnection {
   id: string;
   orgId: string;
   platform: "telegram" | "discord" | "slack";
-  /** Encrypted bot token or OAuth credentials */
+  /** Encrypted bot token or OAuth credentials (AES-256-GCM) */
   credentials: string;
+  /** Initialization vector for AES-256-GCM decryption */
+  credentialsIV: string;
   webhookUrl?: string;
   connectedAt: Date | null;
   active: boolean;
@@ -82,12 +85,17 @@ export async function createPlatformConnection(
   orgId: string,
   platform: "telegram" | "discord" | "slack",
   credentials: string,
+  masterSecret: string,
   metadata?: Record<string, unknown>
 ): Promise<string> {
+  // Encrypt credentials before storage (AES-256-GCM)
+  const { encryptedValue, iv } = encryptValue(credentials, orgId, masterSecret);
+
   const ref = await addDoc(collection(db, "platformConnections"), {
     orgId,
     platform,
-    credentials, // Should be encrypted in production
+    credentials: encryptedValue,
+    credentialsIV: iv,
     webhookUrl: "",
     connectedAt: serverTimestamp(),
     active: true,
@@ -98,7 +106,8 @@ export async function createPlatformConnection(
 
 export async function getPlatformConnection(
   orgId: string,
-  platform: "telegram" | "discord" | "slack"
+  platform: "telegram" | "discord" | "slack",
+  masterSecret: string
 ): Promise<PlatformConnection | null> {
   const q = query(
     collection(db, "platformConnections"),
@@ -112,11 +121,21 @@ export async function getPlatformConnection(
 
   const doc = snap.docs[0];
   const data = doc.data();
+
+  // Decrypt credentials before returning
+  const decryptedCredentials = decryptValue(
+    data.credentials,
+    data.credentialsIV,
+    orgId,
+    masterSecret
+  );
+
   return {
     id: doc.id,
     orgId: data.orgId,
     platform: data.platform,
-    credentials: data.credentials,
+    credentials: decryptedCredentials,
+    credentialsIV: data.credentialsIV,
     webhookUrl: data.webhookUrl,
     connectedAt: data.connectedAt?.toDate() || null,
     active: data.active,
@@ -125,7 +144,8 @@ export async function getPlatformConnection(
 }
 
 export async function getAllPlatformConnections(
-  orgId: string
+  orgId: string,
+  masterSecret: string
 ): Promise<PlatformConnection[]> {
   const q = query(
     collection(db, "platformConnections"),
@@ -136,11 +156,21 @@ export async function getAllPlatformConnections(
   const snap = await getDocs(q);
   return snap.docs.map((d) => {
     const data = d.data();
+
+    // Decrypt credentials before returning
+    const decryptedCredentials = decryptValue(
+      data.credentials,
+      data.credentialsIV,
+      orgId,
+      masterSecret
+    );
+
     return {
       id: d.id,
       orgId: data.orgId,
       platform: data.platform,
-      credentials: data.credentials,
+      credentials: decryptedCredentials,
+      credentialsIV: data.credentialsIV,
       webhookUrl: data.webhookUrl,
       connectedAt: data.connectedAt?.toDate() || null,
       active: data.active,

@@ -10,6 +10,7 @@ import {
   type TelegramUpdate,
   extractMessageContent,
   getSenderName,
+  verifyTelegramWebhook,
 } from "@/lib/telegram";
 import {
   getBridgedChannelByPlatform,
@@ -20,6 +21,20 @@ import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 
 export async function POST(request: NextRequest) {
   try {
+    // Verify Telegram secret token
+    const secretToken = process.env.TELEGRAM_WEBHOOK_SECRET;
+    if (!secretToken) {
+      console.error("TELEGRAM_WEBHOOK_SECRET environment variable not set");
+      return Response.json({ error: "Server configuration error" }, { status: 500 });
+    }
+
+    const receivedToken = request.headers.get("x-telegram-bot-api-secret-token");
+    const isValid = verifyTelegramWebhook(secretToken, receivedToken || undefined);
+    if (!isValid) {
+      console.warn("Telegram webhook verification failed");
+      return Response.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const update: TelegramUpdate = await request.json();
 
     // Extract message from update

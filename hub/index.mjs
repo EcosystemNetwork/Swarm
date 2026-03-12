@@ -949,7 +949,7 @@ async function reportGatewayHeartbeat() {
       log("debug", "Gateway heartbeat sent", {
         gatewayId: HUB_GATEWAY_ID,
         region: HUB_REGION,
-        activeConnections: totalAgents
+        activeConnections: totalAgentConnections
       });
     }
   } catch (err) {

@@ -10,17 +10,43 @@ import {
   type DiscordMessage,
   extractMessageContent,
   getSenderName,
+  verifyDiscordSignature,
 } from "@/lib/discord";
 import {
   getBridgedChannelByPlatform,
   logBridgedMessage,
+  getPlatformConnection,
 } from "@/lib/platform-bridge";
 import { db } from "@/lib/firebase";
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 
 export async function POST(request: NextRequest) {
   try {
-    const event = await request.json();
+    // Verify Discord signature (Ed25519)
+    const signature = request.headers.get("x-signature-ed25519");
+    const timestamp = request.headers.get("x-signature-timestamp");
+    const body = await request.text();
+
+    if (!signature || !timestamp) {
+      console.warn("Discord webhook missing signature headers");
+      return Response.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // Get public key from environment (Discord application public key)
+    const publicKey = process.env.DISCORD_PUBLIC_KEY;
+    if (!publicKey) {
+      console.error("DISCORD_PUBLIC_KEY environment variable not set");
+      return Response.json({ error: "Server configuration error" }, { status: 500 });
+    }
+
+    // Verify signature
+    const isValid = verifyDiscordSignature(publicKey, signature, timestamp, body);
+    if (!isValid) {
+      console.warn("Discord webhook signature verification failed");
+      return Response.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const event = JSON.parse(body);
 
     // Discord sends different event types
     // For message events, the structure is:

@@ -17,6 +17,7 @@ import { NextRequest } from "next/server";
 import { verifyAgentRequest, isTimestampFresh } from "@/app/api/v1/verify";
 import { authenticateAgent, type AuthResult } from "@/app/api/webhooks/auth";
 import { getOrganization, type Organization } from "@/lib/firestore";
+import crypto from "crypto";
 
 // ─── Standard error responses ────────────────────────────
 
@@ -45,7 +46,27 @@ export function requirePlatformAdmin(req: NextRequest): { ok: boolean; error?: s
 
   const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
 
-  if (token === secret || headerSecret === secret) {
+  // Timing-safe comparison to prevent timing attacks
+  let tokenMatch = false;
+  let headerMatch = false;
+
+  try {
+    if (token.length === secret.length) {
+      tokenMatch = crypto.timingSafeEqual(Buffer.from(token), Buffer.from(secret));
+    }
+  } catch {
+    tokenMatch = false;
+  }
+
+  try {
+    if (headerSecret.length === secret.length) {
+      headerMatch = crypto.timingSafeEqual(Buffer.from(headerSecret), Buffer.from(secret));
+    }
+  } catch {
+    headerMatch = false;
+  }
+
+  if (tokenMatch || headerMatch) {
     return { ok: true };
   }
 
@@ -65,7 +86,27 @@ export function requireInternalService(req: NextRequest): { ok: boolean; error?:
 
   const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
 
-  if (token === secret || headerSecret === secret) {
+  // Timing-safe comparison to prevent timing attacks
+  let tokenMatch = false;
+  let headerMatch = false;
+
+  try {
+    if (token.length === secret.length) {
+      tokenMatch = crypto.timingSafeEqual(Buffer.from(token), Buffer.from(secret));
+    }
+  } catch {
+    tokenMatch = false;
+  }
+
+  try {
+    if (headerSecret.length === secret.length) {
+      headerMatch = crypto.timingSafeEqual(Buffer.from(headerSecret), Buffer.from(secret));
+    }
+  } catch {
+    headerMatch = false;
+  }
+
+  if (tokenMatch || headerMatch) {
     return { ok: true };
   }
 

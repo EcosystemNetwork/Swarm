@@ -11,6 +11,7 @@ import {
   SlackClient,
   extractMessageContent,
   getSenderName,
+  verifySlackRequest,
 } from "@/lib/slack";
 import {
   getBridgedChannelByPlatform,
@@ -22,7 +23,24 @@ import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 
 export async function POST(request: NextRequest) {
   try {
-    const event: SlackEvent = await request.json();
+    // Verify Slack request signature (HMAC-SHA256)
+    const signature = request.headers.get("x-slack-signature");
+    const timestamp = request.headers.get("x-slack-request-timestamp");
+    const body = await request.text();
+
+    const signingSecret = process.env.SLACK_SIGNING_SECRET;
+    if (!signingSecret || !signature || !timestamp) {
+      console.warn("Slack webhook missing signature or secret");
+      return Response.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const isValid = verifySlackRequest(signingSecret, signature, timestamp, body);
+    if (!isValid) {
+      console.warn("Slack webhook signature verification failed");
+      return Response.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const event: SlackEvent = JSON.parse(body);
 
     // Slack URL verification challenge
     if (event.type === "url_verification") {
@@ -60,8 +78,15 @@ export async function POST(request: NextRequest) {
         return Response.json({ ok: true });
       }
 
+      // Get master secret from environment
+      const masterSecret = process.env.MASTER_SECRET;
+      if (!masterSecret) {
+        console.error("MASTER_SECRET environment variable not set");
+        return Response.json({ error: "Server configuration error" }, { status: 500 });
+      }
+
       // Get Slack client to fetch user info
-      const connection = await getPlatformConnection(bridge.orgId, "slack");
+      const connection = await getPlatformConnection(bridge.orgId, "slack", masterSecret);
       if (!connection) {
         console.error("No Slack connection found for org:", bridge.orgId);
         return Response.json({ ok: true });
