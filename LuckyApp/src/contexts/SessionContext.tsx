@@ -73,9 +73,12 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const fetchedRef = useRef(false);
 
   const fetchSession = useCallback(async () => {
+    console.log("[Swarm:Session] Fetching session...");
     try {
       const res = await fetch("/api/auth/session", { credentials: "include" });
+      console.log("[Swarm:Session] Session response:", res.status);
       if (!res.ok) {
+        console.log("[Swarm:Session] Not authenticated");
         setSession({
           authenticated: false,
           address: null,
@@ -86,13 +89,15 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       }
 
       const data = await res.json();
+      console.log("[Swarm:Session] Session data:", data);
       setSession({
         authenticated: data.authenticated ?? false,
         address: data.address ?? null,
         role: data.role ?? null,
         sessionId: data.sessionId ?? null,
       });
-    } catch {
+    } catch (err) {
+      console.error("[Swarm:Session] Fetch error:", err);
       setSession({
         authenticated: false,
         address: null,
@@ -101,6 +106,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       });
     } finally {
       setLoading(false);
+      console.log("[Swarm:Session] Loading complete");
     }
   }, []);
 
