@@ -72,9 +72,10 @@ export async function verifyAgentRequest(
 }
 
 /**
- * Check that a timestamp is not stale (within 5 minutes).
+ * Check that a timestamp is not stale (within 2 minutes).
+ * Reduced from 5 minutes to minimize replay attack window.
  */
-export function isTimestampFresh(timestampMs: number, maxAgeMs = 5 * 60 * 1000): boolean {
+export function isTimestampFresh(timestampMs: number, maxAgeMs = 2 * 60 * 1000): boolean {
     const now = Date.now();
     return Math.abs(now - timestampMs) < maxAgeMs;
 }

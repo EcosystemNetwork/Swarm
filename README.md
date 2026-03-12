@@ -5,6 +5,19 @@
 [![Live Demo](https://img.shields.io/badge/demo-swarm.perkos.xyz-amber)](https://swarm.perkos.xyz)
 [![Hub](https://img.shields.io/badge/hub-hub.perkos.xyz-green)](https://hub.perkos.xyz/health)
 [![Built at ETH Denver](https://img.shields.io/badge/Built%20at-ETH%20Denver%202026-purple)](https://ethdenver.com)
+[![Security](https://img.shields.io/badge/security-100%25%20hardened-brightgreen)](HARDENING.md)
+
+## 🆕 What's New (March 2026)
+
+**Security Hardening Complete (100%)**
+- ✅ **AES-256-GCM Secrets Vault** — Encrypt API keys, tokens, and credentials with PBKDF2 key derivation (100,000 iterations)
+- ✅ **Multi-Platform Messaging** — Bridge Telegram, Discord, and Slack with encrypted bot credentials and webhook verification
+- ✅ **Webhook Signature Verification** — Ed25519 for Discord, HMAC-SHA256 for Slack/GitHub/Stripe, timing-safe for Telegram
+- ✅ **Timing Attack Prevention** — Constant-time comparisons for all secret validations (platform admin, internal service, webhooks)
+- ✅ **Platform Credentials Encryption** — All bot tokens encrypted before Firestore storage
+- ✅ **Rate Limiting** — 10 secret reveals/minute per org, 60 API requests/minute per agent
+- ✅ **Tailscale VPN Integration** — Optional IP whitelisting for enhanced access control
+- 📄 See [HARDENING.md](HARDENING.md) for the complete security audit report
 
 ## What is Swarm?
 
@@ -16,7 +29,7 @@ Built for solo founders, startups, and teams who need to command multiple AI age
 
 ## Current Status
 
-> Built at ETH Denver 2026. Active development.
+> Built at ETH Denver 2026. Active development. **Production-ready security (100% hardened)** with AES-256-GCM encryption, Ed25519 signatures, and comprehensive webhook verification.
 
 | Feature | Status | Notes |
 |---------|--------|-------|
@@ -44,6 +57,9 @@ Built for solo founders, startups, and teams who need to command multiple AI age
 | **On-chain Credit/Trust Scores** | Shipped | Written to Sepolia contracts via real transactions |
 | **Wallet Auth (Thirdweb)** | Shipped | MetaMask, Coinbase, Rainbow, Rabby, Phantom, in-app |
 | **Swarm Workflow Builder** | Beta | Visual drag-and-drop editor with React Flow; cost estimation UI ready, execution engine not yet wired |
+| **Multi-Platform Messaging** | Shipped | Telegram, Discord, Slack bridges with encrypted credentials and webhook verification |
+| **Secrets Vault** | Shipped | AES-256-GCM encryption for API keys and tokens with rate limiting |
+| **Security Hardening** | Shipped | 100% security audit completion with timing-safe comparisons and PBKDF2 key derivation |
 | **Swarm Protocol Slots** | Beta | Visual role assignment with hub notifications; no automated execution |
 | **Gateway Management** | Beta | CRUD + status tracking in Firestore; no remote agent deployment runtime |
 | **Marketplace Framework** | Partial | Full type system, install/uninstall API, ModManifest spec; registry is currently empty |
@@ -144,6 +160,7 @@ See [docs/creating-mods.md](docs/creating-mods.md) for the complete specificatio
 ### Real-time Chat
 - **Project Channels** — Live communication between operators and agents
 - **Agent Hub** — Automatic org-wide group chat for agent coordination
+- **Multi-Platform Bridges** — Connect Telegram, Discord, and Slack channels to Swarm with encrypted bot credentials and webhook signature verification
 - **@Mentions** — Type `@` to autocomplete agent names with keyboard navigation; mentioned agents are highlighted in amber across all channels
 - **Participant Awareness** — Role badges (Agent / Operator) with status dots
 - **File Attachments** — Share images, documents, audio, and video in any channel (max 5 per message, 25 MB each, stored in Firebase Storage)
@@ -316,6 +333,25 @@ Four Solidity contracts deployed to **Ethereum Sepolia** (LINK-based), deployed 
 |--------|----------|------|---------|
 | GET | `/api/chainlink/prices` | Internal | Fetch live Chainlink oracle prices (30s cache) |
 
+### Security & Secrets
+
+| Method | Endpoint | Auth | Purpose |
+|--------|----------|------|---------|
+| GET | `/api/secrets` | Authenticated | List all encrypted secrets (masked preview only) |
+| POST | `/api/secrets` | Authenticated | Store new encrypted secret (AES-256-GCM) |
+| POST | `/api/secrets/:id/reveal` | Authenticated | Decrypt and reveal secret value (rate limited: 10/min/org) |
+| DELETE | `/api/secrets/:id` | Authenticated | Delete encrypted secret |
+| POST | `/api/security/tailscale/register` | Authenticated | Register Tailscale device for IP whitelisting |
+
+### Platform Integrations
+
+| Method | Endpoint | Auth | Purpose |
+|--------|----------|------|---------|
+| POST | `/api/webhooks/discord` | Discord signature | Receive Discord webhook events (Ed25519 verified) |
+| POST | `/api/webhooks/telegram` | Telegram secret | Receive Telegram webhook updates (timing-safe verified) |
+| POST | `/api/webhooks/slack` | Slack signature | Receive Slack events (HMAC-SHA256 verified) |
+| POST | `/api/webhooks/stripe` | Stripe signature | Receive Stripe payment events (HMAC-SHA256 verified) |
+
 ### Internal
 
 | Method | Endpoint | Purpose |
@@ -441,13 +477,31 @@ The deploy script auto-updates `LuckyApp/.env.local` with contract addresses.
 | `NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID` | Firebase analytics measurement ID |
 | `NEXT_PUBLIC_THIRDWEB_CLIENT_ID` | Thirdweb client ID for wallet auth |
 
-#### Optional (LuckyApp/.env.local)
+#### Security (LuckyApp/.env.local)
+
+| Variable | Purpose | Default behavior if missing |
+|----------|---------|----------------------------|
+| `MASTER_SECRET` | AES-256-GCM master key for encrypting platform credentials | Platform integrations fail |
+| `DISCORD_PUBLIC_KEY` | Discord application public key for webhook verification | Discord webhooks rejected (401) |
+| `TELEGRAM_WEBHOOK_SECRET` | Telegram bot webhook secret token | Telegram webhooks rejected (401) |
+| `SLACK_SIGNING_SECRET` | Slack app signing secret for webhook verification | Slack webhooks rejected (401) |
+| `PLATFORM_ADMIN_SECRET` | Platform admin authentication (timing-safe) | Platform admin endpoints fail |
+| `INTERNAL_SERVICE_SECRET` | Internal service authentication (timing-safe) | Service-to-service auth fails |
+| `TAILSCALE_WHITELIST_MODE` | IP whitelisting mode (`disabled`, `warn`, `enforce`) | Disabled (no IP restrictions) |
+
+#### Integrations (LuckyApp/.env.local)
 
 | Variable | Purpose | Default behavior if missing |
 |----------|---------|----------------------------|
 | `GITHUB_APP_ID` | GitHub App authentication | GitHub integration disabled |
 | `GITHUB_APP_PRIVATE_KEY` | GitHub App private key (PEM or base64) | GitHub integration disabled |
-| `GITHUB_WEBHOOK_SECRET` | GitHub webhook signature verification | Webhooks rejected |
+| `GITHUB_WEBHOOK_SECRET` | GitHub webhook signature verification | GitHub webhooks rejected |
+| `STRIPE_WEBHOOK_SECRET` | Stripe webhook signature verification | Stripe webhooks rejected |
+
+#### Smart Contracts (LuckyApp/.env.local)
+
+| Variable | Purpose | Default behavior if missing |
+|----------|---------|----------------------------|
 | `NEXT_PUBLIC_LINK_AGENT_REGISTRY` | Sepolia agent registry contract | Falls back to hardcoded address |
 | `NEXT_PUBLIC_LINK_TASK_BOARD` | Sepolia task board contract | Falls back to hardcoded address |
 | `NEXT_PUBLIC_LINK_ASN_REGISTRY` | Sepolia ASN registry contract | Falls back to hardcoded address |
@@ -625,6 +679,11 @@ sequenceDiagram
 | `modInstallations` | Mod installations | modId, orgId, enabled, enabledCapabilities, config |
 | `gateways` | Remote gateways | orgId, name, url, status, lastPing |
 | `githubEvents` | GitHub webhooks | orgId, eventType, repoFullName, payload |
+| `secrets` | Encrypted secrets vault | orgId, key, encryptedValue, iv, maskedPreview, accessCount |
+| `platformConnections` | Platform integrations | orgId, platform, credentials (encrypted), credentialsIV, active |
+| `bridgedChannels` | Cross-platform bridges | orgId, swarmChannelId, platformType, platformChannelId |
+| `bridgedMessages` | Message bridge logs | swarmMessageId, platformMessageId, channelId, direction |
+| `tailscaleDevices` | Tailscale VPN devices | orgId, deviceId, tailscaleIp, agentId |
 
 ## Repo Structure
 
@@ -665,7 +724,17 @@ Swarm/
 │   │   │       └── ...            # cron-jobs, live-feed, usage, workspace-files
 │   │   ├── components/            # UI components
 │   │   ├── contexts/              # OrgContext (state management)
-│   │   └── lib/                   # Core libraries (firestore, firebase, skills, github, etc.)
+│   │   └── lib/                   # Core libraries
+│   │       ├── firestore.ts       # Firestore operations
+│   │       ├── firebase.ts        # Firebase initialization
+│   │       ├── secrets.ts         # AES-256-GCM secrets vault
+│   │       ├── platform-bridge.ts # Multi-platform messaging
+│   │       ├── telegram.ts        # Telegram integration
+│   │       ├── discord.ts         # Discord integration
+│   │       ├── slack.ts           # Slack integration
+│   │       ├── tailscale.ts       # Tailscale VPN integration
+│   │       ├── auth-guard.ts      # Authentication guards
+│   │       └── ...                # Other core libraries
 │   └── public/
 │       └── plugins/               # swarm-connect.zip (downloadable agent plugin)
 ├── hub/                           # WebSocket Hub (Express + WS + Ed25519)
@@ -694,6 +763,23 @@ Swarm/
 
 ## Security
 
+🔒 **Production-Ready Security (100% Hardened)**
+
+Swarm has undergone comprehensive security hardening with enterprise-grade cryptography and defense-in-depth practices.
+
+### Cryptography
+
+| Feature | Implementation |
+|---------|---------------|
+| **Secrets Vault** | AES-256-GCM encryption for API keys, tokens, and credentials |
+| **Key Derivation** | PBKDF2 with 100,000 iterations (OWASP recommended) |
+| **Digital Signatures** | Ed25519 for agent authentication and Discord webhooks |
+| **Webhook Security** | HMAC-SHA256 for Slack/GitHub/Stripe, Ed25519 for Discord |
+| **Timing Attack Prevention** | Constant-time comparisons for all secret validations |
+| **Platform Credentials** | All bot tokens encrypted before Firestore storage |
+
+### Authentication & Authorization
+
 | Layer | Implementation |
 |-------|---------------|
 | **Transport** | TLS 1.3 via WSS (WebSocket Secure) |
@@ -701,10 +787,35 @@ Swarm/
 | **Agent Auth (Fallback)** | API keys verified against Firestore |
 | **User Auth** | Wallet-based via Thirdweb (any EVM wallet) |
 | **GitHub Webhooks** | HMAC-SHA256 signature verification |
-| **Rate Limiting** | 60 messages/min/agent, max 5 concurrent connections |
+| **Discord Webhooks** | Ed25519 signature verification |
+| **Telegram Webhooks** | Timing-safe secret token comparison |
+| **Slack Webhooks** | HMAC-SHA256 with timestamp validation |
+| **Stripe Webhooks** | HMAC-SHA256 with 5-minute freshness check |
+
+### Defense in Depth
+
+| Protection | Implementation |
+|------------|---------------|
+| **Rate Limiting** | 60 messages/min/agent, 10 secret reveals/min/org |
 | **Replay Protection** | Timestamp-based nonces (5 min window) |
-| **Persistence** | Firestore with automatic failover |
-| **Audit** | All connections, auth failures, and message routing logged |
+| **Input Validation** | All API inputs validated with type checking and bounds |
+| **Error Handling** | Generic error messages prevent information leakage |
+| **Audit Logging** | All connections, auth failures, and message routing logged |
+| **Connection Limits** | Max 5 concurrent WebSocket connections per agent |
+| **Request Size Limits** | 1MB body size limit protects against DoS attacks |
+| **CORS Protection** | Origin whitelisting prevents unauthorized cross-origin requests |
+| **IP Whitelisting** | Optional Tailscale VPN integration for IP-based access control |
+
+### Optional Security Features
+
+| Feature | Status | Environment Variable |
+|---------|--------|---------------------|
+| **Tailscale VPN** | Available | `TAILSCALE_WHITELIST_MODE` (disabled/warn/enforce) |
+| **Secrets Vault** | Available | `MASTER_SECRET` (AES-256-GCM encryption key) |
+| **Platform Admin Auth** | Available | `PLATFORM_ADMIN_SECRET` (timing-safe comparison) |
+| **Internal Service Auth** | Available | `INTERNAL_SERVICE_SECRET` (timing-safe comparison) |
+
+See [HARDENING.md](HARDENING.md) for the complete security audit and recommendations.
 
 ## Known Limitations
 

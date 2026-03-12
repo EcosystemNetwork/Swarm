@@ -1,0 +1,82 @@
+/**
+ * POST /api/v1/assignments/:id/accept - Accept a task assignment
+ *
+ * Authentication: Ed25519 signature required
+ */
+
+import { NextRequest } from "next/server";
+import { verifyAgentRequest, isTimestampFresh } from "@/app/api/v1/verify";
+import { rateLimit } from "@/app/api/v1/rate-limit";
+import { acceptAssignment, getAgentWorkMode } from "@/lib/assignments";
+
+export async function POST(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const assignmentId = params.id;
+    const url = request.nextUrl;
+
+    // Extract Ed25519 auth params
+    const agentParam = url.searchParams.get("agent");
+    const sig = url.searchParams.get("sig");
+    const ts = url.searchParams.get("ts");
+
+    if (!agentParam || !sig || !ts) {
+      return Response.json(
+        { error: "Missing required parameters: agent, sig, ts" },
+        { status: 400 }
+      );
+    }
+
+    // Verify timestamp freshness
+    const tsNum = parseInt(ts, 10);
+    if (!isTimestampFresh(tsNum)) {
+      return Response.json({ error: "Stale timestamp" }, { status: 401 });
+    }
+
+    // Verify Ed25519 signature
+    const message = `POST:/v1/assignments/${assignmentId}/accept:${ts}`;
+    const verified = await verifyAgentRequest(agentParam, message, sig);
+    if (!verified) {
+      return Response.json({ error: "Invalid signature" }, { status: 401 });
+    }
+
+    // Rate limiting (60 requests/minute)
+    const rateLimitResponse = rateLimit(verified.agentId);
+    if (rateLimitResponse) return rateLimitResponse;
+
+    // Parse request body (optional notes)
+    const body = await request.json().catch(() => ({}));
+    const { notes } = body;
+
+    // Accept assignment
+    await acceptAssignment(assignmentId, verified.agentId, notes);
+
+    // Get updated work mode
+    const workMode = await getAgentWorkMode(verified.agentId);
+
+    return Response.json({
+      assignmentId,
+      status: "accepted",
+      respondedAt: Date.now(),
+      currentLoad: workMode?.currentLoad || 0,
+      capacity: workMode?.capacity || 3,
+    });
+  } catch (err: any) {
+    console.error("Accept assignment error:", err);
+
+    // Handle specific errors
+    if (err.message?.includes("not found")) {
+      return Response.json({ error: err.message }, { status: 404 });
+    }
+    if (err.message?.includes("not the recipient") || err.message?.includes("not pending")) {
+      return Response.json({ error: err.message }, { status: 403 });
+    }
+
+    return Response.json(
+      { error: err.message || "Internal error" },
+      { status: 500 }
+    );
+  }
+}

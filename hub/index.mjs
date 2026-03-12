@@ -211,6 +211,24 @@ function broadcastToChannel(channelId, message, excludeWs = null) {
   }
 }
 
+/**
+ * Broadcast a message to a specific agent (all their active WebSocket connections).
+ * Used for direct notifications like assignment alerts.
+ */
+function broadcastToAgent(agentId, message) {
+  const sockets = agentConnections.get(agentId);
+  if (!sockets) return false;
+  const data = typeof message === "string" ? message : JSON.stringify(message);
+  let sent = false;
+  for (const ws of sockets) {
+    if (ws.readyState === 1) {
+      ws.send(data);
+      sent = true;
+    }
+  }
+  return sent;
+}
+
 function subscribeToChannel(ws, channelId) {
   const state = wsState.get(ws);
   if (!state) return;
@@ -438,6 +456,15 @@ async function replayChannel(ws, channelId, channelName, agentId, sinceMs) {
 
 // ── Express ─────────────────────────────────────────────────────────────────
 const app = express();
+
+// Security headers (anti-clickjacking, XSS, MIME sniffing, HTTPS enforcement)
+app.use((req, res, next) => {
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-XSS-Protection', '1; mode=block');
+  res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+  next();
+});
 
 // Security: Lock down CORS to only allow requests from the main app
 const ALLOWED_ORIGINS = optionalEnv("ALLOWED_ORIGINS", "https://swarm.perkos.xyz,http://localhost:3000")
@@ -667,8 +694,23 @@ wss.on("connection", async (ws, _req) => {
     if (data && data.length > 0) {
       try {
         const vitals = JSON.parse(data.toString());
-        if (vitals.cpu !== undefined && vitals.memory !== undefined && vitals.disk !== undefined) {
-          // Record vitals to Firestore
+
+        // SECURITY: Validate vitals schema and types before storing
+        const isValidNumber = (val) => typeof val === 'number' && !isNaN(val) && isFinite(val);
+        const isValidPercent = (val) => isValidNumber(val) && val >= 0 && val <= 100;
+
+        if (
+          isValidPercent(vitals.cpu) &&
+          isValidPercent(vitals.memory) &&
+          isValidPercent(vitals.disk)
+        ) {
+          // Sanitize optional fields
+          const memoryUsedMB = isValidNumber(vitals.memoryUsedMB) && vitals.memoryUsedMB >= 0 ? vitals.memoryUsedMB : undefined;
+          const memoryTotalMB = isValidNumber(vitals.memoryTotalMB) && vitals.memoryTotalMB >= 0 ? vitals.memoryTotalMB : undefined;
+          const diskUsedGB = isValidNumber(vitals.diskUsedGB) && vitals.diskUsedGB >= 0 ? vitals.diskUsedGB : undefined;
+          const diskTotalGB = isValidNumber(vitals.diskTotalGB) && vitals.diskTotalGB >= 0 ? vitals.diskTotalGB : undefined;
+
+          // Record validated vitals to Firestore
           await addDoc(collection(db, "agentVitals"), {
             orgId,
             agentId,
@@ -677,10 +719,10 @@ wss.on("connection", async (ws, _req) => {
               cpu: vitals.cpu,
               memory: vitals.memory,
               disk: vitals.disk,
-              memoryUsedMB: vitals.memoryUsedMB,
-              memoryTotalMB: vitals.memoryTotalMB,
-              diskUsedGB: vitals.diskUsedGB,
-              diskTotalGB: vitals.diskTotalGB,
+              memoryUsedMB,
+              memoryTotalMB,
+              diskUsedGB,
+              diskTotalGB,
             },
             timestamp: serverTimestamp(),
           });
@@ -956,6 +998,86 @@ async function reportGatewayHeartbeat() {
     log("error", "Gateway heartbeat failed", { error: err.message });
   }
 }
+
+// ── Assignment Notification Listener ────────────────────────────────────────
+// Watch for new assignment notifications and broadcast them via WebSocket
+
+const notificationsQuery = query(
+  collection(db, "assignmentNotifications"),
+  where("read", "==", false),
+  orderBy("createdAt", "desc")
+);
+
+let notificationInitialLoad = true;
+onSnapshot(notificationsQuery, (snapshot) => {
+  // Skip initial load to avoid broadcasting old notifications on startup
+  if (notificationInitialLoad) {
+    notificationInitialLoad = false;
+    return;
+  }
+
+  // Process new notifications
+  snapshot.docChanges().forEach(async (change) => {
+    if (change.type !== "added") return;
+
+    const notification = change.doc.data();
+    const { agentId, type, assignmentId, message, channelId } = notification;
+
+    // Build WebSocket message based on notification type
+    let wsMessage = {
+      type: `assignment:${type.replace("_", ":")}`,
+      assignmentId,
+      message,
+      ts: Date.now(),
+    };
+
+    // Add type-specific fields
+    if (type === "new_assignment") {
+      // Fetch assignment details to include in notification
+      try {
+        const assignmentRef = doc(db, "taskAssignments", assignmentId);
+        const assignmentSnap = await getDoc(assignmentRef);
+        if (assignmentSnap.exists()) {
+          const assignment = assignmentSnap.data();
+          wsMessage = {
+            type: "assignment:new",
+            assignmentId,
+            from: assignment.fromAgentName || assignment.fromHumanName || "Unknown",
+            fromId: assignment.fromAgentId || assignment.fromHumanId,
+            title: assignment.title,
+            priority: assignment.priority,
+            deadline: assignment.deadline?.toDate().toISOString() || null,
+            ts: Date.now(),
+          };
+        }
+      } catch (err) {
+        log("warn", "Failed to fetch assignment details for notification", { assignmentId, error: err.message });
+      }
+    }
+
+    // Broadcast to agent via WebSocket
+    const sent = broadcastToAgent(agentId, wsMessage);
+    if (sent) {
+      log("info", "Assignment notification broadcast", { agentId, type, assignmentId });
+    }
+
+    // Also post to Agent Hub channel if specified
+    if (channelId) {
+      broadcastToChannel(channelId, {
+        type: "message",
+        channelId,
+        from: "SwarmHub",
+        fromType: "system",
+        text: message,
+        ts: Date.now(),
+      });
+    }
+  });
+}, (err) => {
+  log("error", "Assignment notification listener error", { error: err.message });
+});
+
+log("info", "Assignment notification listener started");
 
 // ── Start ───────────────────────────────────────────────────────────────────
 server.listen(PORT, () => {

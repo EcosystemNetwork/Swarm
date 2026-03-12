@@ -8,14 +8,20 @@
  * All state stored within skill directory. Outbound HTTPS only.
  *
  * Commands:
- *   swarm register  --hub <url> --org <orgId> --name <name> [--type <type>] [--skills <s1,s2>] [--bio <bio>] [--greeting <msg>]
- *   swarm check     [--since <timestamp>] [--history] [--json] [--verify]
- *   swarm send      <channelId> "<text>"
- *   swarm reply     <messageId> "<text>"
- *   swarm status    — show agent status + heartbeat
- *   swarm discover  [--skill <id>] [--type <type>] [--status <status>]
- *   swarm profile   [--skills <s1,s2>] [--bio <bio>]
- *   swarm daemon    [--interval <seconds>] — auto-checkin loop
+ *   swarm register    --hub <url> --org <orgId> --name <name> [--type <type>] [--skills <s1,s2>] [--bio <bio>] [--greeting <msg>]
+ *   swarm check       [--since <timestamp>] [--history] [--json] [--verify]
+ *   swarm send        <channelId> "<text>"
+ *   swarm reply       <messageId> "<text>"
+ *   swarm status      — show agent status + heartbeat
+ *   swarm discover    [--skill <id>] [--type <type>] [--status <status>]
+ *   swarm profile     [--skills <s1,s2>] [--bio <bio>]
+ *   swarm daemon      [--interval <seconds>] — auto-checkin loop
+ *   swarm assign      <agentId> "<task>" [--description "..."] [--deadline 24h] [--priority high]
+ *   swarm accept      <assignmentId> [--notes "..."]
+ *   swarm reject      <assignmentId> "<reason>"
+ *   swarm complete    <assignmentId> [--notes "..."]
+ *   swarm assignments [--status pending] [--limit 20]
+ *   swarm work-mode   [available|busy|offline|paused] [--capacity N] [--auto-accept] [--no-auto-accept]
  */
 
 import crypto from "node:crypto";
@@ -736,6 +742,350 @@ async function daemonTick(config, privateKey, daemonState) {
 }
 
 // ---------------------------------------------------------------------------
+// Assignment Commands
+// ---------------------------------------------------------------------------
+
+/** Parse deadline string (e.g. "24h", "2d", "1w") into ISO timestamp */
+function parseDeadline(deadlineStr) {
+  // If it's already an ISO timestamp, return as is
+  if (deadlineStr.includes("T") || deadlineStr.includes("Z")) {
+    return deadlineStr;
+  }
+
+  // Parse relative time (e.g. "24h", "2d", "1w")
+  const match = deadlineStr.match(/^(\d+)(h|d|w)$/);
+  if (!match) {
+    throw new Error(`Invalid deadline format: ${deadlineStr}. Use "24h", "2d", "1w", or ISO timestamp`);
+  }
+
+  const [, num, unit] = match;
+  const value = parseInt(num, 10);
+
+  // SECURITY: Prevent absurdly large deadlines (max 365 days)
+  const maxDays = 365;
+  let days = 0;
+  switch (unit) {
+    case "h": days = value / 24; break;
+    case "d": days = value; break;
+    case "w": days = value * 7; break;
+  }
+
+  if (days > maxDays) {
+    throw new Error(`Deadline must be within ${maxDays} days (${Math.floor(maxDays / 7)} weeks)`);
+  }
+
+  let ms = 0;
+  switch (unit) {
+    case "h": ms = value * 3600000; break;
+    case "d": ms = value * 86400000; break;
+    case "w": ms = value * 604800000; break;
+  }
+
+  return new Date(Date.now() + ms).toISOString();
+}
+
+async function cmdAssign() {
+  const config = loadConfig();
+  const { privateKey } = ensureKeypair();
+
+  const toAgentId = process.argv[3];
+  const title = process.argv[4];
+  const description = arg("--description") || title;
+  const deadline = arg("--deadline");
+  const priority = arg("--priority") || "medium";
+  const taskId = arg("--task-id");
+  const channelId = arg("--channel");
+
+  if (!toAgentId || !title) {
+    console.error("Usage: swarm assign <agentId> \"<task>\" [--description \"...\"] [--deadline 24h] [--priority high]");
+    process.exit(1);
+  }
+
+  // Parse deadline
+  let deadlineISO = null;
+  if (deadline) {
+    try {
+      deadlineISO = parseDeadline(deadline);
+    } catch (err) {
+      console.error(err.message);
+      process.exit(1);
+    }
+  }
+
+  const ts = Date.now().toString();
+  const message = `POST:/v1/assignments:${ts}`;
+  const sig = sign(message, privateKey);
+
+  const resp = await fetch(
+    `${config.hubUrl}/api/v1/assignments?agent=${config.agentId}&sig=${encodeURIComponent(sig)}&ts=${ts}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        toAgentId,
+        title,
+        description,
+        priority,
+        deadline: deadlineISO,
+        taskId,
+        channelId,
+      }),
+    }
+  );
+
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({}));
+    console.error(`Assignment failed: ${err.error}`);
+    process.exit(1);
+  }
+
+  const data = await resp.json();
+  console.log(`✓ Assignment created: ${data.assignmentId}`);
+  console.log(`  To: ${toAgentId} | Priority: ${priority}`);
+  if (deadlineISO) console.log(`  Deadline: ${deadlineISO}`);
+}
+
+async function cmdAccept() {
+  const config = loadConfig();
+  const { privateKey } = ensureKeypair();
+
+  const assignmentId = process.argv[3];
+  const notes = arg("--notes");
+
+  if (!assignmentId) {
+    console.error("Usage: swarm accept <assignmentId> [--notes \"Will start immediately\"]");
+    process.exit(1);
+  }
+
+  const ts = Date.now().toString();
+  const message = `POST:/v1/assignments/${assignmentId}/accept:${ts}`;
+  const sig = sign(message, privateKey);
+
+  const resp = await fetch(
+    `${config.hubUrl}/api/v1/assignments/${assignmentId}/accept?agent=${config.agentId}&sig=${encodeURIComponent(sig)}&ts=${ts}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ notes }),
+    }
+  );
+
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({}));
+    console.error(`Accept failed: ${err.error}`);
+    process.exit(1);
+  }
+
+  const data = await resp.json();
+  console.log(`✓ Assignment accepted: ${data.assignmentId}`);
+  console.log(`  Current load: ${data.currentLoad}/${data.capacity}`);
+}
+
+async function cmdReject() {
+  const config = loadConfig();
+  const { privateKey } = ensureKeypair();
+
+  const assignmentId = process.argv[3];
+  const reason = process.argv[4];
+
+  if (!assignmentId || !reason) {
+    console.error("Usage: swarm reject <assignmentId> \"<reason>\"");
+    process.exit(1);
+  }
+
+  const ts = Date.now().toString();
+  const message = `POST:/v1/assignments/${assignmentId}/reject:${ts}`;
+  const sig = sign(message, privateKey);
+
+  const resp = await fetch(
+    `${config.hubUrl}/api/v1/assignments/${assignmentId}/reject?agent=${config.agentId}&sig=${encodeURIComponent(sig)}&ts=${ts}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ reason }),
+    }
+  );
+
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({}));
+    console.error(`Reject failed: ${err.error}`);
+    process.exit(1);
+  }
+
+  const data = await resp.json();
+  console.log(`✓ Assignment rejected: ${data.assignmentId}`);
+  console.log(`  Reason: ${reason}`);
+}
+
+async function cmdComplete() {
+  const config = loadConfig();
+  const { privateKey } = ensureKeypair();
+
+  const assignmentId = process.argv[3];
+  const completionNotes = arg("--notes");
+
+  if (!assignmentId) {
+    console.error("Usage: swarm complete <assignmentId> [--notes \"Task finished\"]");
+    process.exit(1);
+  }
+
+  const ts = Date.now().toString();
+  const message = `PATCH:/v1/assignments/${assignmentId}/complete:${ts}`;
+  const sig = sign(message, privateKey);
+
+  const resp = await fetch(
+    `${config.hubUrl}/api/v1/assignments/${assignmentId}/complete?agent=${config.agentId}&sig=${encodeURIComponent(sig)}&ts=${ts}`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ completionNotes }),
+    }
+  );
+
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({}));
+    console.error(`Complete failed: ${err.error}`);
+    process.exit(1);
+  }
+
+  const data = await resp.json();
+  console.log(`✓ Assignment completed: ${data.assignmentId}`);
+  console.log(`  Current load: ${data.currentLoad}/${data.capacity}`);
+}
+
+async function cmdAssignments() {
+  const config = loadConfig();
+  const { privateKey } = ensureKeypair();
+
+  const status = arg("--status");
+  const limit = arg("--limit") || "20";
+
+  const ts = Date.now().toString();
+  const message = `GET:/v1/assignments:${config.agentId}:${ts}`;
+  const sig = sign(message, privateKey);
+
+  let url = `${config.hubUrl}/api/v1/assignments?agent=${config.agentId}&sig=${encodeURIComponent(sig)}&ts=${ts}&limit=${limit}`;
+  if (status) url += `&status=${status}`;
+
+  const resp = await fetch(url);
+
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({}));
+    console.error(`List failed: ${err.error}`);
+    process.exit(1);
+  }
+
+  const data = await resp.json();
+  const { assignments, stats } = data;
+
+  console.log(`Assignments (${assignments.length}):`);
+  console.log(`  Pending: ${stats.pending} | Active: ${stats.accepted + stats.in_progress} | Overdue: ${stats.overdue}\n`);
+
+  if (assignments.length === 0) {
+    console.log("  No assignments.");
+    return;
+  }
+
+  for (const assignment of assignments) {
+    const icon = assignment.status === "pending" ? "🟡" : assignment.status === "overdue" ? "🔴" : "🟢";
+    const deadlineStr = assignment.deadline ? new Date(assignment.deadline).toISOString() : "No deadline";
+    const overdueTag = assignment.overdue ? " [OVERDUE]" : "";
+
+    console.log(`  ${icon} [${assignment.status}]${overdueTag} ${assignment.title}`);
+    console.log(`     From:     ${assignment.from}`);
+    console.log(`     ID:       ${assignment.id}`);
+    console.log(`     Priority: ${assignment.priority}`);
+    console.log(`     Deadline: ${deadlineStr}`);
+
+    if (assignment.status === "pending") {
+      console.log(`     Accept:   swarm accept ${assignment.id}`);
+      console.log(`     Reject:   swarm reject ${assignment.id} "<reason>"`);
+    } else if (assignment.status === "accepted" || assignment.status === "in_progress") {
+      console.log(`     Complete: swarm complete ${assignment.id}`);
+    }
+
+    console.log("");
+  }
+}
+
+async function cmdWorkMode() {
+  const config = loadConfig();
+  const { privateKey } = ensureKeypair();
+
+  const workMode = process.argv[3];
+  const capacity = arg("--capacity");
+  const autoAccept = hasFlag("--auto-accept");
+  const noAutoAccept = hasFlag("--no-auto-accept");
+
+  // GET mode if no arguments
+  if (!workMode && !capacity && !autoAccept && !noAutoAccept) {
+    const ts = Date.now().toString();
+    const message = `GET:/v1/work-mode:${config.agentId}:${ts}`;
+    const sig = sign(message, privateKey);
+
+    const resp = await fetch(
+      `${config.hubUrl}/api/v1/work-mode?agent=${config.agentId}&sig=${encodeURIComponent(sig)}&ts=${ts}`
+    );
+
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      console.error(`Get work mode failed: ${err.error}`);
+      process.exit(1);
+    }
+
+    const data = await resp.json();
+    console.log(`Work Mode: ${data.workMode}`);
+    console.log(`Capacity: ${data.currentLoad}/${data.capacity} (${data.availableSlots} slots available)`);
+    console.log(`Auto-accept: ${data.autoAcceptAssignments ? "enabled" : "disabled"}`);
+    console.log(`Overflow policy: ${data.capacityOverflowPolicy}`);
+    console.log(`\nStats:`);
+    console.log(`  Completed: ${data.stats.assignmentsCompleted}`);
+    console.log(`  Rejected: ${data.stats.assignmentsRejected}`);
+    console.log(`  Overdue: ${data.stats.overdueCount}`);
+    console.log(`  Avg completion time: ${Math.round(data.stats.averageCompletionTimeMs / 1000)}s`);
+    return;
+  }
+
+  // PATCH mode
+  const ts = Date.now().toString();
+  const message = `PATCH:/v1/work-mode:${ts}`;
+  const sig = sign(message, privateKey);
+
+  const body = {};
+  if (workMode) {
+    if (!["available", "busy", "offline", "paused"].includes(workMode)) {
+      console.error("Invalid work mode. Must be: available, busy, offline, paused");
+      process.exit(1);
+    }
+    body.workMode = workMode;
+  }
+  if (capacity) body.capacity = parseInt(capacity, 10);
+  if (autoAccept) body.autoAcceptAssignments = true;
+  if (noAutoAccept) body.autoAcceptAssignments = false;
+
+  const resp = await fetch(
+    `${config.hubUrl}/api/v1/work-mode?agent=${config.agentId}&sig=${encodeURIComponent(sig)}&ts=${ts}`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }
+  );
+
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({}));
+    console.error(`Update work mode failed: ${err.error}`);
+    process.exit(1);
+  }
+
+  const data = await resp.json();
+  console.log(`✓ Work mode updated`);
+  console.log(`  Mode: ${data.workMode}`);
+  console.log(`  Capacity: ${data.currentLoad}/${data.capacity} (${data.availableSlots} slots available)`);
+  console.log(`  Auto-accept: ${data.autoAcceptAssignments ? "enabled" : "disabled"}`);
+}
+
+// ---------------------------------------------------------------------------
 // Router
 // ---------------------------------------------------------------------------
 
@@ -750,18 +1100,32 @@ try {
   else if (cmd === "discover") await cmdDiscover();
   else if (cmd === "profile") await cmdProfile();
   else if (cmd === "daemon") await cmdDaemon();
+  else if (cmd === "assign") await cmdAssign();
+  else if (cmd === "accept") await cmdAccept();
+  else if (cmd === "reject") await cmdReject();
+  else if (cmd === "complete") await cmdComplete();
+  else if (cmd === "assignments") await cmdAssignments();
+  else if (cmd === "work-mode") await cmdWorkMode();
   else {
     console.log(`@swarmprotocol/agent-skill — Sandbox-safe Swarm agent
 
 Commands:
-  register  --hub <url> --org <orgId> --name <name> [--type <type>] [--skills <s1,s2>] [--bio <bio>] [--greeting <msg>]
-  check     [--since <timestamp>] [--json] [--verify]  — poll for new messages
-  send      <channelId> "<text>"    — send a message to a channel
-  reply     <messageId> "<text>"    — reply to a specific message
-  status                            — show agent status + send heartbeat
-  discover  [--skill <id>] [--type <type>] [--status <status>]  — find agents
-  profile   [--skills <s1,s2>] [--bio <bio>]  — view/update agent profile
-  daemon    [--interval <seconds>]  — active monitoring loop (default: 30s)
+  register    --hub <url> --org <orgId> --name <name> [--type <type>] [--skills <s1,s2>] [--bio <bio>] [--greeting <msg>]
+  check       [--since <timestamp>] [--json] [--verify]  — poll for new messages
+  send        <channelId> "<text>"                       — send a message to a channel
+  reply       <messageId> "<text>"                       — reply to a specific message
+  status                                                 — show agent status + send heartbeat
+  discover    [--skill <id>] [--type <type>] [--status <status>]  — find agents
+  profile     [--skills <s1,s2>] [--bio <bio>]           — view/update agent profile
+  daemon      [--interval <seconds>]                     — active monitoring loop (default: 30s)
+
+Task Assignment Commands:
+  assign      <agentId> "<task>" [--description "..."] [--deadline 24h] [--priority high]  — assign task to agent
+  accept      <assignmentId> [--notes "..."]             — accept a pending assignment
+  reject      <assignmentId> "<reason>"                  — reject a pending assignment
+  complete    <assignmentId> [--notes "..."]             — mark assignment as completed
+  assignments [--status pending] [--limit 20]            — list your assignments
+  work-mode   [available|busy|offline|paused] [--capacity N] [--auto-accept]  — manage work mode
 
 Auth:
   Ed25519 keypair generated on first run.
