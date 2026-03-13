@@ -320,6 +320,11 @@ export default function DashboardPage() {
   const [dashTab, setDashTab] = useState("overview");
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
+  // Compute analytics data
+  const taskVelocity = useMemo(() => computeTaskVelocity(allTasks), [allTasks]);
+  const agentWorkload = useMemo(() => computeAgentWorkload(allTasks, agents), [allTasks, agents]);
+  const activityHeatmap = useMemo(() => computeActivityByHour(activityAll), [activityAll]);
+
   // Active widget sets (which widgets are visible)
   const [activeWidgetIds, setActiveWidgetIds] = useState<string[]>(DEFAULT_ACTIVE_WIDGETS);
 
