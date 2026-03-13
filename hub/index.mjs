@@ -14,6 +14,23 @@ import {
   INSTANCE_ID,
 } from "./pubsub-client.mjs";
 import { routeMessage } from "./message-router.mjs";
+import {
+  initRedis,
+  getRedis,
+  trackAgentConnection,
+  untrackAgentConnection,
+  refreshAgentPresence,
+  getAgentInstance,
+  subscribeChannel as redisSubscribeChannel,
+  unsubscribeChannel as redisUnsubscribeChannel,
+  unsubscribeAllChannels,
+  getChannelSubscribers,
+  checkRateLimit as redisCheckRateLimit,
+  publishToInstances,
+  subscribeToInstances,
+  getInstanceId,
+  checkRedisHealth,
+} from "./redis-state.mjs";
 
 /**
  * SECURITY NOTE: This hub currently uses the Firebase client SDK instead of
@@ -197,17 +214,16 @@ async function checkTailscaleWhitelist(orgId, ip) {
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
-function checkRateLimit(agentId) {
-  const now = Date.now();
-  let entry = rateLimits.get(agentId);
-  if (!entry) {
-    entry = { timestamps: [] };
-    rateLimits.set(agentId, entry);
+async function checkRateLimit(agentId) {
+  try {
+    // Use Redis-backed rate limiting for distributed enforcement
+    const result = await redisCheckRateLimit(agentId, RATE_LIMIT_MAX, RATE_LIMIT_WINDOW);
+    return result.allowed;
+  } catch (err) {
+    log("warn", "Redis rate limit check failed, allowing request", { agentId, error: err.message });
+    // Fallback to allowing the request if Redis is unavailable
+    return true;
   }
-  entry.timestamps = entry.timestamps.filter((t) => now - t < RATE_LIMIT_WINDOW);
-  if (entry.timestamps.length >= RATE_LIMIT_MAX) return false;
-  entry.timestamps.push(now);
-  return true;
 }
 
 function broadcastToChannel(channelId, message, excludeWs = null) {
@@ -231,8 +247,9 @@ function broadcastToChannel(channelId, message, excludeWs = null) {
 /**
  * Broadcast a message to a specific agent (all their active WebSocket connections).
  * Used for direct notifications like assignment alerts.
+ * If agent is not on this instance, routes via Redis pub/sub.
  */
-function broadcastToAgent(agentId, message) {
+async function broadcastToAgent(agentId, message) {
   const sockets = agentConnections.get(agentId);
   const data = typeof message === "string" ? message : JSON.stringify(message);
   let sent = false;
@@ -247,6 +264,24 @@ function broadcastToAgent(agentId, message) {
     }
   }
 
+  // If not sent locally, check if agent is on another instance via Redis
+  if (!sent) {
+    try {
+      const agentInstance = await getAgentInstance(agentId);
+      if (agentInstance && agentInstance !== getInstanceId()) {
+        // Route to other instance via Redis pub/sub
+        await publishToInstances("websocket:broadcast", {
+          type: "send_to_agent",
+          agentId,
+          payload: typeof message === "string" ? JSON.parse(message) : message,
+        });
+        sent = true;
+      }
+    } catch (err) {
+      log("warn", "Failed to route message via Redis", { agentId, error: err.message });
+    }
+  }
+
   // Cross-instance broadcast via Pub/Sub (fire-and-forget)
   // Agent may be connected to a different instance
   pubsubSendToAgent(agentId, typeof message === "string" ? JSON.parse(message) : message)
@@ -255,22 +290,48 @@ function broadcastToAgent(agentId, message) {
   return sent;
 }
 
-function subscribeToChannel(ws, channelId) {
+async function subscribeToChannel(ws, channelId) {
   const state = wsState.get(ws);
   if (!state) return;
+
+  // Track locally
   if (!channelSubscribers.has(channelId)) {
     channelSubscribers.set(channelId, new Set());
   }
   channelSubscribers.get(channelId).add(ws);
   state.channels.add(channelId);
+
+  // Track in Redis for distributed state
+  try {
+    await redisSubscribeChannel(channelId, state.agentId);
+  } catch (err) {
+    log("warn", "Failed to track channel subscription in Redis", {
+      agentId: state.agentId,
+      channelId,
+      error: err.message,
+    });
+  }
 }
 
-function unsubscribeFromChannel(ws, channelId) {
+async function unsubscribeFromChannel(ws, channelId) {
   const state = wsState.get(ws);
   if (!state) return;
+
+  // Untrack locally
   const subs = channelSubscribers.get(channelId);
   if (subs) {
     subs.delete(ws);
+
+  // Untrack from Redis
+  try {
+    await redisUnsubscribeChannel(channelId, state.agentId);
+  } catch (err) {
+    log("warn", "Failed to untrack channel subscription from Redis", {
+      agentId: state.agentId,
+      channelId,
+      error: err.message,
+    });
+  }
     if (subs.size === 0) channelSubscribers.delete(channelId);
   }
   state.channels.delete(channelId);
@@ -560,6 +621,9 @@ app.get("/health", async (_req, res) => {
   // Check Pub/Sub health
   const pubsubHealthy = await isPubSubHealthy();
 
+  // Check Redis health
+  const redisHealth = await checkRedisHealth();
+
   res.json({
     status: "ok",
     auth: "ed25519",
@@ -570,6 +634,11 @@ app.get("/health", async (_req, res) => {
     pubsub: {
       enabled: pubsubHealthy,
       instanceId: INSTANCE_ID,
+    },
+    redis: {
+      healthy: redisHealth.healthy,
+      instanceId: getInstanceId(),
+      error: redisHealth.error || undefined,
     },
     ts: new Date().toISOString(),
   });
@@ -697,12 +766,19 @@ wss.on("connection", async (ws, _req) => {
   delete ws._agentData;
   delete ws._sinceMs;
 
-  // Track connection
+  // Track connection locally
   if (!agentConnections.has(agentId)) agentConnections.set(agentId, new Set());
   agentConnections.get(agentId).add(ws);
 
   const state = { agentId, orgId, agentName, agentType, channels: new Set(), unsubs: [] };
   wsState.set(ws, state);
+
+  // Track connection in Redis for distributed state
+  try {
+    await trackAgentConnection(agentId, orgId, agentName, agentType);
+  } catch (err) {
+    log("warn", "Failed to track agent in Redis", { agentId, error: err.message });
+  }
 
   log("info", "Agent connected (Ed25519)", { agentId, agentName });
 
@@ -760,6 +836,16 @@ wss.on("connection", async (ws, _req) => {
   ws._pongPending = false;
   ws.on("pong", async (data) => {
     ws._pongPending = false;
+
+    // Refresh agent presence in Redis
+    const state = wsState.get(ws);
+    if (state) {
+      try {
+        await refreshAgentPresence(state.agentId);
+      } catch (err) {
+        // Ignore errors silently to avoid log spam
+      }
+    }
 
     // Parse vitals from pong data if provided
     if (data && data.length > 0) {
@@ -1011,7 +1097,7 @@ wss.on("connection", async (ws, _req) => {
 
   // ── Disconnect Handler ──────────────────────────────────────────────────
 
-  ws.on("close", () => {
+  ws.on("close", async () => {
     log("info", "Agent disconnected", { agentId, agentName });
 
     // Clean up Firestore listeners
@@ -1035,11 +1121,21 @@ wss.on("connection", async (ws, _req) => {
       }
     }
 
-    // Remove from agent pool
+    // Remove from local agent pool
     const conns = agentConnections.get(agentId);
     if (conns) {
       conns.delete(ws);
-      if (conns.size === 0) agentConnections.delete(agentId);
+      if (conns.size === 0) {
+        agentConnections.delete(agentId);
+
+        // Untrack from Redis (only when last connection closes)
+        try {
+          await untrackAgentConnection(agentId);
+          await unsubscribeAllChannels(agentId);
+        } catch (err) {
+          log("warn", "Failed to untrack agent from Redis", { agentId, error: err.message });
+        }
+      }
     }
     wsState.delete(ws);
   });
@@ -1197,6 +1293,33 @@ onSnapshot(notificationsQuery, (snapshot) => {
 });
 
 log("info", "Assignment notification listener started");
+
+// ── Redis Initialization ────────────────────────────────────────────────────
+
+// Initialize Redis for distributed state management
+try {
+  await initRedis();
+  log("info", `Redis initialized — instance: ${getInstanceId()}`);
+
+  // Subscribe to cross-instance WebSocket messages
+  await subscribeToInstances("websocket:broadcast", (message) => {
+    if (message.type === "send_to_agent" && message.agentId && message.payload) {
+      // Route message to local agent connections
+      const sockets = agentConnections.get(message.agentId);
+      if (sockets) {
+        const data = JSON.stringify(message.payload);
+        for (const ws of sockets) {
+          if (ws.readyState === 1) {
+            ws.send(data);
+          }
+        }
+      }
+    }
+  });
+} catch (err) {
+  log("error", "Redis initialization failed — falling back to in-memory state", { error: err.message });
+  log("warn", "Multi-instance scaling disabled");
+}
 
 // ── Pub/Sub Initialization ─────────────────────────────────────────────────
 
