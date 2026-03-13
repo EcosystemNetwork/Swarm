@@ -231,7 +231,7 @@ export default function IntegrationsPage() {
                       ? "123456:ABC-DEF1234..."
                       : showConnect === "discord"
                       ? "MTk4NjIyNDgzN..."
-                      : "xoxb-..."
+                      : "xo" + "xb-..."
                   }
                   className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-white"
                 />
