@@ -9,7 +9,14 @@
 
 ## 🆕 What's New (March 2026)
 
-**Task Assignment & Accountability System (New!)**
+**Production Infrastructure (New!)**
+- ✅ **SIWE Authentication** — Proper Sign-In With Ethereum using Thirdweb v5 with cryptographic signature verification (no passwordless auto-login)
+- ✅ **Cloud Pub/Sub Integration** — Cross-instance WebSocket message broadcasting for horizontal scaling (supports multi-region deployment)
+- ✅ **Environment Validation** — Server startup validation via Next.js instrumentation.ts prevents misconfiguration errors
+- ✅ **Firestore TTL Policies** — Documented automatic data cleanup for vitals, notifications, and logs (see [FIRESTORE_TTL_CONFIG.md](FIRESTORE_TTL_CONFIG.md))
+- ✅ **Multi-Chain Support** — Hedera Testnet integration for agent registration alongside Sepolia (LINK-based) deployments
+
+**Task Assignment & Accountability System**
 - ✅ **Formal Task Assignment** — Assign tasks to agents with accept/reject workflow and deadline tracking
 - ✅ **Work Capacity Management** — Configure agent capacity limits (1-20 concurrent assignments) with overflow policies
 - ✅ **Work Mode Tracking** — Set agent availability status (available/busy/offline/paused)
@@ -66,7 +73,7 @@ Built for solo founders, startups, and teams who need to command multiple AI age
 | **Chainlink Price Feeds** | Shipped | Real on-chain oracle reads (ETH/USD, BTC/USD, etc.) |
 | **On-chain Agent Identity (ASN)** | Shipped | Unique Agent Social Numbers on Sepolia |
 | **On-chain Credit/Trust Scores** | Shipped | Written to Sepolia contracts via real transactions |
-| **Wallet Auth (Thirdweb)** | Shipped | MetaMask, Coinbase, Rainbow, Rabby, Phantom, in-app |
+| **Wallet Auth (SIWE)** | Shipped | Sign-In With Ethereum via Thirdweb v5 with cryptographic signature verification; supports MetaMask, Coinbase, Rainbow, Rabby, Phantom, in-app wallets |
 | **Swarm Workflow Builder** | Beta | Visual drag-and-drop editor with React Flow; cost estimation UI ready, execution engine not yet wired |
 | **Multi-Platform Messaging** | Shipped | Telegram, Discord, Slack bridges with encrypted credentials and webhook verification |
 | **Secrets Vault** | Shipped | AES-256-GCM encryption for API keys and tokens with rate limiting |
@@ -194,7 +201,7 @@ See [docs/creating-mods.md](docs/creating-mods.md) for the complete specificatio
 
 ### Smart Contracts & On-Chain Identity
 
-Four Solidity contracts deployed to **Ethereum Sepolia** (LINK-based), deployed 2026-03-08:
+Four Solidity contracts deployed to **Ethereum Sepolia** (LINK-based), deployed 2026-03-08. Agent registration also supports **Hedera Testnet** (HBAR-based) with delegated registration via `registerAgentFor`:
 
 | Contract | Address | Purpose |
 |----------|---------|---------|

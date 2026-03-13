@@ -62,7 +62,10 @@ export async function POST(req: Request) {
 
     // Verify the SIWE signature
     console.log("[auth/verify] Verifying SIWE signature...");
+    console.log("[auth/verify] Payload:", JSON.stringify(payload, null, 2));
+    console.log("[auth/verify] Signature:", signature);
     const domain = getDomainFromRequest(req);
+    console.log("[auth/verify] Domain:", domain);
     const auth = getThirdwebAuth(domain);
 
     let verifiedPayload;
@@ -77,8 +80,17 @@ export async function POST(req: Request) {
       );
     }
 
-    const address = verifiedPayload.address;
+    // Extract address from verified payload (nested at payload.address)
+    const address = verifiedPayload.payload?.address || verifiedPayload.address;
     console.log("[auth/verify] ✅ Signature verified for:", address);
+
+    if (!address) {
+      console.error("[auth/verify] No address found in verified payload");
+      return Response.json(
+        { error: "Invalid payload: no address found" },
+        { status: 400 }
+      );
+    }
 
     // 1. Determine role based on org ownership
     let orgs;

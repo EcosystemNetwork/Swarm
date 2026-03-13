@@ -72,6 +72,7 @@ export const TASK_BOARD_ABI = [
 export const AGENT_REGISTRY_ABI = [
   // Write functions
   "function registerAgent(string name, string skills, uint256 feeRate) external",
+  "function registerAgentFor(address agentAddress, string name, string skills, uint256 feeRate) external",
   "function updateSkills(string newSkills) external",
   "function deactivateAgent() external",
   // Read functions

@@ -33,40 +33,81 @@ const ENV_REQUIREMENTS: EnvRequirement[] = [
     example: "openssl rand -hex 32",
   },
 
-  // Critical - Firebase
+  // Critical - Firebase (Server-side)
   {
     key: "FIREBASE_API_KEY",
     required: true,
-    description: "Firebase API key",
+    description: "Firebase API key (server-side)",
   },
   {
     key: "FIREBASE_AUTH_DOMAIN",
     required: true,
     validate: (val) => val.includes("firebaseapp.com"),
-    description: "Firebase auth domain",
+    description: "Firebase auth domain (server-side)",
   },
   {
     key: "FIREBASE_PROJECT_ID",
     required: true,
-    description: "Firebase project ID",
+    description: "Firebase project ID (server-side)",
   },
   {
     key: "FIREBASE_APP_ID",
     required: true,
     validate: (val) => val.includes(":web:"),
-    description: "Firebase app ID",
+    description: "Firebase app ID (server-side)",
   },
 
-  // Optional - Firebase
+  // Optional - Firebase (Server-side)
   {
     key: "FIREBASE_STORAGE_BUCKET",
     required: false,
-    description: "Firebase storage bucket (optional)",
+    description: "Firebase storage bucket (server-side, optional)",
   },
   {
     key: "FIREBASE_MESSAGING_SENDER_ID",
     required: false,
-    description: "Firebase messaging sender ID (optional)",
+    description: "Firebase messaging sender ID (server-side, optional)",
+  },
+
+  // Critical - Firebase (Client-side / Public)
+  {
+    key: "NEXT_PUBLIC_FIREBASE_API_KEY",
+    required: true,
+    description: "Firebase API key (client-side)",
+  },
+  {
+    key: "NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN",
+    required: true,
+    validate: (val) => val.includes("firebaseapp.com"),
+    description: "Firebase auth domain (client-side)",
+  },
+  {
+    key: "NEXT_PUBLIC_FIREBASE_PROJECT_ID",
+    required: true,
+    description: "Firebase project ID (client-side)",
+  },
+  {
+    key: "NEXT_PUBLIC_FIREBASE_APP_ID",
+    required: true,
+    validate: (val) => val.includes(":web:"),
+    description: "Firebase app ID (client-side)",
+  },
+
+  // Optional - Firebase (Client-side)
+  {
+    key: "NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET",
+    required: false,
+    description: "Firebase storage bucket (client-side, optional)",
+  },
+  {
+    key: "NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID",
+    required: false,
+    description: "Firebase messaging sender ID (client-side, optional)",
+  },
+  {
+    key: "NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID",
+    required: false,
+    description: "Firebase measurement ID for analytics (client-side, optional)",
   },
 
   // Critical - Thirdweb
@@ -74,6 +115,11 @@ const ENV_REQUIREMENTS: EnvRequirement[] = [
     key: "NEXT_PUBLIC_THIRDWEB_CLIENT_ID",
     required: true,
     description: "Thirdweb client ID for wallet connection",
+  },
+  {
+    key: "THIRDWEB_SECRET_KEY",
+    required: false,
+    description: "Thirdweb secret key (server-side, optional for advanced features)",
   },
 
   // Optional - Platform Admin
