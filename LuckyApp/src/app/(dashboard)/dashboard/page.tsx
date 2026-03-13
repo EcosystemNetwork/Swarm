@@ -229,7 +229,6 @@ const DEFAULT_ACTIVE_WIDGETS = [
   "widget-llm-usage",
   "widget-agent-messages",
   "widget-agent-sessions",
-  "widget-coordinators",
 ];
 
 /* ------------------------------------------------------------------ */
