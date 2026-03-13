@@ -22,6 +22,11 @@
  *   swarm complete    <assignmentId> [--notes "..."]
  *   swarm assignments [--status pending] [--limit 20]
  *   swarm work-mode   [available|busy|offline|paused] [--capacity N] [--auto-accept] [--no-auto-accept]
+ *   swarm send-a2a    <agentId> "<payload>"
+ *   swarm send-coord  --coordinator <id> --action <action> "<payload>"
+ *   swarm create-session --coordinator <id> --participants <agent1,agent2> [--purpose "..."] [--ttl 60]
+ *   swarm list-sessions [--status active]
+ *   swarm close-session <sessionId> [--status completed|cancelled]
  */
 
 import crypto from "node:crypto";
@@ -1086,6 +1091,244 @@ async function cmdWorkMode() {
 }
 
 // ---------------------------------------------------------------------------
+// Structured Messaging Commands
+// ---------------------------------------------------------------------------
+
+async function cmdSendA2A() {
+  const config = loadConfig();
+  const { privateKey } = ensureKeypair();
+
+  const toAgentId = process.argv[3];
+  const payload = process.argv[4];
+
+  if (!toAgentId || !payload) {
+    console.error("Usage: swarm send-a2a <agentId> \"<payload>\"");
+    console.error("Example: swarm send-a2a agent_123 '{\"action\":\"analyze\",\"data\":\"file.txt\"}'");
+    process.exit(1);
+  }
+
+  // Parse payload as JSON if it looks like JSON
+  let parsedPayload;
+  try {
+    parsedPayload = JSON.parse(payload);
+  } catch {
+    parsedPayload = { message: payload };
+  }
+
+  const ts = Date.now().toString();
+  const message = `POST:/v1/messaging:${ts}`;
+  const sig = sign(message, privateKey);
+
+  const resp = await fetch(
+    `${config.hubUrl}/api/v1/messaging?agent=${config.agentId}&sig=${encodeURIComponent(sig)}&ts=${ts}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        messageType: "a2a",
+        to: toAgentId,
+        payload: parsedPayload,
+      }),
+    }
+  );
+
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({}));
+    console.error(`Send a2a failed: ${err.error}`);
+    process.exit(1);
+  }
+
+  const data = await resp.json();
+  console.log(`✓ A2A message sent`);
+  console.log(`  Message ID: ${data.messageId}`);
+  console.log(`  To: ${toAgentId}`);
+}
+
+async function cmdSendCoord() {
+  const config = loadConfig();
+  const { privateKey } = ensureKeypair();
+
+  const coordinatorId = arg("--coordinator");
+  const action = arg("--action");
+  const payload = process.argv[3];
+
+  if (!coordinatorId || !action || !payload) {
+    console.error("Usage: swarm send-coord --coordinator <coordId> --action <action> \"<payload>\"");
+    console.error("Example: swarm send-coord --coordinator coord_123 --action execute '{\"task\":\"analyze\"}'");
+    process.exit(1);
+  }
+
+  // Parse payload as JSON if it looks like JSON
+  let parsedPayload;
+  try {
+    parsedPayload = JSON.parse(payload);
+  } catch {
+    parsedPayload = { message: payload };
+  }
+
+  const ts = Date.now().toString();
+  const message = `POST:/v1/messaging:${ts}`;
+  const sig = sign(message, privateKey);
+
+  const resp = await fetch(
+    `${config.hubUrl}/api/v1/messaging?agent=${config.agentId}&sig=${encodeURIComponent(sig)}&ts=${ts}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        messageType: "coord",
+        coordinatorId,
+        action,
+        payload: parsedPayload,
+      }),
+    }
+  );
+
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({}));
+    console.error(`Send coord failed: ${err.error}`);
+    process.exit(1);
+  }
+
+  const data = await resp.json();
+  console.log(`✓ Coordinator message sent`);
+  console.log(`  Message ID: ${data.messageId}`);
+  console.log(`  Coordinator: ${coordinatorId}`);
+  console.log(`  Action: ${action}`);
+}
+
+async function cmdCreateSession() {
+  const config = loadConfig();
+  const { privateKey } = ensureKeypair();
+
+  const coordinatorId = arg("--coordinator");
+  const participantsStr = arg("--participants");
+  const purpose = arg("--purpose");
+  const ttlMinutes = arg("--ttl");
+
+  if (!coordinatorId || !participantsStr) {
+    console.error("Usage: swarm create-session --coordinator <coordId> --participants <agent1,agent2> [--purpose \"...\"] [--ttl 60]");
+    process.exit(1);
+  }
+
+  const participants = participantsStr.split(",").map((p) => p.trim());
+
+  const ts = Date.now().toString();
+  const message = `POST:/v1/sessions:${ts}`;
+  const sig = sign(message, privateKey);
+
+  const resp = await fetch(
+    `${config.hubUrl}/api/v1/sessions?agent=${config.agentId}&sig=${encodeURIComponent(sig)}&ts=${ts}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        coordinatorId,
+        participants,
+        purpose: purpose || "Multi-step workflow",
+        ttlMinutes: ttlMinutes ? parseInt(ttlMinutes, 10) : 60,
+      }),
+    }
+  );
+
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({}));
+    console.error(`Create session failed: ${err.error}`);
+    process.exit(1);
+  }
+
+  const data = await resp.json();
+  console.log(`✓ Session created`);
+  console.log(`  Session ID: ${data.sessionId}`);
+  console.log(`  Coordinator: ${coordinatorId}`);
+  console.log(`  Participants: ${data.participants.join(", ")}`);
+  console.log(`  Expires: ${new Date(data.expiresAt).toISOString()}`);
+}
+
+async function cmdListSessions() {
+  const config = loadConfig();
+  const { privateKey } = ensureKeypair();
+
+  const status = arg("--status") || "active";
+
+  const ts = Date.now().toString();
+  const message = `GET:/v1/sessions:${config.agentId}:${ts}`;
+  const sig = sign(message, privateKey);
+
+  const resp = await fetch(
+    `${config.hubUrl}/api/v1/sessions?agent=${config.agentId}&sig=${encodeURIComponent(sig)}&ts=${ts}&status=${status}`
+  );
+
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({}));
+    console.error(`List sessions failed: ${err.error}`);
+    process.exit(1);
+  }
+
+  const data = await resp.json();
+
+  if (data.sessions.length === 0) {
+    console.log(`No ${status} sessions found.`);
+    return;
+  }
+
+  console.log(`Sessions (${data.sessions.length}):\n`);
+  for (const session of data.sessions) {
+    console.log(`  [${session.status}] ${session.id}`);
+    console.log(`     Purpose: ${session.purpose}`);
+    console.log(`     Coordinator: ${session.coordinatorId}`);
+    console.log(`     Participants: ${session.participants.join(", ")}`);
+    console.log(`     Messages: ${session.messageCount}`);
+    console.log(`     Created: ${new Date(session.createdAt).toISOString()}`);
+    if (session.expiresAt) {
+      console.log(`     Expires: ${new Date(session.expiresAt).toISOString()}`);
+    }
+    console.log();
+  }
+}
+
+async function cmdCloseSession() {
+  const config = loadConfig();
+  const { privateKey } = ensureKeypair();
+
+  const sessionId = process.argv[3];
+  const status = arg("--status") || "completed";
+
+  if (!sessionId) {
+    console.error("Usage: swarm close-session <sessionId> [--status completed|cancelled]");
+    process.exit(1);
+  }
+
+  if (!["completed", "cancelled"].includes(status)) {
+    console.error("Status must be: completed, cancelled");
+    process.exit(1);
+  }
+
+  const ts = Date.now().toString();
+  const message = `PATCH:/v1/sessions:${ts}`;
+  const sig = sign(message, privateKey);
+
+  const resp = await fetch(
+    `${config.hubUrl}/api/v1/sessions/${sessionId}?agent=${config.agentId}&sig=${encodeURIComponent(sig)}&ts=${ts}`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status }),
+    }
+  );
+
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({}));
+    console.error(`Close session failed: ${err.error}`);
+    process.exit(1);
+  }
+
+  const data = await resp.json();
+  console.log(`✓ Session ${status}`);
+  console.log(`  Session ID: ${data.sessionId}`);
+}
+
+// ---------------------------------------------------------------------------
 // Router
 // ---------------------------------------------------------------------------
 
@@ -1106,6 +1349,11 @@ try {
   else if (cmd === "complete") await cmdComplete();
   else if (cmd === "assignments") await cmdAssignments();
   else if (cmd === "work-mode") await cmdWorkMode();
+  else if (cmd === "send-a2a") await cmdSendA2A();
+  else if (cmd === "send-coord") await cmdSendCoord();
+  else if (cmd === "create-session") await cmdCreateSession();
+  else if (cmd === "list-sessions") await cmdListSessions();
+  else if (cmd === "close-session") await cmdCloseSession();
   else {
     console.log(`@swarmprotocol/agent-skill — Sandbox-safe Swarm agent
 
@@ -1126,6 +1374,13 @@ Task Assignment Commands:
   complete    <assignmentId> [--notes "..."]             — mark assignment as completed
   assignments [--status pending] [--limit 20]            — list your assignments
   work-mode   [available|busy|offline|paused] [--capacity N] [--auto-accept]  — manage work mode
+
+Structured Messaging Commands:
+  send-a2a       <agentId> "<payload>"                   — send agent-to-agent message (JSON payload)
+  send-coord     --coordinator <id> --action <action> "<payload>"  — send coordinator message
+  create-session --coordinator <id> --participants <agent1,agent2> [--purpose "..."] [--ttl 60]  — create workflow session
+  list-sessions  [--status active]                       — list agent sessions
+  close-session  <sessionId> [--status completed|cancelled]  — close a session
 
 Auth:
   Ed25519 keypair generated on first run.

@@ -13,6 +13,7 @@ import {
   isPubSubHealthy,
   INSTANCE_ID,
 } from "./pubsub-client.mjs";
+import { routeMessage } from "./message-router.mjs";
 
 /**
  * SECURITY NOTE: This hub currently uses the Firebase client SDK instead of
@@ -828,6 +829,54 @@ wss.on("connection", async (ws, _req) => {
     }
 
     const { type, channelId, content } = msg;
+
+    // ── Structured Agent Messages (a2a, coord, broadcast, session) ──────────
+    if (["a2a", "coord", "broadcast", "session"].includes(type)) {
+      try {
+        // Ensure message has required fields
+        msg.orgId = msg.orgId || orgId;
+        msg.from = msg.from || agentId;
+        msg.fromName = msg.fromName || agentName;
+        msg.id = msg.id || crypto.randomUUID();
+        msg.timestamp = msg.timestamp || Date.now();
+
+        const result = await routeMessage(
+          db,
+          msg,
+          broadcastToAgent,
+          broadcastToChannel,
+          log
+        );
+
+        ws.send(JSON.stringify({
+          type: `${type}:sent`,
+          messageId: msg.id,
+          success: result.success,
+          deliveredVia: result.deliveredVia,
+          ts: Date.now(),
+        }));
+
+        log("info", `Structured message ${type}`, {
+          messageId: msg.id,
+          from: agentId,
+          deliveredVia: result.deliveredVia,
+        });
+
+        return;
+      } catch (err) {
+        ws.send(JSON.stringify({
+          type: "error",
+          error: `Failed to route ${type} message: ${err.message}`,
+          code: "ROUTING_FAILED",
+        }));
+        log("error", `Structured message routing failed`, {
+          type,
+          from: agentId,
+          error: err.message,
+        });
+        return;
+      }
+    }
 
     // Subscribe/unsubscribe
     if (type === "subscribe" && channelId) {

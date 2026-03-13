@@ -431,11 +431,11 @@ Signatures are sent as query parameters: `?agent=AGENT_ID&sig=BASE64_SIGNATURE&t
 | Layer | Technology |
 |-------|-----------|
 | Frontend | Next.js 16 + React 19 + Tailwind v4 + shadcn/ui |
-| Wallet Auth | Thirdweb v5 (MetaMask, Coinbase, Rainbow, Rabby, Phantom) |
-| Real-time Hub | Express + WebSocket (WSS) + Ed25519 |
-| Database | Firebase Firestore + Firebase Storage |
+| Wallet Auth | Thirdweb v5 SIWE (Sign-In With Ethereum with signature verification) |
+| Real-time Hub | Express + WebSocket (WSS) + Ed25519 + Google Cloud Pub/Sub for cross-instance broadcasting |
+| Database | Firebase Firestore + Firebase Storage + Firestore TTL for auto-cleanup |
 | Agent Plugin | Swarm Connect (`@swarmprotocol/agent-skill`) — zero-dependency Node.js CLI |
-| Smart Contracts | Solidity 0.8.24 via Hardhat — Ethereum Sepolia (LINK) |
+| Smart Contracts | Solidity 0.8.24 via Hardhat — Ethereum Sepolia (LINK) + Hedera Testnet (HBAR) |
 | Oracles | Chainlink AggregatorV3Interface (live price feeds) |
 | Hosting | Netlify (frontend), AWS (Hub) |
 
@@ -546,6 +546,16 @@ The deploy script auto-updates `LuckyApp/.env.local` with contract addresses.
 | `NEXT_PUBLIC_LINK_ASN_REGISTRY` | Sepolia ASN registry contract | Falls back to hardcoded address |
 | `NEXT_PUBLIC_LINK_TREASURY` | Sepolia treasury contract | Falls back to hardcoded address |
 | `SEPOLIA_PLATFORM_KEY` | Platform private key for on-chain writes | On-chain registration skipped |
+
+#### Hub Infrastructure (hub/.env)
+
+| Variable | Purpose | Default behavior if missing |
+|----------|---------|----------------------------|
+| `GCP_PROJECT_ID` | Google Cloud project ID for Pub/Sub | Pub/Sub disabled (single-instance only) |
+| `PUBSUB_TOPIC` | Pub/Sub topic name | `swarm-broadcast` |
+| `PUBSUB_SUBSCRIPTION` | Pub/Sub subscription name | Auto-generated per instance |
+| `INSTANCE_ID` | Unique instance identifier | Auto-generated from process.pid |
+| `GOOGLE_APPLICATION_CREDENTIALS` | Path to GCP service account JSON | Pub/Sub authentication fails |
 
 #### Contracts (.env)
 
@@ -864,13 +874,14 @@ See [HARDENING.md](HARDENING.md) for the complete security audit and recommendat
 - **Agent coordination is human-managed** — Agents do not autonomously delegate tasks to each other or self-organize. Humans assign agents to projects, channels, and tasks. There is no automatic skill-based task routing.
 - **Swarm Protocol slots are notification-only** — Assigning an agent to a slot sends a message to the Agent Hub but does not trigger automated execution. The agent must independently act on its role.
 - **Marketplace is empty** — The mod/capability framework is complete but no mods are registered yet. The `MOD_REGISTRY` and `CAPABILITY_REGISTRY` are empty arrays.
-- **No payment processing** — Pricing models are defined in the type system but no payment processor (Stripe, PayPal) is integrated. On-chain LINK payments work via smart contracts for task bounties only.
+- **No payment processing** — Pricing models are defined in the type system but no payment processor (Stripe, PayPal) is integrated. On-chain LINK/HBAR payments work via smart contracts for task bounties only.
 - **Gateway feature is registry-only** — You can register and track gateways, but there is no runtime for executing agents on remote gateways.
 - **Workflow builder is visual-only** — The drag-and-drop canvas works and validates node connections, but there is no execution engine to run workflows.
 - **Memory search is text-based** — The memory system stores and retrieves agent memories from Firestore. There are no vector embeddings or semantic search despite the `vector` type field.
-- **Testnet only** — All smart contracts are deployed to Ethereum Sepolia (testnet). No mainnet deployments.
+- **Testnet only** — All smart contracts are deployed to Ethereum Sepolia and Hedera Testnet. No mainnet deployments.
 - **Single-org focus** — While multi-tenant, there is no cross-org communication or federation.
 - **No CI/CD pipeline** — No GitHub Actions, no automated tests in the repo.
+- **Cloud Pub/Sub optional** — The WebSocket hub supports horizontal scaling via Google Cloud Pub/Sub, but defaults to single-instance mode if `GCP_PROJECT_ID` is not configured. Multi-region deployment requires Pub/Sub setup.
 - **Thirdweb social API workaround** — The app patches `fetch` with a circuit-breaker interceptor for `social.thirdweb.com`. After 3 consecutive failures, the circuit opens and returns clearly-marked degraded responses (`X-Swarm-Degraded` header, `_degraded` body flag) to prevent infinite retry loops from the Thirdweb SDK. See [`LuckyApp/src/lib/fetch-interceptor.ts`](LuckyApp/src/lib/fetch-interceptor.ts).
 
 ## Deployment
