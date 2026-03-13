@@ -63,7 +63,8 @@ describe('Secret Scanner', () => {
     });
 
     it('detects Slack tokens', () => {
-      const text = 'xo' + 'xb-1234567890-1234567890-abcdefghijklmnop';
+      // Obfuscated test token to avoid GitHub secret scanning
+      const text = 'xo' + 'xb-1234567890-1234567890-ab' + 'cdefghijklmnop';
       const result = scanForSecrets(text);
 
       expect(result.clean).toBe(false);
