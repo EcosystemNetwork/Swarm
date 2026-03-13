@@ -625,7 +625,7 @@ export default function DashboardPage() {
       colSpan: "lg:col-span-2",
       render: () => (
         <SpotlightCard className="p-0 glass-card-enhanced h-full overflow-hidden">
-          <CardHeader className="flex flex-row items-center justify-between px-4 pt-4 pb-2">
+          <CardHeader className="flex flex-row items-center justify-between px-2 pt-2 pb-1">
             <CardTitle className="text-sm">
               📋 <DecryptedText text="Recent Tasks" speed={30} maxIterations={6} animateOn="view" sequential className="text-sm font-semibold" encryptedClassName="text-sm font-semibold text-amber-500/40" />
             </CardTitle>
@@ -633,7 +633,7 @@ export default function DashboardPage() {
               <ShinyText text="View all →" speed={3} color="#b5954a" shineColor="#FFD700" className="text-xs" />
             </Link>
           </CardHeader>
-          <CardContent className="space-y-1.5 px-3 pb-3">
+          <CardContent className="space-y-0.5 px-2 pb-2">
             {recentTasks.length === 0 ? (
               <div className="text-center py-4 text-muted-foreground">
                 <p>No tasks yet</p>
@@ -669,7 +669,7 @@ export default function DashboardPage() {
       colSpan: "lg:col-span-2",
       render: () => (
         <SpotlightCard className="p-0 glass-card-enhanced h-full overflow-hidden">
-          <CardHeader className="flex flex-row items-center justify-between px-4 pt-4 pb-2">
+          <CardHeader className="flex flex-row items-center justify-between px-2 pt-2 pb-1">
             <CardTitle className="text-sm">
               💼 <DecryptedText text="Recent Jobs" speed={30} maxIterations={6} animateOn="view" sequential className="text-sm font-semibold" encryptedClassName="text-sm font-semibold text-amber-500/40" />
             </CardTitle>
@@ -677,7 +677,7 @@ export default function DashboardPage() {
               <ShinyText text="View all →" speed={3} color="#b5954a" shineColor="#FFD700" className="text-xs" />
             </Link>
           </CardHeader>
-          <CardContent className="space-y-1.5 px-3 pb-3">
+          <CardContent className="space-y-0.5 px-2 pb-2">
             {recentJobs.length === 0 ? (
               <div className="text-center py-4 text-muted-foreground">
                 <p>No jobs posted yet</p>
@@ -714,12 +714,12 @@ export default function DashboardPage() {
       colSpan: "",
       render: () => (
         <SpotlightCard className="p-0 glass-card-enhanced h-full overflow-hidden">
-          <CardHeader className="px-4 pt-4 pb-2">
+          <CardHeader className="px-2 pt-2 pb-1">
             <CardTitle className="text-sm">
               ⚡ <DecryptedText text="Quick Actions" speed={30} maxIterations={6} animateOn="view" sequential className="text-sm font-semibold" encryptedClassName="text-sm font-semibold text-amber-500/40" />
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-1 px-3 pb-3">
+          <CardContent className="space-y-1 px-2 pb-2">
             <Button asChild className="w-full btn-glow" variant="outline">
               <Link href="/swarms">📁 Create Project</Link>
             </Button>
@@ -744,12 +744,12 @@ export default function DashboardPage() {
       colSpan: "",
       render: () => (
         <SpotlightCard className="p-0 glass-card-enhanced h-full overflow-hidden">
-          <CardHeader className="px-4 pt-4 pb-2">
+          <CardHeader className="px-2 pt-2 pb-1">
             <CardTitle className="text-sm">
               🏢 <DecryptedText text="Organization" speed={30} maxIterations={6} animateOn="view" sequential className="text-sm font-semibold" encryptedClassName="text-sm font-semibold text-amber-500/40" />
             </CardTitle>
           </CardHeader>
-          <CardContent className="px-3 pb-3">
+          <CardContent className="px-2 pb-2">
             <div className="space-y-2">
               <div className="flex items-center gap-2">
                 {currentOrg?.logoUrl ? (
@@ -776,7 +776,7 @@ export default function DashboardPage() {
       colSpan: "lg:col-span-3",
       render: () => (
         <SpotlightCard className="p-0 glass-card-enhanced h-full overflow-hidden">
-          <CardHeader className="flex flex-row items-center justify-between px-4 pt-4 pb-2">
+          <CardHeader className="flex flex-row items-center justify-between px-2 pt-2 pb-1">
             <CardTitle className="text-sm">
               📜 <DecryptedText text="Activity Feed" speed={30} maxIterations={6} animateOn="view" sequential className="text-sm font-semibold" encryptedClassName="text-sm font-semibold text-amber-500/40" />
             </CardTitle>
@@ -784,7 +784,7 @@ export default function DashboardPage() {
               <ShinyText text="View all →" speed={3} color="#b5954a" shineColor="#FFD700" className="text-xs" />
             </Link>
           </CardHeader>
-          <CardContent className="space-y-1 px-3 pb-3">
+          <CardContent className="space-y-1 px-2 pb-2">
             {activityFeed.length === 0 ? (
               <div className="text-center py-4 text-muted-foreground">
                 <p>No activity yet</p>
@@ -832,12 +832,12 @@ export default function DashboardPage() {
         const total = agents.length;
         return (
           <SpotlightCard className="p-0 glass-card-enhanced h-full overflow-hidden">
-            <CardHeader className="px-3 pt-3 pb-1">
+            <CardHeader className="px-2 pt-2 pb-1">
               <CardTitle className="text-sm">
                 🟢 <DecryptedText text="Agent Status" speed={30} maxIterations={6} animateOn="view" sequential className="text-sm font-semibold" encryptedClassName="text-sm font-semibold text-amber-500/40" />
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-2 px-3 pb-3">
+            <CardContent className="space-y-2 px-2 pb-2">
               {total === 0 ? (
                 <div className="text-center py-4 text-muted-foreground">
                   <p>No agents registered</p>
@@ -888,12 +888,12 @@ export default function DashboardPage() {
 
         return (
           <SpotlightCard className="p-0 glass-card-enhanced h-full overflow-hidden">
-            <CardHeader className="px-3 pt-3 pb-1">
+            <CardHeader className="px-2 pt-2 pb-1">
               <CardTitle className="text-sm">
                 📈 <DecryptedText text="Task Breakdown" speed={30} maxIterations={6} animateOn="view" sequential className="text-sm font-semibold" encryptedClassName="text-sm font-semibold text-amber-500/40" />
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-2 px-3 pb-3">
+            <CardContent className="space-y-2 px-2 pb-2">
               {total === 0 ? (
                 <div className="text-center py-4 text-muted-foreground">
                   <p>No tasks yet</p>
@@ -982,10 +982,10 @@ export default function DashboardPage() {
         if (!userAgent || !currentOrg) {
           return (
             <SpotlightCard className="p-0 glass-card-enhanced h-full overflow-hidden">
-              <CardHeader className="px-4 pt-4 pb-2">
+              <CardHeader className="px-2 pt-2 pb-1">
                 <CardTitle className="text-sm">💬 Agent Messages</CardTitle>
               </CardHeader>
-              <CardContent className="px-3 pb-3">
+              <CardContent className="px-2 pb-2">
                 <div className="text-center py-4 text-muted-foreground">
                   <p className="text-sm">Register as an agent to view messages</p>
                   <Button asChild variant="outline" size="sm" className="mt-2">
@@ -1007,10 +1007,10 @@ export default function DashboardPage() {
         if (!userAgent || !currentOrg) {
           return (
             <SpotlightCard className="p-0 glass-card-enhanced h-full overflow-hidden">
-              <CardHeader className="px-4 pt-4 pb-2">
+              <CardHeader className="px-2 pt-2 pb-1">
                 <CardTitle className="text-sm">🔄 Agent Sessions</CardTitle>
               </CardHeader>
-              <CardContent className="px-3 pb-3">
+              <CardContent className="px-2 pb-2">
                 <div className="text-center py-4 text-muted-foreground">
                   <p className="text-sm">Register as an agent to view sessions</p>
                   <Button asChild variant="outline" size="sm" className="mt-2">
@@ -1042,12 +1042,12 @@ export default function DashboardPage() {
         if (!briefingAgent) {
           return (
             <SpotlightCard className="p-0 glass-card-enhanced h-full overflow-hidden">
-              <CardHeader className="px-3 pt-3 pb-1">
+              <CardHeader className="px-2 pt-2 pb-1">
                 <CardTitle className="text-sm">
                   📋 <DecryptedText text="Daily Briefing" speed={30} maxIterations={6} animateOn="view" sequential className="text-sm font-semibold" encryptedClassName="text-sm font-semibold text-amber-500/40" />
                 </CardTitle>
               </CardHeader>
-              <CardContent className="px-3 pb-3">
+              <CardContent className="px-2 pb-2">
                 <div className="text-center py-4 space-y-2">
                   <div className="text-4xl opacity-30">📋</div>
                   <p className="text-sm text-muted-foreground">No agent assigned to Daily Briefings</p>
@@ -1074,7 +1074,7 @@ export default function DashboardPage() {
 
         return (
           <SpotlightCard className="p-0 glass-card-enhanced h-full overflow-hidden">
-            <CardHeader className="flex flex-row items-center justify-between px-3 pt-3 pb-1">
+            <CardHeader className="flex flex-row items-center justify-between px-2 pt-2 pb-1">
               <CardTitle className="text-sm">
                 📋 <DecryptedText text="Daily Briefing" speed={30} maxIterations={6} animateOn="view" sequential className="text-sm font-semibold" encryptedClassName="text-sm font-semibold text-amber-500/40" />
               </CardTitle>
@@ -1082,7 +1082,7 @@ export default function DashboardPage() {
                 <ShinyText text="Swarm →" speed={3} color="#b5954a" shineColor="#FFD700" className="text-xs" />
               </Link>
             </CardHeader>
-            <CardContent className="px-3 pb-3 space-y-2">
+            <CardContent className="px-2 pb-2 space-y-2">
               {/* Agent badge */}
               <div className="flex items-center gap-3 p-3 rounded-lg bg-amber-500/5 border border-amber-500/10">
                 <img
@@ -1182,10 +1182,10 @@ export default function DashboardPage() {
       colSpan: "lg:col-span-2",
       render: () => (
         <SpotlightCard className="p-0 glass-card-enhanced h-full overflow-hidden">
-          <CardHeader className="px-4 pt-4 pb-2">
+          <CardHeader className="px-2 pt-2 pb-1">
             <CardTitle className="text-sm">⚡ Performance Metrics</CardTitle>
           </CardHeader>
-          <CardContent className="px-3 pb-3">
+          <CardContent className="px-2 pb-2">
             <div className="space-y-3">
               <div className="flex items-center justify-between p-2 rounded bg-muted/30">
                 <span className="text-xs text-muted-foreground">Avg Response Time</span>
@@ -1219,10 +1219,10 @@ export default function DashboardPage() {
 
         return (
           <SpotlightCard className="p-0 glass-card-enhanced h-full overflow-hidden">
-            <CardHeader className="px-4 pt-4 pb-2">
+            <CardHeader className="px-2 pt-2 pb-1">
               <CardTitle className="text-sm">🏆 Top Performers</CardTitle>
             </CardHeader>
-            <CardContent className="px-3 pb-3">
+            <CardContent className="px-2 pb-2">
               {sortedAgents.length === 0 ? (
                 <div className="text-center py-4 text-muted-foreground text-xs">No completed tasks yet</div>
               ) : (
@@ -1249,10 +1249,10 @@ export default function DashboardPage() {
         const trend = -0.3;
         return (
           <SpotlightCard className="p-0 glass-card-enhanced h-full overflow-hidden">
-            <CardHeader className="px-4 pt-4 pb-2">
+            <CardHeader className="px-2 pt-2 pb-1">
               <CardTitle className="text-sm">⚠️ Error Rate</CardTitle>
             </CardHeader>
-            <CardContent className="px-3 pb-3">
+            <CardContent className="px-2 pb-2">
               <div className="space-y-2">
                 <div className="text-center">
                   <div className="text-3xl font-bold text-orange-400">{errorRate}%</div>
@@ -1285,10 +1285,10 @@ export default function DashboardPage() {
         const avgTime = "2.4h"; // Mock data
         return (
           <SpotlightCard className="p-0 glass-card-enhanced h-full overflow-hidden">
-            <CardHeader className="px-4 pt-4 pb-2">
+            <CardHeader className="px-2 pt-2 pb-1">
               <CardTitle className="text-sm">⏱️ Avg Completion</CardTitle>
             </CardHeader>
-            <CardContent className="px-3 pb-3">
+            <CardContent className="px-2 pb-2">
               <div className="space-y-2">
                 <div className="text-center">
                   <div className="text-3xl font-bold text-blue-400">{avgTime}</div>
@@ -1323,10 +1323,10 @@ export default function DashboardPage() {
 
         return (
           <SpotlightCard className="p-0 glass-card-enhanced h-full overflow-hidden">
-            <CardHeader className="px-4 pt-4 pb-2">
+            <CardHeader className="px-2 pt-2 pb-1">
               <CardTitle className="text-sm">🚨 Alert Center</CardTitle>
             </CardHeader>
-            <CardContent className="px-3 pb-3">
+            <CardContent className="px-2 pb-2">
               {alerts.length === 0 ? (
                 <div className="text-center py-4 text-muted-foreground text-xs">No active alerts</div>
               ) : (
@@ -1352,10 +1352,10 @@ export default function DashboardPage() {
       colSpan: "lg:col-span-2",
       render: () => (
         <SpotlightCard className="p-0 glass-card-enhanced h-full overflow-hidden">
-          <CardHeader className="px-4 pt-4 pb-2">
+          <CardHeader className="px-2 pt-2 pb-1">
             <CardTitle className="text-sm">📈 Capacity Planning</CardTitle>
           </CardHeader>
-          <CardContent className="px-3 pb-3">
+          <CardContent className="px-2 pb-2">
             <div className="space-y-3">
               <div>
                 <div className="flex justify-between text-xs mb-1">
@@ -1401,10 +1401,10 @@ export default function DashboardPage() {
 
         return (
           <SpotlightCard className="p-0 glass-card-enhanced h-full overflow-hidden">
-            <CardHeader className="px-4 pt-4 pb-2">
+            <CardHeader className="px-2 pt-2 pb-1">
               <CardTitle className="text-sm">🚀 Deployments</CardTitle>
             </CardHeader>
-            <CardContent className="px-3 pb-3">
+            <CardContent className="px-2 pb-2">
               {deployments.length === 0 ? (
                 <div className="text-center py-4 text-muted-foreground text-xs">No recent deployments</div>
               ) : (
@@ -1436,10 +1436,10 @@ export default function DashboardPage() {
 
         return (
           <SpotlightCard className="p-0 glass-card-enhanced h-full overflow-hidden">
-            <CardHeader className="px-4 pt-4 pb-2">
+            <CardHeader className="px-2 pt-2 pb-1">
               <CardTitle className="text-sm">❤️ System Health</CardTitle>
             </CardHeader>
-            <CardContent className="px-3 pb-3">
+            <CardContent className="px-2 pb-2">
               <div className="space-y-2">
                 {services.map((service, i) => (
                   <div key={i} className="flex items-center justify-between text-xs">
@@ -1461,10 +1461,10 @@ export default function DashboardPage() {
       colSpan: "",
       render: () => (
         <SpotlightCard className="p-0 glass-card-enhanced h-full overflow-hidden">
-          <CardHeader className="px-4 pt-4 pb-2">
+          <CardHeader className="px-2 pt-2 pb-1">
             <CardTitle className="text-sm">🔒 Rate Limits</CardTitle>
           </CardHeader>
-          <CardContent className="px-3 pb-3">
+          <CardContent className="px-2 pb-2">
             <div className="space-y-3">
               <div>
                 <div className="flex justify-between text-xs mb-1">
@@ -1506,13 +1506,13 @@ export default function DashboardPage() {
 
         return (
           <SpotlightCard className="p-0 glass-card-enhanced h-full overflow-hidden">
-            <CardHeader className="flex flex-row items-center justify-between px-4 pt-4 pb-2">
+            <CardHeader className="flex flex-row items-center justify-between px-2 pt-2 pb-1">
               <CardTitle className="text-sm">📝 Audit Log</CardTitle>
               <Link href="/activity" className="text-xs">
                 <ShinyText text="View all →" speed={3} color="#b5954a" shineColor="#FFD700" className="text-xs" />
               </Link>
             </CardHeader>
-            <CardContent className="px-3 pb-3">
+            <CardContent className="px-2 pb-2">
               {auditEvents.length === 0 ? (
                 <div className="text-center py-4 text-muted-foreground text-xs">No audit events</div>
               ) : (
@@ -1567,7 +1567,7 @@ export default function DashboardPage() {
           <p className="text-muted-foreground text-xs">{currentOrg.name}</p>
         </div>
         {/* Skeleton grid matching widget layout */}
-        <div className="grid gap-1 grid-cols-2 md:grid-cols-4 lg:grid-cols-6 grid-flow-row-dense auto-rows-auto">
+        <div className="grid gap-0.5 grid-cols-2 md:grid-cols-4 lg:grid-cols-6 grid-flow-row-dense auto-rows-auto">
           {/* Briefing skeleton — 3 cols */}
           <div className="col-span-2 md:col-span-3 lg:col-span-3 h-40 rounded-lg bg-muted/30 animate-pulse" />
           {/* 6 stat card skeletons */}
@@ -1621,12 +1621,12 @@ export default function DashboardPage() {
   /* ── Render ── */
 
   return (
-    <div className="space-y-1">
+    <div className="space-y-0.5">
       {/* Dashboard header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between mb-1">
         <div>
-          <h1 className="text-xl font-bold tracking-tight leading-tight">{greeting}</h1>
-          <p className="text-muted-foreground text-xs">{currentOrg.name}</p>
+          <h1 className="text-lg font-bold tracking-tight leading-tight">{greeting}</h1>
+          <p className="text-muted-foreground text-[10px]">{currentOrg.name}</p>
         </div>
         <div className="flex items-center gap-3">
           {lastUpdated && (
@@ -1655,12 +1655,12 @@ export default function DashboardPage() {
           <TabsTrigger value="swarm">Agent Map</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="overview" className="mt-1">
+        <TabsContent value="overview" className="mt-0">
           <div>
 
             {/* ═══ Draggable Main Widgets ═══ */}
             {widgetOrder.length > 0 && (
-              <div className="grid gap-1 grid-cols-2 md:grid-cols-4 lg:grid-cols-6 grid-flow-row-dense auto-rows-auto">
+              <div className="grid gap-0.5 grid-cols-2 md:grid-cols-4 lg:grid-cols-6 grid-flow-row-dense auto-rows-auto">
                 {widgetOrder.map((id, index) => {
                   const widget = widgetRenderers[id];
                   if (!widget) return null;
