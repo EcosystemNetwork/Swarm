@@ -31,7 +31,7 @@ function LandingPageContent() {
   const canvasRefs = useRef<(HTMLCanvasElement | null)[]>([]);
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
-  const { authenticated } = useSession();
+  const { authenticated, loading } = useSession();
   const authConfig = useThirdwebAuth();
 
   useEffect(() => setMounted(true), []);
@@ -39,10 +39,10 @@ function LandingPageContent() {
   // Extract redirect URL early to avoid dependency issues
   const redirectUrl = searchParams.get('redirect') || '/dashboard';
 
-  // If already authenticated, redirect to dashboard
+  // If already authenticated, redirect to dashboard (only after loading completes)
   useEffect(() => {
-    debug.log("[Swarm:Landing] Auth state changed:", authenticated);
-    if (authenticated) {
+    debug.log("[Swarm:Landing] Auth state changed:", { authenticated, loading });
+    if (authenticated && !loading) {
       debug.log("[Swarm:Landing] Authenticated! Redirecting to:", redirectUrl);
       const timer = setTimeout(() => {
         debug.log("[Swarm:Landing] Executing redirect...");
@@ -50,7 +50,7 @@ function LandingPageContent() {
       }, 300);
       return () => clearTimeout(timer);
     }
-  }, [authenticated, router, redirectUrl]);
+  }, [authenticated, loading, router, redirectUrl]);
 
   const handleRobotLoad = (index: number) => (spline: any) => {
     canvasRefs.current[index] = spline.canvas ?? spline._canvas ?? null;
