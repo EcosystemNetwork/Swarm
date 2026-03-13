@@ -33,6 +33,7 @@ export default function CoordinatorDashboardWidget({
 }: CoordinatorDashboardWidgetProps) {
   const [coordinators, setCoordinators] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<'all' | 'available' | 'busy'>('all');
 
   useEffect(() => {
@@ -65,15 +66,28 @@ export default function CoordinatorDashboardWidget({
       );
     }
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const coords = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-        registeredAt: doc.data().registeredAt?.toMillis(),
-      }));
-      setCoordinators(coords);
-      setLoading(false);
-    });
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        const coords = snapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+          registeredAt: doc.data().registeredAt?.toMillis(),
+        }));
+        setCoordinators(coords);
+        setLoading(false);
+        setError(null);
+      },
+      (err) => {
+        console.error('[CoordinatorWidget] Firestore error:', err);
+        setLoading(false);
+        if (err.message?.includes('index')) {
+          setError('Database index required. This widget is temporarily unavailable.');
+        } else {
+          setError('Failed to load coordinators');
+        }
+      }
+    );
 
     return () => unsubscribe();
   }, [orgId, projectId, channelId]);
@@ -90,6 +104,20 @@ export default function CoordinatorDashboardWidget({
   const availableCount = coordinators.filter(
     (c) => (c.currentLoad || 0) < (c.maxConcurrentTasks || 10)
   ).length;
+
+  if (error) {
+    return (
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+        <div className="text-center py-4">
+          <div className="text-3xl mb-2">⚠️</div>
+          <p className="text-sm text-muted-foreground mb-2">{error}</p>
+          <p className="text-xs text-muted-foreground/60">
+            Remove this widget or contact your administrator
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   if (loading) {
     return (
