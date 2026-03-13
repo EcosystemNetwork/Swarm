@@ -1165,7 +1165,7 @@ export default function DashboardPage() {
     "widget-cost-trend": {
       label: "Cost Trends",
       colSpan: "lg:col-span-2",
-      render: () => <CostTrendChart dailyCosts={[]} />,
+      render: () => <CostTrendChart data={dailyCosts} />,
     },
     "widget-agent-workload": {
       label: "Agent Workload",
