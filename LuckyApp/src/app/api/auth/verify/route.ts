@@ -5,34 +5,27 @@
  * Returns: { success: true, session: { address, role } }
  * Sets: httpOnly cookie `swarm_session`
  */
-import { NextResponse } from "next/server";
 import {
   resolveRole,
   createSession,
   signSessionJWT,
-  SESSION_COOKIE,
+  setSessionCookie,
 } from "@/lib/session";
 import { getOrganizationsByWallet } from "@/lib/firestore";
 import { getCachedOrgs, cacheOrgs } from "@/lib/org-cache";
-import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
-
-const SESSION_MAX_AGE = 60 * 60 * 24; // 24 hours in seconds
-
-function isProd(): boolean {
-  return process.env.NODE_ENV === "production";
-}
+import { checkRateLimit, getClientIp } from "@/lib/rate-limit-firestore";
 
 export async function POST(req: Request) {
   try {
     // Rate limiting: 10 login attempts per IP per minute
     const clientIp = getClientIp(req);
-    const rateLimit = checkRateLimit(clientIp, {
+    const rateLimit = await checkRateLimit(clientIp, {
       max: 10,
       windowMs: 60 * 1000, // 1 minute
     });
 
     if (!rateLimit.allowed) {
-      return NextResponse.json(
+      return Response.json(
         {
           error: "Too many login attempts. Please try again later.",
           retryAfter: Math.ceil((rateLimit.resetTime - Date.now()) / 1000),
@@ -53,7 +46,7 @@ export async function POST(req: Request) {
     const address = (body.address ?? body.payload?.address ?? "").trim();
 
     if (!address || typeof address !== "string") {
-      return NextResponse.json(
+      return Response.json(
         { error: "address is required" },
         { status: 400 }
       );
@@ -72,7 +65,7 @@ export async function POST(req: Request) {
       }
     } catch (err) {
       console.error("[auth/verify] getOrganizationsByWallet error:", err);
-      return NextResponse.json(
+      return Response.json(
         { error: "Failed to load organizations. Please try again." },
         { status: 500 }
       );
@@ -92,7 +85,7 @@ export async function POST(req: Request) {
       sessionId = await createSession(address, role);
     } catch (err) {
       console.error("[auth/verify] createSession error:", err);
-      return NextResponse.json(
+      return Response.json(
         { error: "Failed to create session. Please try again." },
         { status: 500 }
       );
@@ -103,33 +96,29 @@ export async function POST(req: Request) {
       token = await signSessionJWT(address, sessionId, role);
     } catch (err) {
       console.error("[auth/verify] signSessionJWT error:", err);
-      return NextResponse.json(
+      return Response.json(
         { error: "Failed to sign session token. Check SESSION_SECRET." },
         { status: 500 }
       );
     }
 
-    // 3. Create response with httpOnly cookie
-    const response = NextResponse.json({
+    // 3. Set httpOnly cookie
+    try {
+      await setSessionCookie(token);
+      console.log("[auth/verify] ✅ Session cookie set successfully");
+    } catch (err) {
+      console.error("[auth/verify] setSessionCookie error:", err);
+      // Don't fail - cookie might still work
+    }
+
+    console.log("[auth/verify] ✅ Session created successfully for:", address);
+    return Response.json({
       success: true,
       session: {
         address,
         role,
-        sessionId,
       },
     });
-
-    // Set cookie directly on response
-    response.cookies.set(SESSION_COOKIE, token, {
-      httpOnly: true,
-      secure: isProd(),
-      sameSite: "lax",
-      path: "/",
-      maxAge: SESSION_MAX_AGE,
-    });
-
-    console.log("[auth/verify] ✅ Session created successfully for:", address);
-    return response;
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error("[auth/verify] Unhandled error:", msg, err);
