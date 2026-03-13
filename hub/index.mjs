@@ -4,6 +4,15 @@ import http from "http";
 import { WebSocketServer } from "ws";
 import cors from "cors";
 import crypto from "crypto";
+import {
+  initPubSub,
+  subscribeToMessages,
+  broadcastToChannel as pubsubBroadcastToChannel,
+  sendToAgent as pubsubSendToAgent,
+  closePubSub,
+  isPubSubHealthy,
+  INSTANCE_ID,
+} from "./pubsub-client.mjs";
 
 /**
  * SECURITY NOTE: This hub currently uses the Firebase client SDK instead of
@@ -201,14 +210,21 @@ function checkRateLimit(agentId) {
 }
 
 function broadcastToChannel(channelId, message, excludeWs = null) {
+  // Local broadcast to all subscribers on this instance
   const subs = channelSubscribers.get(channelId);
-  if (!subs) return;
   const data = typeof message === "string" ? message : JSON.stringify(message);
-  for (const ws of subs) {
-    if (ws !== excludeWs && ws.readyState === 1) {
-      ws.send(data);
+
+  if (subs) {
+    for (const ws of subs) {
+      if (ws !== excludeWs && ws.readyState === 1) {
+        ws.send(data);
+      }
     }
   }
+
+  // Cross-instance broadcast via Pub/Sub (fire-and-forget)
+  pubsubBroadcastToChannel(channelId, typeof message === "string" ? JSON.parse(message) : message)
+    .catch(err => log("warn", "Pub/Sub broadcast failed", { channelId, error: err.message }));
 }
 
 /**
@@ -217,15 +233,24 @@ function broadcastToChannel(channelId, message, excludeWs = null) {
  */
 function broadcastToAgent(agentId, message) {
   const sockets = agentConnections.get(agentId);
-  if (!sockets) return false;
   const data = typeof message === "string" ? message : JSON.stringify(message);
   let sent = false;
-  for (const ws of sockets) {
-    if (ws.readyState === 1) {
-      ws.send(data);
-      sent = true;
+
+  // Local broadcast to agent connections on this instance
+  if (sockets) {
+    for (const ws of sockets) {
+      if (ws.readyState === 1) {
+        ws.send(data);
+        sent = true;
+      }
     }
   }
+
+  // Cross-instance broadcast via Pub/Sub (fire-and-forget)
+  // Agent may be connected to a different instance
+  pubsubSendToAgent(agentId, typeof message === "string" ? JSON.parse(message) : message)
+    .catch(err => log("warn", "Pub/Sub sendToAgent failed", { agentId, error: err.message }));
+
   return sent;
 }
 
@@ -248,6 +273,43 @@ function unsubscribeFromChannel(ws, channelId) {
     if (subs.size === 0) channelSubscribers.delete(channelId);
   }
   state.channels.delete(channelId);
+}
+
+/**
+ * Handle cross-instance Pub/Sub messages.
+ * When another hub instance broadcasts a message, this handler
+ * relays it to local WebSocket connections.
+ */
+function handleCrossInstanceMessage(payload) {
+  const { type, channelId, targetAgentId, message } = payload;
+
+  if (type === "broadcast" && channelId) {
+    // Relay channel broadcast to local subscribers (without triggering another Pub/Sub publish)
+    const subs = channelSubscribers.get(channelId);
+    if (!subs || subs.size === 0) return; // No local subscribers
+
+    const data = JSON.stringify(message);
+    for (const ws of subs) {
+      if (ws.readyState === 1) {
+        ws.send(data);
+      }
+    }
+
+    log("debug", "Relayed cross-instance channel broadcast", { channelId, sourceInstance: payload.sourceInstance });
+  } else if (type === "direct" && targetAgentId) {
+    // Relay direct message to local agent connections (without triggering another Pub/Sub publish)
+    const sockets = agentConnections.get(targetAgentId);
+    if (!sockets || sockets.size === 0) return; // Agent not connected to this instance
+
+    const data = JSON.stringify(message);
+    for (const ws of sockets) {
+      if (ws.readyState === 1) {
+        ws.send(data);
+      }
+    }
+
+    log("debug", "Relayed cross-instance agent message", { targetAgentId, sourceInstance: payload.sourceInstance });
+  }
 }
 
 async function persistMessage(agentId, agentName, orgId, channelId, content) {
@@ -490,9 +552,13 @@ app.use(cors({
 app.use(express.json({ limit: "1mb" }));
 
 // GET /health
-app.get("/health", (_req, res) => {
+app.get("/health", async (_req, res) => {
   let totalConnections = 0;
   for (const conns of agentConnections.values()) totalConnections += conns.size;
+
+  // Check Pub/Sub health
+  const pubsubHealthy = await isPubSubHealthy();
+
   res.json({
     status: "ok",
     auth: "ed25519",
@@ -500,6 +566,10 @@ app.get("/health", (_req, res) => {
     agents: agentConnections.size,
     connections: totalConnections,
     channels: channelSubscribers.size,
+    pubsub: {
+      enabled: pubsubHealthy,
+      instanceId: INSTANCE_ID,
+    },
     ts: new Date().toISOString(),
   });
 });
@@ -1078,6 +1148,31 @@ onSnapshot(notificationsQuery, (snapshot) => {
 });
 
 log("info", "Assignment notification listener started");
+
+// ── Pub/Sub Initialization ─────────────────────────────────────────────────
+
+// Initialize Pub/Sub client (optional - only if GCP_PROJECT_ID is set)
+const pubsubClient = initPubSub();
+if (pubsubClient) {
+  // Subscribe to messages from other hub instances
+  subscribeToMessages(handleCrossInstanceMessage);
+  log("info", `Pub/Sub enabled — instance: ${INSTANCE_ID}`);
+} else {
+  log("warn", "Pub/Sub disabled — multi-instance broadcasting unavailable");
+}
+
+// Graceful shutdown handler
+process.on("SIGTERM", async () => {
+  log("info", "SIGTERM received — shutting down gracefully");
+  await closePubSub();
+  process.exit(0);
+});
+
+process.on("SIGINT", async () => {
+  log("info", "SIGINT received — shutting down gracefully");
+  await closePubSub();
+  process.exit(0);
+});
 
 // ── Start ───────────────────────────────────────────────────────────────────
 server.listen(PORT, () => {
