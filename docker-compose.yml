@@ -1,0 +1,89 @@
+version: '3.8'
+
+services:
+  # Redis for distributed state management
+  redis:
+    image: redis:7-alpine
+    container_name: swarm-redis
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-swarm_dev_password}
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    restart: unless-stopped
+    networks:
+      - swarm-network
+
+  # WebSocket Hub Instance 1
+  hub-1:
+    build:
+      context: ./hub
+      dockerfile: Dockerfile
+    container_name: swarm-hub-1
+    ports:
+      - "3001:3000"
+    environment:
+      - PORT=3000
+      - INSTANCE_ID=hub-1
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-swarm_dev_password}@redis:6379
+      - FIREBASE_PROJECT_ID=${FIREBASE_PROJECT_ID}
+      - FIREBASE_CLIENT_EMAIL=${FIREBASE_CLIENT_EMAIL}
+      - FIREBASE_PRIVATE_KEY=${FIREBASE_PRIVATE_KEY}
+      - PUBSUB_PROJECT_ID=${PUBSUB_PROJECT_ID}
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - swarm-network
+
+  # WebSocket Hub Instance 2 (for testing multi-instance)
+  hub-2:
+    build:
+      context: ./hub
+      dockerfile: Dockerfile
+    container_name: swarm-hub-2
+    ports:
+      - "3002:3000"
+    environment:
+      - PORT=3000
+      - INSTANCE_ID=hub-2
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-swarm_dev_password}@redis:6379
+      - FIREBASE_PROJECT_ID=${FIREBASE_PROJECT_ID}
+      - FIREBASE_CLIENT_EMAIL=${FIREBASE_CLIENT_EMAIL}
+      - FIREBASE_PRIVATE_KEY=${FIREBASE_PRIVATE_KEY}
+      - PUBSUB_PROJECT_ID=${PUBSUB_PROJECT_ID}
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - swarm-network
+
+  # Load Balancer (nginx)
+  load-balancer:
+    image: nginx:alpine
+    container_name: swarm-lb
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - hub-1
+      - hub-2
+    restart: unless-stopped
+    networks:
+      - swarm-network
+
+volumes:
+  redis-data:
+
+networks:
+  swarm-network:
+    driver: bridge
