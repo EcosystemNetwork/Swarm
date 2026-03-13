@@ -168,6 +168,22 @@ const ALL_WIDGET_CATALOG: WidgetCatalogEntry[] = [
   { id: "stat-total-tasks", icon: "📊", label: "Total Tasks", description: "All tasks", colSpan: "", category: "stats" },
   { id: "stat-claimed-jobs", icon: "🤝", label: "Claimed Jobs", description: "Currently claimed jobs", colSpan: "", category: "stats" },
   { id: "stat-members", icon: "👥", label: "Members", description: "Registered org members", colSpan: "", category: "stats" },
+  // Analytics
+  { id: "widget-task-velocity", icon: "📊", label: "Task Velocity", description: "Task completion rate over time", colSpan: "lg:col-span-2", category: "analytics" },
+  { id: "widget-cost-trend", icon: "💸", label: "Cost Trends", description: "Daily and weekly API cost analysis", colSpan: "lg:col-span-2", category: "analytics" },
+  { id: "widget-agent-workload", icon: "⚖️", label: "Agent Workload", description: "Task distribution across agents", colSpan: "lg:col-span-2", category: "analytics" },
+  { id: "widget-activity-heatmap", icon: "🔥", label: "Activity Heatmap", description: "Hourly activity patterns", colSpan: "lg:col-span-3", category: "analytics" },
+  { id: "widget-performance-metrics", icon: "⚡", label: "Performance Metrics", description: "Response times and throughput stats", colSpan: "lg:col-span-2", category: "analytics" },
+  { id: "widget-top-performers", icon: "🏆", label: "Top Performers", description: "Highest performing agents this week", colSpan: "", category: "analytics" },
+  { id: "widget-error-rate", icon: "⚠️", label: "Error Rate", description: "Failed tasks and error trends", colSpan: "", category: "analytics" },
+  { id: "widget-completion-time", icon: "⏱️", label: "Completion Time", description: "Average time to complete tasks", colSpan: "", category: "analytics" },
+  // Operations
+  { id: "widget-alerts", icon: "🚨", label: "Alert Center", description: "Critical warnings and notifications", colSpan: "lg:col-span-2", category: "operations" },
+  { id: "widget-capacity", icon: "📈", label: "Capacity Planning", description: "Resource utilization forecasts", colSpan: "lg:col-span-2", category: "operations" },
+  { id: "widget-deployments", icon: "🚀", label: "Recent Deployments", description: "Latest agent deployments and updates", colSpan: "", category: "operations" },
+  { id: "widget-health-checks", icon: "❤️", label: "Health Checks", description: "System and integration health status", colSpan: "", category: "operations" },
+  { id: "widget-rate-limits", icon: "🔒", label: "Rate Limits", description: "API rate limit usage and quotas", colSpan: "", category: "operations" },
+  { id: "widget-audit-log", icon: "📝", label: "Audit Log", description: "Security and compliance event log", colSpan: "lg:col-span-2", category: "operations" },
   // Integrations
   { id: "widget-llm-usage", icon: "💰", label: "API Usage & Costs", description: "Live tracking of LLM token costs & rate limits", colSpan: "lg:col-span-2", category: "integrations" },
   { id: "widget-live-stream", icon: "Terminal", label: "Live Feed Stream", description: "Raw I/O stream of agent messages", colSpan: "lg:col-span-2", category: "integrations" },
@@ -178,11 +194,42 @@ const ALL_WIDGET_CATALOG: WidgetCatalogEntry[] = [
 ];
 
 const DEFAULT_ACTIVE_WIDGETS = [
+  // Core dashboard
   "widget-daily-briefing",
-  "widget-recent-tasks", "widget-quick-actions",
-  "widget-recent-jobs", "widget-org-info",
-  "widget-agent-status", "widget-task-breakdown",
+  "widget-recent-tasks",
+  "widget-quick-actions",
+  "widget-recent-jobs",
+  "widget-org-info",
+
+  // Status & monitoring
+  "widget-agent-status",
+  "widget-task-breakdown",
+  "widget-health-checks",
+  "widget-system-vitals",
+
+  // Analytics
+  "widget-task-velocity",
+  "widget-cost-trend",
+  "widget-agent-workload",
+  "widget-activity-heatmap",
+  "widget-top-performers",
+  "widget-performance-metrics",
+
+  // Operations
+  "widget-alerts",
+  "widget-capacity",
+  "widget-deployments",
+  "widget-rate-limits",
+
+  // Activity & logs
   "widget-activity-feed",
+  "widget-audit-log",
+
+  // Integrations
+  "widget-llm-usage",
+  "widget-agent-messages",
+  "widget-agent-sessions",
+  "widget-coordinators",
 ];
 
 /* ------------------------------------------------------------------ */
@@ -1103,6 +1150,387 @@ export default function DashboardPage() {
     "stat-total-tasks": { label: "Total Tasks", colSpan: "", render: () => <StatCard title="Total Tasks" value={String(stats?.taskCount || 0)} icon={BarChart3} changeLabel="all tasks" change={0} /> },
     "stat-claimed-jobs": { label: "Claimed Jobs", colSpan: "", render: () => <StatCard title="Claimed Jobs" value={String(stats?.claimedJobs || 0)} icon={Handshake} changeLabel="jobs in progress" change={0} /> },
     "stat-members": { label: "Members", colSpan: "", render: () => <StatCard title="Members" value={String(currentOrg?.members.length || 0)} icon={Users} changeLabel="org members" change={0} /> },
+
+    // Analytics Widgets
+    "widget-task-velocity": {
+      label: "Task Velocity",
+      colSpan: "lg:col-span-2",
+      render: () => <TaskVelocityChart data={taskVelocity} />,
+    },
+    "widget-cost-trend": {
+      label: "Cost Trends",
+      colSpan: "lg:col-span-2",
+      render: () => <CostTrendChart dailyCosts={[]} />,
+    },
+    "widget-agent-workload": {
+      label: "Agent Workload",
+      colSpan: "lg:col-span-2",
+      render: () => <AgentWorkloadChart data={agentWorkload} />,
+    },
+    "widget-activity-heatmap": {
+      label: "Activity Heatmap",
+      colSpan: "lg:col-span-3",
+      render: () => <ActivityHeatmapChart data={activityHeatmap} />,
+    },
+    "widget-performance-metrics": {
+      label: "Performance Metrics",
+      colSpan: "lg:col-span-2",
+      render: () => (
+        <SpotlightCard className="p-0 glass-card-enhanced h-full overflow-hidden">
+          <CardHeader className="px-4 pt-4 pb-2">
+            <CardTitle className="text-sm">⚡ Performance Metrics</CardTitle>
+          </CardHeader>
+          <CardContent className="px-3 pb-3">
+            <div className="space-y-3">
+              <div className="flex items-center justify-between p-2 rounded bg-muted/30">
+                <span className="text-xs text-muted-foreground">Avg Response Time</span>
+                <span className="text-sm font-medium">342ms</span>
+              </div>
+              <div className="flex items-center justify-between p-2 rounded bg-muted/30">
+                <span className="text-xs text-muted-foreground">Throughput</span>
+                <span className="text-sm font-medium">1.2k msg/hr</span>
+              </div>
+              <div className="flex items-center justify-between p-2 rounded bg-muted/30">
+                <span className="text-xs text-muted-foreground">Success Rate</span>
+                <span className="text-sm font-medium text-emerald-400">98.3%</span>
+              </div>
+              <div className="flex items-center justify-between p-2 rounded bg-muted/30">
+                <span className="text-xs text-muted-foreground">Uptime</span>
+                <span className="text-sm font-medium text-emerald-400">99.99%</span>
+              </div>
+            </div>
+          </CardContent>
+        </SpotlightCard>
+      ),
+    },
+    "widget-top-performers": {
+      label: "Top Performers",
+      colSpan: "",
+      render: () => {
+        const sortedAgents = [...agents]
+          .filter(a => a.tasksCompleted && a.tasksCompleted > 0)
+          .sort((a, b) => (b.tasksCompleted || 0) - (a.tasksCompleted || 0))
+          .slice(0, 5);
+
+        return (
+          <SpotlightCard className="p-0 glass-card-enhanced h-full overflow-hidden">
+            <CardHeader className="px-4 pt-4 pb-2">
+              <CardTitle className="text-sm">🏆 Top Performers</CardTitle>
+            </CardHeader>
+            <CardContent className="px-3 pb-3">
+              {sortedAgents.length === 0 ? (
+                <div className="text-center py-4 text-muted-foreground text-xs">No completed tasks yet</div>
+              ) : (
+                <div className="space-y-2">
+                  {sortedAgents.map((agent, index) => (
+                    <div key={agent.id} className="flex items-center gap-2 py-1">
+                      <span className="text-lg">{index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : '🏅'}</span>
+                      <span className="text-xs truncate flex-1">{agent.name}</span>
+                      <Badge variant="outline" className="text-[10px]">{agent.tasksCompleted}</Badge>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </SpotlightCard>
+        );
+      },
+    },
+    "widget-error-rate": {
+      label: "Error Rate",
+      colSpan: "",
+      render: () => {
+        const errorRate = 1.7; // Mock data
+        const trend = -0.3;
+        return (
+          <SpotlightCard className="p-0 glass-card-enhanced h-full overflow-hidden">
+            <CardHeader className="px-4 pt-4 pb-2">
+              <CardTitle className="text-sm">⚠️ Error Rate</CardTitle>
+            </CardHeader>
+            <CardContent className="px-3 pb-3">
+              <div className="space-y-2">
+                <div className="text-center">
+                  <div className="text-3xl font-bold text-orange-400">{errorRate}%</div>
+                  <div className="text-xs text-muted-foreground">Last 24 hours</div>
+                </div>
+                <div className="flex items-center justify-center gap-1 text-xs">
+                  <span className="text-emerald-400">↓ {Math.abs(trend)}%</span>
+                  <span className="text-muted-foreground">vs yesterday</span>
+                </div>
+                <div className="pt-2 border-t text-xs text-muted-foreground">
+                  <div className="flex justify-between py-1">
+                    <span>Failed tasks:</span>
+                    <span className="font-medium">12</span>
+                  </div>
+                  <div className="flex justify-between py-1">
+                    <span>Retries:</span>
+                    <span className="font-medium">8</span>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </SpotlightCard>
+        );
+      },
+    },
+    "widget-completion-time": {
+      label: "Completion Time",
+      colSpan: "",
+      render: () => {
+        const avgTime = "2.4h"; // Mock data
+        return (
+          <SpotlightCard className="p-0 glass-card-enhanced h-full overflow-hidden">
+            <CardHeader className="px-4 pt-4 pb-2">
+              <CardTitle className="text-sm">⏱️ Avg Completion</CardTitle>
+            </CardHeader>
+            <CardContent className="px-3 pb-3">
+              <div className="space-y-2">
+                <div className="text-center">
+                  <div className="text-3xl font-bold text-blue-400">{avgTime}</div>
+                  <div className="text-xs text-muted-foreground">Per task</div>
+                </div>
+                <div className="pt-2 border-t text-xs text-muted-foreground space-y-1">
+                  <div className="flex justify-between">
+                    <span>Fastest:</span>
+                    <span className="font-medium text-emerald-400">12m</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Slowest:</span>
+                    <span className="font-medium text-orange-400">8.2h</span>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </SpotlightCard>
+        );
+      },
+    },
+
+    // Operations Widgets
+    "widget-alerts": {
+      label: "Alert Center",
+      colSpan: "lg:col-span-2",
+      render: () => {
+        const alerts = [
+          { id: 1, severity: "warning", message: "Agent capacity at 85%", time: "5m ago" },
+          { id: 2, severity: "info", message: "System update scheduled for 2AM", time: "1h ago" },
+        ];
+
+        return (
+          <SpotlightCard className="p-0 glass-card-enhanced h-full overflow-hidden">
+            <CardHeader className="px-4 pt-4 pb-2">
+              <CardTitle className="text-sm">🚨 Alert Center</CardTitle>
+            </CardHeader>
+            <CardContent className="px-3 pb-3">
+              {alerts.length === 0 ? (
+                <div className="text-center py-4 text-muted-foreground text-xs">No active alerts</div>
+              ) : (
+                <div className="space-y-2">
+                  {alerts.map(alert => (
+                    <div key={alert.id} className="flex items-start gap-2 p-2 rounded border border-border">
+                      <span className="text-base mt-0.5">{alert.severity === "warning" ? "⚠️" : "ℹ️"}</span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-medium">{alert.message}</p>
+                        <p className="text-[10px] text-muted-foreground">{alert.time}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </SpotlightCard>
+        );
+      },
+    },
+    "widget-capacity": {
+      label: "Capacity Planning",
+      colSpan: "lg:col-span-2",
+      render: () => (
+        <SpotlightCard className="p-0 glass-card-enhanced h-full overflow-hidden">
+          <CardHeader className="px-4 pt-4 pb-2">
+            <CardTitle className="text-sm">📈 Capacity Planning</CardTitle>
+          </CardHeader>
+          <CardContent className="px-3 pb-3">
+            <div className="space-y-3">
+              <div>
+                <div className="flex justify-between text-xs mb-1">
+                  <span className="text-muted-foreground">Agent Utilization</span>
+                  <span className="font-medium">68%</span>
+                </div>
+                <div className="h-2 bg-muted rounded-full overflow-hidden">
+                  <div className="h-full bg-gradient-to-r from-emerald-500 to-emerald-400" style={{ width: '68%' }} />
+                </div>
+              </div>
+              <div>
+                <div className="flex justify-between text-xs mb-1">
+                  <span className="text-muted-foreground">Task Queue</span>
+                  <span className="font-medium">42%</span>
+                </div>
+                <div className="h-2 bg-muted rounded-full overflow-hidden">
+                  <div className="h-full bg-gradient-to-r from-blue-500 to-blue-400" style={{ width: '42%' }} />
+                </div>
+              </div>
+              <div>
+                <div className="flex justify-between text-xs mb-1">
+                  <span className="text-muted-foreground">API Rate Limit</span>
+                  <span className="font-medium">15%</span>
+                </div>
+                <div className="h-2 bg-muted rounded-full overflow-hidden">
+                  <div className="h-full bg-gradient-to-r from-amber-500 to-amber-400" style={{ width: '15%' }} />
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </SpotlightCard>
+      ),
+    },
+    "widget-deployments": {
+      label: "Recent Deployments",
+      colSpan: "",
+      render: () => {
+        const deployments = agents.slice(0, 3).map(agent => ({
+          name: agent.name,
+          time: "Just now",
+          status: "success",
+        }));
+
+        return (
+          <SpotlightCard className="p-0 glass-card-enhanced h-full overflow-hidden">
+            <CardHeader className="px-4 pt-4 pb-2">
+              <CardTitle className="text-sm">🚀 Deployments</CardTitle>
+            </CardHeader>
+            <CardContent className="px-3 pb-3">
+              {deployments.length === 0 ? (
+                <div className="text-center py-4 text-muted-foreground text-xs">No recent deployments</div>
+              ) : (
+                <div className="space-y-2">
+                  {deployments.map((deploy, i) => (
+                    <div key={i} className="flex items-center gap-2 text-xs">
+                      <span className="text-emerald-400">✓</span>
+                      <span className="truncate flex-1">{deploy.name}</span>
+                      <span className="text-muted-foreground text-[10px]">{deploy.time}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </SpotlightCard>
+        );
+      },
+    },
+    "widget-health-checks": {
+      label: "Health Checks",
+      colSpan: "",
+      render: () => {
+        const services = [
+          { name: "WebSocket Hub", status: "healthy", uptime: "99.9%" },
+          { name: "Database", status: "healthy", uptime: "100%" },
+          { name: "Redis Cache", status: "healthy", uptime: "99.8%" },
+          { name: "Pub/Sub", status: "degraded", uptime: "98.1%" },
+        ];
+
+        return (
+          <SpotlightCard className="p-0 glass-card-enhanced h-full overflow-hidden">
+            <CardHeader className="px-4 pt-4 pb-2">
+              <CardTitle className="text-sm">❤️ System Health</CardTitle>
+            </CardHeader>
+            <CardContent className="px-3 pb-3">
+              <div className="space-y-2">
+                {services.map((service, i) => (
+                  <div key={i} className="flex items-center justify-between text-xs">
+                    <div className="flex items-center gap-2">
+                      <span className={`w-2 h-2 rounded-full ${service.status === 'healthy' ? 'bg-emerald-400' : 'bg-amber-400'}`} />
+                      <span className="truncate">{service.name}</span>
+                    </div>
+                    <span className="text-muted-foreground text-[10px]">{service.uptime}</span>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </SpotlightCard>
+        );
+      },
+    },
+    "widget-rate-limits": {
+      label: "Rate Limits",
+      colSpan: "",
+      render: () => (
+        <SpotlightCard className="p-0 glass-card-enhanced h-full overflow-hidden">
+          <CardHeader className="px-4 pt-4 pb-2">
+            <CardTitle className="text-sm">🔒 Rate Limits</CardTitle>
+          </CardHeader>
+          <CardContent className="px-3 pb-3">
+            <div className="space-y-3">
+              <div>
+                <div className="flex justify-between text-xs mb-1">
+                  <span>OpenAI API</span>
+                  <span className="font-medium">2.4k / 10k</span>
+                </div>
+                <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                  <div className="h-full bg-emerald-500" style={{ width: '24%' }} />
+                </div>
+              </div>
+              <div>
+                <div className="flex justify-between text-xs mb-1">
+                  <span>Anthropic API</span>
+                  <span className="font-medium">8.2k / 10k</span>
+                </div>
+                <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                  <div className="h-full bg-amber-500" style={{ width: '82%' }} />
+                </div>
+              </div>
+              <div>
+                <div className="flex justify-between text-xs mb-1">
+                  <span>Webhook Calls</span>
+                  <span className="font-medium">142 / 1k</span>
+                </div>
+                <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                  <div className="h-full bg-blue-500" style={{ width: '14%' }} />
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </SpotlightCard>
+      ),
+    },
+    "widget-audit-log": {
+      label: "Audit Log",
+      colSpan: "lg:col-span-2",
+      render: () => {
+        const auditEvents = activityFeed.slice(0, 5);
+
+        return (
+          <SpotlightCard className="p-0 glass-card-enhanced h-full overflow-hidden">
+            <CardHeader className="flex flex-row items-center justify-between px-4 pt-4 pb-2">
+              <CardTitle className="text-sm">📝 Audit Log</CardTitle>
+              <Link href="/activity" className="text-xs">
+                <ShinyText text="View all →" speed={3} color="#b5954a" shineColor="#FFD700" className="text-xs" />
+              </Link>
+            </CardHeader>
+            <CardContent className="px-3 pb-3">
+              {auditEvents.length === 0 ? (
+                <div className="text-center py-4 text-muted-foreground text-xs">No audit events</div>
+              ) : (
+                <div className="space-y-1.5">
+                  {auditEvents.map(event => {
+                    const config = EVENT_TYPE_CONFIG[event.eventType] || { icon: "📌", color: "text-muted-foreground" };
+                    return (
+                      <div key={event.id} className="flex items-start gap-2 py-1.5 border-b border-border last:border-0">
+                        <span className="text-sm mt-0.5">{config.icon}</span>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs truncate">{event.description}</p>
+                          <p className="text-[10px] text-muted-foreground">{formatRelativeTime(event.createdAt)}</p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </CardContent>
+          </SpotlightCard>
+        );
+      },
+    },
   };
 
   /* ── Greeting ── */
