@@ -121,7 +121,7 @@ function LandingPageContent() {
                 </Button>
               </Link>
             ) : (
-              <ConnectButton client={thirdwebClient} chains={WALLET_CHAINS} auth={authConfig} autoConnect={false} />
+              <ConnectButton client={thirdwebClient} chains={WALLET_CHAINS} auth={authConfig} autoConnect={false} connectButton={{ label: "Connect" }} />
             )}
           </div>
         </div>
@@ -190,7 +190,7 @@ function LandingPageContent() {
                   </Button>
                 </Link>
               ) : (
-                <ConnectButton client={thirdwebClient} chains={WALLET_CHAINS} auth={authConfig} autoConnect={false} />
+                <ConnectButton client={thirdwebClient} chains={WALLET_CHAINS} auth={authConfig} autoConnect={false} connectButton={{ label: "Connect" }} />
               )}
               <Link href="/docs">
                 <Button variant="outline" size="lg" className="h-12 px-8 rounded-full border-white/10 hover:bg-white/5 group bg-black/20">
@@ -215,7 +215,7 @@ function LandingPageContent() {
                   </Button>
                 </Link>
               ) : (
-                <ConnectButton client={thirdwebClient} chains={WALLET_CHAINS} auth={authConfig} autoConnect={false} />
+                <ConnectButton client={thirdwebClient} chains={WALLET_CHAINS} auth={authConfig} autoConnect={false} connectButton={{ label: "Connect" }} />
               )}
             </div>
           </div>
