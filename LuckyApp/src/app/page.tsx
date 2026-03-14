@@ -42,30 +42,19 @@ function LandingPageContent() {
 
   useEffect(() => setMounted(true), []);
 
-  // Extract redirect URL early to avoid dependency issues
-  const redirectUrl = searchParams.get('redirect') || '/dashboard';
+  // Only auto-redirect if the user was bounced here from a protected route
+  // (middleware sets ?redirect=/dashboard etc). If they navigate to "/" directly,
+  // always show the landing page — never silently redirect.
+  const redirectParam = searchParams.get('redirect');
 
-  // If already authenticated, redirect to dashboard (only after loading completes)
-  // Skip redirect if user just explicitly logged out (prevents instant re-login loop)
   useEffect(() => {
-    debug.log("[Swarm:Landing] Auth state changed:", { authenticated, loading });
-    if (authenticated && !loading) {
-      // Don't auto-redirect if user just logged out
-      try {
-        if (sessionStorage.getItem("swarm_explicit_logout") === "1") {
-          debug.log("[Swarm:Landing] Skipping redirect — user explicitly logged out");
-          sessionStorage.removeItem("swarm_explicit_logout");
-          return;
-        }
-      } catch {}
-      debug.log("[Swarm:Landing] Authenticated! Redirecting to:", redirectUrl);
-      const timer = setTimeout(() => {
-        debug.log("[Swarm:Landing] Executing redirect...");
-        router.push(redirectUrl);
-      }, 300);
+    debug.log("[Swarm:Landing] Auth state changed:", { authenticated, loading, redirectParam });
+    if (authenticated && !loading && redirectParam) {
+      debug.log("[Swarm:Landing] Authenticated + redirect param, going to:", redirectParam);
+      const timer = setTimeout(() => router.push(redirectParam), 300);
       return () => clearTimeout(timer);
     }
-  }, [authenticated, loading, router, redirectUrl]);
+  }, [authenticated, loading, router, redirectParam]);
 
   // Stagger robot loading: center immediately, left at 4s, right at 8s
   useEffect(() => {
