@@ -22,8 +22,8 @@ const client = createThirdwebClient({
   clientId: process.env.NEXT_PUBLIC_THIRDWEB_CLIENT_ID || '510999ec2be00a99e36ab07b36f15a72',
 });
 
-// 3 robots — centered, wider spread, faster load
-const ROBOT_COUNT = 3;
+// Single robot — prevents WebGL context exhaustion (browser limit ~16)
+const ROBOT_COUNT = 1;
 
 function LandingPageContent() {
   const router = useRouter();
@@ -105,37 +105,24 @@ function LandingPageContent() {
       <main className="flex-1 overflow-x-hidden">
         {/* Hero Section */}
         <section className="relative pt-24 pb-32 min-h-[95vh] flex items-center justify-center overflow-hidden">
-          {/* 3 Spline Robots — centered with wider spread */}
+          {/* Single Spline Robot — avoids WebGL context exhaustion */}
           <div className="absolute inset-0 z-0 pointer-events-none">
-            {Array.from({ length: ROBOT_COUNT }, (_, i) => {
-              // Centered trio: left flank, center lead, right flank
-              const configs = [
-                { x: -20, y: 5, scale: 0.85, opacity: 0.55, z: 0 },  // left
-                { x: 5, y: 0, scale: 1, opacity: 0.9, z: 2 },  // center
-                { x: 30, y: 5, scale: 0.85, opacity: 0.55, z: 0 },  // right
-              ];
-              const c = configs[i];
-
-              return (
-                <div
-                  key={i}
-                  className="absolute inset-0"
-                  style={{
-                    transform: `translateX(${c.x}%) translateY(${c.y}%) scale(${c.scale})`,
-                    opacity: c.opacity,
-                    zIndex: c.z,
-                  }}
-                >
-                  <Suspense fallback={null}>
-                    <Spline
-                      onLoad={handleRobotLoad(i)}
-                      scene="https://prod.spline.design/Apa6K76Zg3Ki-VRj/scene.splinecode"
-                      className="w-full h-full"
-                    />
-                  </Suspense>
-                </div>
-              );
-            })}
+            <div
+              className="absolute inset-0"
+              style={{
+                transform: 'translateX(5%) scale(1)',
+                opacity: 0.9,
+                zIndex: 2,
+              }}
+            >
+              <Suspense fallback={null}>
+                <Spline
+                  onLoad={handleRobotLoad(0)}
+                  scene="https://prod.spline.design/Apa6K76Zg3Ki-VRj/scene.splinecode"
+                  className="w-full h-full"
+                />
+              </Suspense>
+            </div>
 
             {/* Gradient Overlay */}
             <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-transparent to-black pointer-events-none z-[10]" />
