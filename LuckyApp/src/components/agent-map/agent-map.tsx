@@ -1,7 +1,7 @@
 /** Agent Map Canvas — React Flow graph visualization of agents, hub, and job nodes with connections. */
 "use client";
 
-import { useMemo, useCallback, useState, useEffect } from "react";
+import { useMemo, useCallback, useState, useEffect, useRef } from "react";
 import {
   ReactFlow,
   ReactFlowProvider,
@@ -32,7 +32,7 @@ import { withNodeWrapper } from "./map-node-wrapper";
 import { AgentMapPalette, type DockPosition } from "./agent-map-palette";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { PanelLeftClose, PanelLeftOpen, Maximize, Trash2, Play, Plus, Minus, LocateFixed, Map } from "lucide-react";
+import { PanelLeftClose, PanelLeftOpen, Maximize, Trash2, Play, Plus, Minus, LocateFixed, Map, Undo2, Redo2, Save, FolderOpen, AlertCircle } from "lucide-react";
 
 interface Agent {
   id: string;
@@ -77,6 +77,99 @@ interface AgentMapProps {
   currencySymbol?: string;
 }
 
+// ─── Undo/Redo History ──────────────────────────────────────────────────────
+
+interface HistoryEntry {
+  nodes: Node[];
+  edges: Edge[];
+}
+
+const MAX_HISTORY = 50;
+
+function useHistory() {
+  const [past, setPast] = useState<HistoryEntry[]>([]);
+  const [future, setFuture] = useState<HistoryEntry[]>([]);
+
+  const pushHistory = useCallback((entry: HistoryEntry) => {
+    setPast(prev => [...prev.slice(-MAX_HISTORY + 1), entry]);
+    setFuture([]);
+  }, []);
+
+  const undo = useCallback((current: HistoryEntry): HistoryEntry | null => {
+    if (past.length === 0) return null;
+    const prev = past[past.length - 1];
+    setPast(p => p.slice(0, -1));
+    setFuture(f => [...f, current]);
+    return prev;
+  }, [past]);
+
+  const redo = useCallback((current: HistoryEntry): HistoryEntry | null => {
+    if (future.length === 0) return null;
+    const next = future[future.length - 1];
+    setFuture(f => f.slice(0, -1));
+    setPast(p => [...p, current]);
+    return next;
+  }, [future]);
+
+  return { pushHistory, undo, redo, canUndo: past.length > 0, canRedo: future.length > 0 };
+}
+
+// ─── Workflow Persistence ────────────────────────────────────────────────────
+
+const WORKFLOW_STORAGE_KEY = "swarm-agent-map-workflow";
+
+function saveWorkflow(nodes: Node[], edges: Edge[]) {
+  try {
+    const data = JSON.stringify({ nodes, edges, savedAt: Date.now() });
+    localStorage.setItem(WORKFLOW_STORAGE_KEY, data);
+  } catch {
+    // localStorage may be full or unavailable
+  }
+}
+
+function loadWorkflow(): { nodes: Node[]; edges: Edge[] } | null {
+  try {
+    const raw = localStorage.getItem(WORKFLOW_STORAGE_KEY);
+    if (!raw) return null;
+    const data = JSON.parse(raw);
+    if (data.nodes && data.edges) return data;
+  } catch {
+    // Corrupted data
+  }
+  return null;
+}
+
+// ─── Edge Validation ─────────────────────────────────────────────────────────
+
+/** Data-driven node types that should not receive workflow connections */
+const DATA_NODE_TYPES = new Set(["agentNode", "hubNode", "jobNode"]);
+
+function isValidConnection(connection: Connection, nodes: Node[]): boolean {
+  if (!connection.source || !connection.target) return false;
+  // Prevent self-loops
+  if (connection.source === connection.target) return false;
+
+  const sourceNode = nodes.find(n => n.id === connection.source);
+  const targetNode = nodes.find(n => n.id === connection.target);
+  if (!sourceNode || !targetNode) return false;
+
+  // Allow agent → job connections (assignment)
+  if (sourceNode.type === "agentNode" && targetNode.type === "jobNode") return true;
+  // Allow agent → prompt connections
+  if (sourceNode.type === "agentNode" && targetNode.type === "mapPrompt") return true;
+
+  // Allow workflow → workflow connections
+  const sourceIsData = DATA_NODE_TYPES.has(sourceNode.type || "");
+  const targetIsData = DATA_NODE_TYPES.has(targetNode.type || "");
+
+  // Block data node → data node connections (except agent→job above)
+  if (sourceIsData && targetIsData) return false;
+
+  return true;
+}
+
+// ─── Node Types ──────────────────────────────────────────────────────────────
+
 // Wrap workflow nodes with hover toolbar + execution states
 const wrappedWorkflow = (key: string) => withNodeWrapper(createWorkflowNodeType(key));
 
@@ -120,8 +213,7 @@ const edgeTypes = {
 let mapNodeId = 0;
 const getMapNodeId = () => `map_wf_${mapNodeId++}`;
 
-function AgentMapInner({ projectName: _projectName, agents, tasks, jobs = [], onAssign, onDispatch, executing = false, currencySymbol = "$" }: AgentMapProps) {
-  void _projectName; // reserved for future use
+function AgentMapInner({ agents, tasks, jobs = [], onAssign, onDispatch, executing = false, currencySymbol = "$" }: AgentMapProps) {
   const [assignmentEdges, setAssignmentEdges] = useState<Edge[]>([]);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [reactFlowInstance, setReactFlowInstance] = useState<any>(null);
@@ -130,6 +222,19 @@ function AgentMapInner({ projectName: _projectName, agents, tasks, jobs = [], on
   const [userWorkflowNodes, setUserWorkflowNodes] = useState<Node[]>([]);
   const [showMiniMap, setShowMiniMap] = useState(true);
   const [miniMapColor, setMiniMapColor] = useState<"default" | "mono" | "warm">("default");
+
+  // Error feedback state
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const errorTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+
+  const showError = useCallback((msg: string) => {
+    setErrorMessage(msg);
+    if (errorTimerRef.current) clearTimeout(errorTimerRef.current);
+    errorTimerRef.current = setTimeout(() => setErrorMessage(null), 5000);
+  }, []);
+
+  // Undo/redo
+  const { pushHistory, undo, redo, canUndo, canRedo } = useHistory();
 
   // Context menu state
   const [contextMenu, setContextMenu] = useState<{
@@ -213,6 +318,17 @@ function AgentMapInner({ projectName: _projectName, agents, tasks, jobs = [], on
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState([...initialEdges, ...assignmentEdges]);
 
+  // Load saved workflow on mount
+  useEffect(() => {
+    const saved = loadWorkflow();
+    if (saved && saved.nodes.length > 0) {
+      const workflowNodes = saved.nodes.filter(n => n.id.startsWith("map_wf_"));
+      if (workflowNodes.length > 0) {
+        setUserWorkflowNodes(workflowNodes);
+      }
+    }
+  }, []);
+
   // Sync nodes/edges when data changes — preserve user-dropped workflow nodes
   useEffect(() => {
     setNodes([...initialNodes, ...userWorkflowNodes]);
@@ -222,15 +338,25 @@ function AgentMapInner({ projectName: _projectName, agents, tasks, jobs = [], on
     setEdges([...initialEdges, ...assignmentEdges]);
   }, [initialEdges, setEdges, assignmentEdges]);
 
-  // Handle new connections — any node to any node
+  // Handle new connections — with validation
   const onConnect = useCallback(
     (connection: Connection) => {
       if (!connection.source || !connection.target) return;
+
+      // Validate connection
+      if (!isValidConnection(connection, nodes)) {
+        showError("Invalid connection — cannot connect these node types");
+        return;
+      }
+
       // Prevent duplicate edges
       const exists = edges.some(
         (e) => e.source === connection.source && e.target === connection.target
       );
       if (exists) return;
+
+      // Save history before change
+      pushHistory({ nodes: [...nodes], edges: [...edges] });
 
       setEdges((eds) => addEdge({
         ...connection,
@@ -238,7 +364,7 @@ function AgentMapInner({ projectName: _projectName, agents, tasks, jobs = [], on
         style: { stroke: "#d97706", strokeWidth: 2 },
       }, eds));
     },
-    [edges, setEdges]
+    [edges, setEdges, nodes, showError, pushHistory]
   );
 
   // Compute assignments from edges
@@ -263,17 +389,45 @@ function AgentMapInner({ projectName: _projectName, agents, tasks, jobs = [], on
     }, 0);
   }, [assignments, openJobs]);
 
-  const handleClearAssignments = () => {
+  const handleClearAssignments = useCallback(() => {
     setAssignmentEdges([]);
     setEdges(initialEdges);
-  };
+  }, [initialEdges, setEdges]);
 
-  const handleExecute = async () => {
+  const handleExecute = useCallback(async () => {
     if (onAssign && assignments.length > 0) {
-      await onAssign(assignments);
-      setAssignmentEdges([]);
+      try {
+        await onAssign(assignments);
+        setAssignmentEdges([]);
+      } catch (err) {
+        showError(`Assignment failed: ${err instanceof Error ? err.message : "Unknown error"}`);
+      }
     }
-  };
+  }, [onAssign, assignments, showError]);
+
+  // ─── Undo / Redo handlers ───
+  const handleUndo = useCallback(() => {
+    const entry = undo({ nodes: [...nodes], edges: [...edges] });
+    if (entry) {
+      const workflowNodes = entry.nodes.filter(n => n.id.startsWith("map_wf_"));
+      setUserWorkflowNodes(workflowNodes);
+      setEdges(entry.edges);
+    }
+  }, [undo, nodes, edges, setEdges]);
+
+  const handleRedo = useCallback(() => {
+    const entry = redo({ nodes: [...nodes], edges: [...edges] });
+    if (entry) {
+      const workflowNodes = entry.nodes.filter(n => n.id.startsWith("map_wf_"));
+      setUserWorkflowNodes(workflowNodes);
+      setEdges(entry.edges);
+    }
+  }, [redo, nodes, edges, setEdges]);
+
+  // ─── Workflow save/load ───
+  const handleSaveWorkflow = useCallback(() => {
+    saveWorkflow(userWorkflowNodes, edges.filter(e => !e.id.startsWith("start-")));
+  }, [userWorkflowNodes, edges]);
 
   // ─── Drag-and-drop from palette ───
   const onDragOver = useCallback((event: React.DragEvent) => {
@@ -287,6 +441,23 @@ function AgentMapInner({ projectName: _projectName, agents, tasks, jobs = [], on
       const type = event.dataTransfer.getData("application/reactflow-type");
       const rawData = event.dataTransfer.getData("application/reactflow-data");
       if (!type || !reactFlowInstance) return;
+
+      // FIX #1: Prevent duplicate agent nodes from palette
+      if (type === "agentNode") {
+        try {
+          const parsed = JSON.parse(rawData);
+          const agentName = parsed.agentName || parsed.label;
+          const alreadyExists = nodes.some(
+            n => n.type === "agentNode" && (n.data.agentName === agentName || n.data.label === agentName)
+          );
+          if (alreadyExists) {
+            showError(`Agent "${agentName}" is already on the canvas`);
+            return;
+          }
+        } catch {
+          // Continue with drop if parsing fails
+        }
+      }
 
       const position = reactFlowInstance.screenToFlowPosition({
         x: event.clientX,
@@ -307,9 +478,11 @@ function AgentMapInner({ projectName: _projectName, agents, tasks, jobs = [], on
         data,
       };
 
+      // Save history before adding
+      pushHistory({ nodes: [...nodes], edges: [...edges] });
       setUserWorkflowNodes((prev) => [...prev, newNode]);
     },
-    [reactFlowInstance]
+    [reactFlowInstance, nodes, edges, showError, pushHistory]
   );
 
   // ─── Context menu handlers ───
@@ -337,19 +510,22 @@ function AgentMapInner({ projectName: _projectName, agents, tasks, jobs = [], on
       data: { label: "Note", content: "", color: "yellow", width: 200, height: 120 },
       style: { width: 200, height: 120 },
     };
+    pushHistory({ nodes: [...nodes], edges: [...edges] });
     setUserWorkflowNodes((prev) => [...prev, newNode]);
-  }, [reactFlowInstance]);
+  }, [reactFlowInstance, nodes, edges, pushHistory]);
 
   const handleDeleteNode = useCallback((nodeId: string) => {
     if (!isUserNode(nodeId)) return;
+    pushHistory({ nodes: [...nodes], edges: [...edges] });
     setUserWorkflowNodes((prev) => prev.filter((n) => n.id !== nodeId));
     setNodes((nds) => nds.filter((n) => n.id !== nodeId));
-  }, [isUserNode, setNodes]);
+  }, [isUserNode, setNodes, nodes, edges, pushHistory]);
 
   const handleDuplicateNode = useCallback((nodeId: string) => {
     if (!isUserNode(nodeId)) return;
     const node = nodes.find((n) => n.id === nodeId);
     if (!node) return;
+    pushHistory({ nodes: [...nodes], edges: [...edges] });
     const newNode: Node = {
       id: getMapNodeId(),
       type: node.type,
@@ -357,7 +533,7 @@ function AgentMapInner({ projectName: _projectName, agents, tasks, jobs = [], on
       data: { ...node.data },
     };
     setUserWorkflowNodes((prev) => [...prev, newNode]);
-  }, [isUserNode, nodes]);
+  }, [isUserNode, nodes, edges, pushHistory]);
 
   const handleToggleDisable = useCallback((nodeId: string) => {
     setNodes((nds) => nds.map((n) =>
@@ -371,6 +547,27 @@ function AgentMapInner({ projectName: _projectName, agents, tasks, jobs = [], on
       const target = e.target as HTMLElement;
       if (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable) return;
 
+      // Ctrl+Z — undo
+      if (e.key === "z" && (e.ctrlKey || e.metaKey) && !e.shiftKey) {
+        e.preventDefault();
+        handleUndo();
+        return;
+      }
+
+      // Ctrl+Shift+Z or Ctrl+Y — redo
+      if ((e.key === "z" && (e.ctrlKey || e.metaKey) && e.shiftKey) || (e.key === "y" && (e.ctrlKey || e.metaKey))) {
+        e.preventDefault();
+        handleRedo();
+        return;
+      }
+
+      // Ctrl+S — save workflow
+      if (e.key === "s" && (e.ctrlKey || e.metaKey)) {
+        e.preventDefault();
+        handleSaveWorkflow();
+        return;
+      }
+
       // Delete selected user nodes + selected edges
       if (e.key === "Delete" || e.key === "Backspace") {
         const selectedNodes = nodes.filter((n) => n.selected && isUserNode(n.id));
@@ -378,9 +575,12 @@ function AgentMapInner({ projectName: _projectName, agents, tasks, jobs = [], on
 
         if (selectedNodes.length > 0 || selectedEdgeIds.length > 0) {
           e.preventDefault();
+          pushHistory({ nodes: [...nodes], edges: [...edges] });
           selectedNodes.forEach((n) => handleDeleteNode(n.id));
           if (selectedEdgeIds.length > 0) {
             setEdges((eds) => eds.filter((edge) => !selectedEdgeIds.includes(edge.id)));
+            // FIX #2: Sync assignment edges when edges are deleted via keyboard
+            setAssignmentEdges((prev) => prev.filter((edge) => !selectedEdgeIds.includes(edge.id)));
           }
         }
       }
@@ -395,18 +595,20 @@ function AgentMapInner({ projectName: _projectName, agents, tasks, jobs = [], on
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [nodes, edges, isUserNode, handleDeleteNode, setNodes, setEdges]);
+  }, [nodes, edges, isUserNode, handleDeleteNode, setNodes, setEdges, handleUndo, handleRedo, handleSaveWorkflow, pushHistory]);
 
   // ─── Edge delete event listener ───
   useEffect(() => {
     const handleEdgeDelete = (e: Event) => {
       const { edgeId } = (e as CustomEvent).detail;
+      pushHistory({ nodes: [...nodes], edges: [...edges] });
       setEdges((eds) => eds.filter((edge) => edge.id !== edgeId));
+      // FIX #2: Always sync assignment edges on edge delete
       setAssignmentEdges((prev) => prev.filter((edge) => edge.id !== edgeId));
     };
     window.addEventListener("map-edge-delete", handleEdgeDelete);
     return () => window.removeEventListener("map-edge-delete", handleEdgeDelete);
-  }, [setEdges]);
+  }, [setEdges, nodes, edges, pushHistory]);
 
   // Build context menu actions
   const contextMenuActions = useMemo(() => {
@@ -430,24 +632,25 @@ function AgentMapInner({ projectName: _projectName, agents, tasks, jobs = [], on
     });
   }, [contextMenu, nodes, isUserNode, handleDuplicateNode, handleDeleteNode, handleToggleDisable, handleAddSticky, setNodes, rfInstance]);
 
-  const toggleAgent = (id: string) => {
+  const toggleAgent = useCallback((id: string) => {
     setSelectedAgentIds((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
       return next;
     });
-  };
+  }, []);
 
-  const selectAllAgents = () => {
+  const selectAllAgents = useCallback(() => {
     if (selectedAgentIds.size === agents.length) {
       setSelectedAgentIds(new Set());
     } else {
       setSelectedAgentIds(new Set(agents.map((a) => a.id)));
     }
-  };
+  }, [selectedAgentIds.size, agents]);
 
-  const handleDispatch = async () => {
+  // FIX #3: Dispatch with user-visible error feedback
+  const handleDispatch = useCallback(async () => {
     if (!onDispatch || !dispatchPrompt.trim() || selectedAgentIds.size === 0) return;
     try {
       setDispatching(true);
@@ -464,11 +667,12 @@ function AgentMapInner({ projectName: _projectName, agents, tasks, jobs = [], on
       setSelectedAgentIds(new Set());
       setDispatchOpen(false);
     } catch (err) {
-      console.error("Dispatch failed:", err);
+      const message = err instanceof Error ? err.message : "Unknown error";
+      showError(`Dispatch failed: ${message}`);
     } finally {
       setDispatching(false);
     }
-  };
+  }, [onDispatch, dispatchPrompt, dispatchPriority, dispatchReward, selectedAgentIds, showError]);
 
   const maxNodes = Math.max(agents.length, openJobs.length);
   const canvasHeight = Math.max(500, Math.min(900, 300 + maxNodes * 80));
@@ -531,12 +735,23 @@ function AgentMapInner({ projectName: _projectName, agents, tasks, jobs = [], on
           </div>
         </>
       )}
+
+      {/* Error toast */}
+      {errorMessage && (
+        <div className="absolute top-3 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 bg-destructive/90 text-destructive-foreground px-4 py-2 rounded-lg shadow-lg animate-in fade-in slide-in-from-top-2 duration-200" role="alert">
+          <AlertCircle className="w-4 h-4 shrink-0" />
+          <span className="text-sm font-medium">{errorMessage}</span>
+          <button onClick={() => setErrorMessage(null)} className="ml-2 hover:opacity-80" aria-label="Dismiss error">×</button>
+        </div>
+      )}
+
       <ReactFlow
         nodes={nodes}
         edges={edges}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
+        isValidConnection={(connection) => isValidConnection(connection as Connection, nodes)}
         onInit={setReactFlowInstance}
         onDrop={onDrop}
         onDragOver={onDragOver}
@@ -558,16 +773,18 @@ function AgentMapInner({ projectName: _projectName, agents, tasks, jobs = [], on
         fitViewOptions={{ maxZoom: 1.5, minZoom: 0.3 }}
         proOptions={{ hideAttribution: true }}
         className="bg-muted"
+        aria-label="Agent workflow canvas"
       >
         <Background variant={BackgroundVariant.Dots} color="#d4d4d4" gap={20} size={1.5} />
 
         {/* Custom zoom controls — styled to match theme */}
         <Panel position="bottom-left">
-          <div className="flex flex-col gap-0.5 bg-card/90 backdrop-blur border border-border rounded-lg shadow-sm overflow-hidden">
+          <div className="flex flex-col gap-0.5 bg-card/90 backdrop-blur border border-border rounded-lg shadow-sm overflow-hidden" role="toolbar" aria-label="Zoom controls">
             <button
               onClick={() => rfInstance.zoomIn({ duration: 200 })}
               className="p-2 hover:bg-accent transition-colors border-b border-border/50"
               title="Zoom in"
+              aria-label="Zoom in"
             >
               <Plus className="w-4 h-4 text-muted-foreground" />
             </button>
@@ -575,6 +792,7 @@ function AgentMapInner({ projectName: _projectName, agents, tasks, jobs = [], on
               onClick={() => rfInstance.zoomOut({ duration: 200 })}
               className="p-2 hover:bg-accent transition-colors border-b border-border/50"
               title="Zoom out"
+              aria-label="Zoom out"
             >
               <Minus className="w-4 h-4 text-muted-foreground" />
             </button>
@@ -582,6 +800,7 @@ function AgentMapInner({ projectName: _projectName, agents, tasks, jobs = [], on
               onClick={() => rfInstance.fitView({ duration: 300 })}
               className="p-2 hover:bg-accent transition-colors"
               title="Fit view"
+              aria-label="Fit view"
             >
               <LocateFixed className="w-4 h-4 text-muted-foreground" />
             </button>
@@ -612,31 +831,87 @@ function AgentMapInner({ projectName: _projectName, agents, tasks, jobs = [], on
                 : "rgba(28, 25, 23, 0.7)"
             }
             className="!border !border-border !rounded-lg !shadow-sm"
+            aria-label="Canvas minimap"
           />
         )}
 
         {/* Canvas toolbar panel — top right */}
         <Panel position="top-right">
-          <div className="flex items-center gap-1.5 bg-card/90 backdrop-blur border border-border rounded-lg px-2 py-1.5 shadow-sm">
+          <div className="flex items-center gap-1.5 bg-card/90 backdrop-blur border border-border rounded-lg px-2 py-1.5 shadow-sm" role="toolbar" aria-label="Canvas actions">
             <Badge variant="outline" className="text-[10px] font-medium">
               {userWorkflowNodes.length} node{userWorkflowNodes.length !== 1 ? "s" : ""}
             </Badge>
             <div className="w-px h-4 bg-border" />
+
+            {/* Undo/Redo */}
+            <button
+              onClick={handleUndo}
+              disabled={!canUndo}
+              className="p-1.5 rounded hover:bg-accent transition-colors disabled:opacity-30"
+              title="Undo (Ctrl+Z)"
+              aria-label="Undo"
+            >
+              <Undo2 className="w-3.5 h-3.5 text-muted-foreground" />
+            </button>
+            <button
+              onClick={handleRedo}
+              disabled={!canRedo}
+              className="p-1.5 rounded hover:bg-accent transition-colors disabled:opacity-30"
+              title="Redo (Ctrl+Shift+Z)"
+              aria-label="Redo"
+            >
+              <Redo2 className="w-3.5 h-3.5 text-muted-foreground" />
+            </button>
+
+            <div className="w-px h-4 bg-border" />
+
+            {/* Save/Load Workflow */}
+            <button
+              onClick={handleSaveWorkflow}
+              className="p-1.5 rounded hover:bg-accent transition-colors"
+              title="Save workflow (Ctrl+S)"
+              aria-label="Save workflow"
+            >
+              <Save className="w-3.5 h-3.5 text-muted-foreground" />
+            </button>
+            <button
+              onClick={() => {
+                const saved = loadWorkflow();
+                if (saved && saved.nodes.length > 0) {
+                  pushHistory({ nodes: [...nodes], edges: [...edges] });
+                  const workflowNodes = saved.nodes.filter(n => n.id.startsWith("map_wf_"));
+                  setUserWorkflowNodes(workflowNodes);
+                } else {
+                  showError("No saved workflow found");
+                }
+              }}
+              className="p-1.5 rounded hover:bg-accent transition-colors"
+              title="Load workflow"
+              aria-label="Load saved workflow"
+            >
+              <FolderOpen className="w-3.5 h-3.5 text-muted-foreground" />
+            </button>
+
+            <div className="w-px h-4 bg-border" />
+
             <button
               onClick={() => rfInstance.fitView({ duration: 300 })}
               className="p-1.5 rounded hover:bg-accent transition-colors"
               title="Fit View"
+              aria-label="Fit view"
             >
               <Maximize className="w-3.5 h-3.5 text-muted-foreground" />
             </button>
             {userWorkflowNodes.length > 0 && (
               <button
                 onClick={() => {
+                  pushHistory({ nodes: [...nodes], edges: [...edges] });
                   setUserWorkflowNodes([]);
                   setNodes(initialNodes);
                 }}
                 className="p-1.5 rounded hover:bg-destructive/10 transition-colors"
                 title="Clear workflow nodes"
+                aria-label="Clear all workflow nodes"
               >
                 <Trash2 className="w-3.5 h-3.5 text-destructive" />
               </button>
@@ -659,6 +934,7 @@ function AgentMapInner({ projectName: _projectName, agents, tasks, jobs = [], on
               }}
               className="p-1.5 rounded hover:bg-emerald-500/10 transition-colors"
               title="Run workflow (demo)"
+              aria-label="Run workflow demo"
               disabled={userWorkflowNodes.length === 0}
             >
               <Play className="w-3.5 h-3.5 text-emerald-500" />
@@ -671,6 +947,8 @@ function AgentMapInner({ projectName: _projectName, agents, tasks, jobs = [], on
                 showMiniMap ? "bg-amber-500/10 text-amber-500" : "hover:bg-accent text-muted-foreground"
               }`}
               title={showMiniMap ? "Hide minimap" : "Show minimap"}
+              aria-label={showMiniMap ? "Hide minimap" : "Show minimap"}
+              aria-pressed={showMiniMap}
             >
               <Map className="w-3.5 h-3.5" />
             </button>
@@ -685,6 +963,8 @@ function AgentMapInner({ projectName: _projectName, agents, tasks, jobs = [], on
                   background: c === "default" ? "#60a5fa" : c === "mono" ? "#888" : "#f59e0b",
                 }}
                 title={`${c.charAt(0).toUpperCase() + c.slice(1)} colors`}
+                aria-label={`Minimap ${c} color theme`}
+                aria-pressed={miniMapColor === c}
               />
             ))}
           </div>
@@ -704,7 +984,7 @@ function AgentMapInner({ projectName: _projectName, agents, tasks, jobs = [], on
   );
 
   return (
-    <div className="flex flex-col rounded-lg border border-border overflow-hidden bg-card">
+    <div className="flex flex-col rounded-lg border border-border overflow-hidden bg-card" role="region" aria-label="Agent Map">
       {/* Main canvas area — flex direction changes based on dock position */}
       <div
         className={`flex min-h-0 overflow-hidden ${
@@ -718,7 +998,7 @@ function AgentMapInner({ projectName: _projectName, agents, tasks, jobs = [], on
       </div>
 
       {/* Assignment Summary Bar */}
-      <div className="border-t border-border bg-card px-4 py-3 flex items-center justify-between gap-4">
+      <div className="border-t border-border bg-card px-4 py-3 flex items-center justify-between gap-4" role="status" aria-label="Assignment summary">
         <div className="flex items-center gap-4">
           <div className="text-sm">
             <span className="text-muted-foreground">Assignments: </span>
@@ -777,6 +1057,8 @@ function AgentMapInner({ projectName: _projectName, agents, tasks, jobs = [], on
             size="sm"
             onClick={() => setShowPalette(!showPalette)}
             title={showPalette ? "Hide Node Palette" : "Show Node Palette"}
+            aria-label={showPalette ? "Hide node palette" : "Show node palette"}
+            aria-pressed={showPalette}
           >
             {showPalette ? <PanelLeftClose className="w-4 h-4" /> : <PanelLeftOpen className="w-4 h-4" />}
           </Button>
@@ -788,6 +1070,8 @@ function AgentMapInner({ projectName: _projectName, agents, tasks, jobs = [], on
         <button
           onClick={() => setDispatchOpen(!dispatchOpen)}
           className="w-full px-4 py-2.5 flex items-center justify-between text-sm font-semibold text-foreground hover:bg-muted/50 transition-colors"
+          aria-expanded={dispatchOpen}
+          aria-controls="dispatch-panel"
         >
           <span className="flex items-center gap-2">
             <span className="text-base">🚀</span>
@@ -797,12 +1081,13 @@ function AgentMapInner({ projectName: _projectName, agents, tasks, jobs = [], on
         </button>
 
         {dispatchOpen && (
-          <div className="px-4 pb-4 space-y-4 bg-muted/30">
+          <div id="dispatch-panel" className="px-4 pb-4 space-y-4 bg-muted/30" role="form" aria-label="Quick dispatch form">
             <div>
-              <label className="text-xs font-medium text-muted-foreground mb-1 block">
+              <label htmlFor="dispatch-prompt" className="text-xs font-medium text-muted-foreground mb-1 block">
                 Job Prompt — What should the agents do?
               </label>
               <textarea
+                id="dispatch-prompt"
                 value={dispatchPrompt}
                 onChange={(e) => setDispatchPrompt(e.target.value)}
                 placeholder="e.g. Research the top 10 DeFi protocols by TVL and create a comparison report with risk analysis..."
@@ -814,12 +1099,14 @@ function AgentMapInner({ projectName: _projectName, agents, tasks, jobs = [], on
             <div className="flex gap-4">
               <div className="flex-1">
                 <label className="text-xs font-medium text-muted-foreground mb-1 block">Priority</label>
-                <div className="flex gap-1.5">
+                <div className="flex gap-1.5" role="radiogroup" aria-label="Job priority">
                   {(["low", "medium", "high"] as const).map((p) => (
                     <button
                       key={p}
                       onClick={() => setDispatchPriority(p)}
                       disabled={dispatching}
+                      role="radio"
+                      aria-checked={dispatchPriority === p}
                       className={`flex-1 px-3 py-1.5 rounded-md text-xs font-medium border transition-all ${dispatchPriority === p
                           ? p === "high"
                             ? "bg-orange-500/15 border-orange-500/40 text-orange-500"
@@ -837,8 +1124,9 @@ function AgentMapInner({ projectName: _projectName, agents, tasks, jobs = [], on
               </div>
 
               <div className="w-40">
-                <label className="text-xs font-medium text-muted-foreground mb-1 block">Reward ({currencySymbol})</label>
+                <label htmlFor="dispatch-reward" className="text-xs font-medium text-muted-foreground mb-1 block">Reward ({currencySymbol})</label>
                 <input
+                  id="dispatch-reward"
                   type="text"
                   value={dispatchReward}
                   onChange={(e) => setDispatchReward(e.target.value)}
@@ -866,7 +1154,7 @@ function AgentMapInner({ projectName: _projectName, agents, tasks, jobs = [], on
               {agents.length === 0 ? (
                 <p className="text-xs text-muted-foreground py-2">No agents assigned to this project yet.</p>
               ) : (
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2" role="group" aria-label="Agent selection">
                   {agents.map((agent) => {
                     const selected = selectedAgentIds.has(agent.id);
                     const isOnline = agent.status === "online";
@@ -875,6 +1163,9 @@ function AgentMapInner({ projectName: _projectName, agents, tasks, jobs = [], on
                         key={agent.id}
                         onClick={() => toggleAgent(agent.id)}
                         disabled={dispatching}
+                        role="checkbox"
+                        aria-checked={selected}
+                        aria-label={`${agent.name} (${agent.status})`}
                         className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-left text-xs transition-all ${selected
                             ? "border-amber-500 bg-amber-500/10 text-foreground ring-1 ring-amber-500/30"
                             : "border-border/50 text-muted-foreground hover:border-border hover:text-foreground"

@@ -1,7 +1,7 @@
 /** Map Agent Node — Custom React Flow node for an agent showing name, status, and skill badges. */
 "use client";
 
-import { useState } from "react";
+import { memo, useState } from "react";
 import { Handle, Position } from "@xyflow/react";
 
 const TYPE_ICONS: Record<string, string> = {
@@ -39,7 +39,7 @@ interface MapAgentNodeData {
   [key: string]: unknown;
 }
 
-export function MapAgentNode({ data }: { data: MapAgentNodeData }) {
+export const MapAgentNode = memo(function MapAgentNode({ data }: { data: MapAgentNodeData }) {
   const [expanded, setExpanded] = useState(false);
   const icon = TYPE_ICONS[data.type] || "🤖";
   const dot = STATUS_DOT[data.status] || "🔴";
@@ -126,4 +126,4 @@ export function MapAgentNode({ data }: { data: MapAgentNodeData }) {
       <Handle type="source" position={Position.Right} className="!bg-emerald-500 !w-3 !h-3" id="job-source" />
     </div>
   );
-}
+});

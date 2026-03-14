@@ -1,7 +1,7 @@
 /** Map Hub Node — Custom React Flow node representing the central project hub/orchestrator. */
 "use client";
 
-import { useState } from "react";
+import { memo, useState } from "react";
 import { Handle, Position } from "@xyflow/react";
 
 interface MapHubNodeData {
@@ -14,7 +14,7 @@ interface MapHubNodeData {
   [key: string]: unknown;
 }
 
-export function MapHubNode({ data }: { data: MapHubNodeData }) {
+export const MapHubNode = memo(function MapHubNode({ data }: { data: MapHubNodeData }) {
   const [expanded, setExpanded] = useState(false);
   const completionRate = data.taskCount > 0 ? Math.round((data.doneCount / data.taskCount) * 100) : 0;
   const todoCount = data.taskCount - data.activeCount - data.doneCount;
@@ -97,4 +97,4 @@ export function MapHubNode({ data }: { data: MapHubNodeData }) {
       <Handle type="target" position={Position.Top} className="!bg-amber-900" />
     </div>
   );
-}
+});

@@ -1,7 +1,7 @@
 /** Map Custom Edge — Bezier edge with hover toolbar and status coloring (n8n-style). */
 "use client";
 
-import { useState, useCallback } from "react";
+import { memo, useState, useCallback } from "react";
 import {
   getBezierPath,
   BaseEdge,
@@ -10,7 +10,7 @@ import {
 } from "@xyflow/react";
 import { Trash2, Plus } from "lucide-react";
 
-export function MapCustomEdge({
+export const MapCustomEdge = memo(function MapCustomEdge({
   id,
   sourceX,
   sourceY,
@@ -128,4 +128,4 @@ export function MapCustomEdge({
       )}
     </>
   );
-}
+});

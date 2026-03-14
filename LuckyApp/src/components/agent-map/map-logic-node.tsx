@@ -1,7 +1,7 @@
 /** Map Logic Nodes — Condition, Switch, and Merge nodes with multi-handle layouts. */
 "use client";
 
-import { useState } from "react";
+import { memo, useState } from "react";
 import { Handle, Position } from "@xyflow/react";
 
 /* ═══════════════ Condition Node ═══════════════ */
@@ -12,7 +12,7 @@ interface ConditionData {
   [key: string]: unknown;
 }
 
-export function MapConditionNode({ data }: { data: ConditionData }) {
+export const MapConditionNode = memo(function MapConditionNode({ data }: { data: ConditionData }) {
   const [expanded, setExpanded] = useState(false);
 
   return (
@@ -78,7 +78,7 @@ export function MapConditionNode({ data }: { data: ConditionData }) {
       />
     </div>
   );
-}
+});
 
 /* ═══════════════ Switch Node ═══════════════ */
 
@@ -89,7 +89,7 @@ interface SwitchData {
   [key: string]: unknown;
 }
 
-export function MapSwitchNode({ data }: { data: SwitchData }) {
+export const MapSwitchNode = memo(function MapSwitchNode({ data }: { data: SwitchData }) {
   const [expanded, setExpanded] = useState(false);
   const cases = Array.isArray(data.cases) ? data.cases : [];
 
@@ -149,7 +149,7 @@ export function MapSwitchNode({ data }: { data: SwitchData }) {
       })}
     </div>
   );
-}
+});
 
 /* ═══════════════ Merge Node ═══════════════ */
 
@@ -160,7 +160,7 @@ interface MergeData {
   [key: string]: unknown;
 }
 
-export function MapMergeNode({ data }: { data: MergeData }) {
+export const MapMergeNode = memo(function MapMergeNode({ data }: { data: MergeData }) {
   const [expanded, setExpanded] = useState(false);
   const inputCount = Math.max(2, Number(data.inputCount) || 2);
 
@@ -216,4 +216,4 @@ export function MapMergeNode({ data }: { data: MergeData }) {
       <Handle type="source" position={Position.Right} className="!w-3 !h-3 !bg-purple-500" />
     </div>
   );
-}
+});

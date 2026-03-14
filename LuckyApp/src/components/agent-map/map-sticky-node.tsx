@@ -1,7 +1,7 @@
 /** Map Sticky Note Node — Resizable, colorable note for canvas annotations (n8n-style). */
 "use client";
 
-import { useState, useCallback, useRef, useEffect } from "react";
+import { memo, useState, useCallback, useRef, useEffect } from "react";
 import { Handle, Position, NodeResizer } from "@xyflow/react";
 
 const STICKY_COLORS: Record<string, { bg: string; border: string; text: string }> = {
@@ -29,7 +29,7 @@ interface MapStickyNodeData {
   [key: string]: unknown;
 }
 
-export function MapStickyNode({ data, id }: { data: MapStickyNodeData; id: string }) {
+export const MapStickyNode = memo(function MapStickyNode({ data, id }: { data: MapStickyNodeData; id: string }) {
   const [editing, setEditing] = useState(false);
   const [content, setContent] = useState(data.content || "");
   const [color, setColor] = useState(data.color || "yellow");
@@ -118,4 +118,4 @@ export function MapStickyNode({ data, id }: { data: MapStickyNodeData; id: strin
       </div>
     </>
   );
-}
+});

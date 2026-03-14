@@ -1,7 +1,7 @@
 /** Map Job Node — Custom React Flow node representing a dispatched job with status and progress. */
 "use client";
 
-import { useState } from "react";
+import { memo, useState } from "react";
 import { Handle, Position } from "@xyflow/react";
 import { Badge } from "@/components/ui/badge";
 
@@ -23,7 +23,7 @@ interface MapJobNodeData {
   [key: string]: unknown;
 }
 
-export function MapJobNode({ data }: { data: MapJobNodeData }) {
+export const MapJobNode = memo(function MapJobNode({ data }: { data: MapJobNodeData }) {
   const [expanded, setExpanded] = useState(false);
   const isOpen = data.status === "open";
   const isAssigned = !!data.assignedAgent;
@@ -127,4 +127,4 @@ export function MapJobNode({ data }: { data: MapJobNodeData }) {
       )}
     </div>
   );
-}
+});
