@@ -39,22 +39,41 @@ function LandingPageContent() {
   const authConfig = useThirdwebAuth();
   // Staggered loading: center first, then flanks after delay
   const [robotsReady, setRobotsReady] = useState<boolean[]>([false, false, false]);
+  // Track whether user was already authenticated when the page first loaded.
+  // This distinguishes "returning visitor with stale cookie" from "just logged in".
+  const wasAuthOnMount = useRef<boolean | null>(null);
 
   useEffect(() => setMounted(true), []);
 
-  // Only auto-redirect if the user was bounced here from a protected route
-  // (middleware sets ?redirect=/dashboard etc). If they navigate to "/" directly,
-  // always show the landing page — never silently redirect.
   const redirectParam = searchParams.get('redirect');
+  const redirectTarget = redirectParam || '/dashboard';
 
   useEffect(() => {
-    debug.log("[Swarm:Landing] Auth state changed:", { authenticated, loading, redirectParam });
-    if (authenticated && !loading && redirectParam) {
-      debug.log("[Swarm:Landing] Authenticated + redirect param, going to:", redirectParam);
-      const timer = setTimeout(() => router.push(redirectParam), 300);
-      return () => clearTimeout(timer);
+    if (loading) return;
+
+    // Capture initial auth state on first non-loading render
+    if (wasAuthOnMount.current === null) {
+      wasAuthOnMount.current = authenticated;
+      debug.log("[Swarm:Landing] Initial auth state:", { authenticated, redirectParam });
+
+      // If user was bounced here from a protected route (?redirect=), let them
+      // through immediately since they already have a valid session.
+      if (authenticated && redirectParam) {
+        debug.log("[Swarm:Landing] Bounced from protected route, redirecting to:", redirectParam);
+        router.push(redirectParam);
+      }
+      // If authenticated but NO redirect param, they navigated to "/" directly.
+      // Show the landing page — don't auto-redirect (prevents instant-login).
+      return;
     }
-  }, [authenticated, loading, router, redirectParam]);
+
+    // After mount: if auth transitions false → true, the user just completed
+    // a fresh login via ConnectButton. Redirect them to the dashboard.
+    if (authenticated && !wasAuthOnMount.current) {
+      debug.log("[Swarm:Landing] Fresh login detected! Redirecting to:", redirectTarget);
+      router.push(redirectTarget);
+    }
+  }, [authenticated, loading, router, redirectParam, redirectTarget]);
 
   // Stagger robot loading: center immediately, left at 4s, right at 8s
   useEffect(() => {
@@ -202,7 +221,7 @@ function LandingPageContent() {
       <footer className="border-t border-white/5 py-12 text-center bg-black/40">
         <div className="mb-4 flex items-center justify-center gap-2">
           <Image src="/lobsterlogo.png" alt="Swarm Logo" width={24} height={24} />
-          <span className="text-sm font-bold text-white">Swarm by PerkOS</span>
+          <span className="text-sm font-bold text-white">Swarm Protocol</span>
         </div>
         <p className="text-xs text-muted-foreground uppercase tracking-widest">
           Enterprise AI Fleet Orchestration &copy; 2026
