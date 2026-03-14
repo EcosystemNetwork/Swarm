@@ -134,7 +134,15 @@ function LandingPageContent() {
                 {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
               </button>
             )}
-            <ConnectButton client={client} chains={WALLET_CHAINS} auth={authConfig} autoConnect={false} />
+            {authenticated && !loading ? (
+              <Link href="/dashboard">
+                <Button size="sm" className="bg-amber-600 hover:bg-amber-700 text-black font-semibold">
+                  Dashboard <ArrowRight className="ml-1.5 w-3.5 h-3.5" />
+                </Button>
+              </Link>
+            ) : (
+              <ConnectButton client={client} chains={WALLET_CHAINS} auth={authConfig} autoConnect={false} />
+            )}
           </div>
         </div>
       </header>
@@ -194,7 +202,16 @@ function LandingPageContent() {
             </p>
 
             <div className="flex flex-col sm:flex-row items-center justify-center gap-6 animate-in delay-300 pointer-events-auto">
-              <ConnectButton client={client} chains={WALLET_CHAINS} auth={authConfig} autoConnect={false} />
+              {authenticated && !loading ? (
+                <Link href="/dashboard">
+                  <Button size="lg" className="h-12 px-8 rounded-full bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-black font-semibold group">
+                    Go to Dashboard
+                    <ArrowRight className="ml-2 w-4 h-4 transition-transform group-hover:translate-x-1" />
+                  </Button>
+                </Link>
+              ) : (
+                <ConnectButton client={client} chains={WALLET_CHAINS} auth={authConfig} autoConnect={false} />
+              )}
               <Link href="/docs">
                 <Button variant="outline" size="lg" className="h-12 px-8 rounded-full border-white/10 hover:bg-white/5 group bg-black/20">
                   Read the Docs
@@ -210,7 +227,16 @@ function LandingPageContent() {
           <div className="max-w-4xl mx-auto px-6 text-center">
             <h2 className="text-4xl font-bold text-white mb-6 tracking-tight">Ready to orchestrate your fleet?</h2>
             <div className="flex justify-center">
-              <ConnectButton client={client} chains={WALLET_CHAINS} auth={authConfig} autoConnect={false} />
+              {authenticated && !loading ? (
+                <Link href="/dashboard">
+                  <Button size="lg" className="h-12 px-8 rounded-full bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-black font-semibold group">
+                    Go to Dashboard
+                    <ArrowRight className="ml-2 w-4 h-4 transition-transform group-hover:translate-x-1" />
+                  </Button>
+                </Link>
+              ) : (
+                <ConnectButton client={client} chains={WALLET_CHAINS} auth={authConfig} autoConnect={false} />
+              )}
             </div>
           </div>
         </section>
