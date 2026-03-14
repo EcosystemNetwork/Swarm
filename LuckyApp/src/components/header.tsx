@@ -167,7 +167,7 @@ export function Header() {
                 {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
               </button>
             )}
-            <ConnectButton client={thirdwebClient} wallets={swarmWallets} chains={WALLET_CHAINS} auth={authConfig} autoConnect={false} />
+            <ConnectButton client={thirdwebClient} wallets={swarmWallets} chains={WALLET_CHAINS} auth={authConfig} autoConnect={true} />
           </div>
         </div>
       </header>
