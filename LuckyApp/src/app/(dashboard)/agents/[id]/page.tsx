@@ -481,14 +481,12 @@ function AgentDetailPage() {
             <div className="flex items-center gap-3 flex-wrap">
               <h1 className="text-3xl font-bold tracking-tight">{agent.name}</h1>
               <Badge className={TYPE_COLORS[agent.type] || ""}>{agent.type}</Badge>
-              <span className={`text-sm flex items-center gap-1.5 ${
-                agent.status === "online" ? "text-emerald-600 dark:text-emerald-400" :
-                agent.status === "busy" ? "text-orange-600 dark:text-orange-400" : "text-muted-foreground"
-              }`}>
-                <span className={`w-2.5 h-2.5 rounded-full ${
-                  agent.status === "online" ? "bg-emerald-500" :
-                  agent.status === "busy" ? "bg-orange-500" : "bg-muted"
-                }`} />
+              <span className={`text-sm flex items-center gap-1.5 ${agent.status === "online" ? "text-emerald-600 dark:text-emerald-400" :
+                  agent.status === "busy" ? "text-orange-600 dark:text-orange-400" : "text-muted-foreground"
+                }`}>
+                <span className={`w-2.5 h-2.5 rounded-full ${agent.status === "online" ? "bg-emerald-500" :
+                    agent.status === "busy" ? "bg-orange-500" : "bg-muted"
+                  }`} />
                 {agent.status}
               </span>
               {onchainMatch && (
@@ -681,8 +679,8 @@ function AgentDetailPage() {
                       project.status === "active"
                         ? "bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400"
                         : project.status === "paused"
-                        ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-950/40 dark:text-yellow-400"
-                        : "bg-muted text-muted-foreground"
+                          ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-950/40 dark:text-yellow-400"
+                          : "bg-muted text-muted-foreground"
                     }
                   >
                     {project.status}
@@ -1107,7 +1105,7 @@ function AgentDetailPage() {
                 <p className="text-muted-foreground"># Install the SwarmConnect skill</p>
                 <p>npm install -g @swarmprotocol/agent-skill</p>
                 <p className="text-muted-foreground mt-2"># Register this agent (with skills)</p>
-                <p>swarm register --hub https://swarm.perkos.xyz --org {currentOrg?.id} --name &quot;{agent.name}&quot; --type &quot;{agent.type}&quot; --skills &quot;web-search,code-interpreter&quot;</p>
+                <p>swarm register --hub https://swarmprotocol.ai --org {currentOrg?.id} --name &quot;{agent.name}&quot; --type &quot;{agent.type}&quot; --skills &quot;web-search,code-interpreter&quot;</p>
                 <p className="text-muted-foreground mt-2"># Report skills at any time</p>
                 <p>swarm report-skills --skills &quot;web-search,code-interpreter&quot;</p>
                 <p className="text-muted-foreground mt-2"># Check for messages</p>
@@ -1157,14 +1155,14 @@ function AgentDetailPage() {
                     job.status === "completed" || job.status === "closed"
                       ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400"
                       : job.status === "in_progress" || job.status === "claimed"
-                      ? "bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400"
-                      : "bg-muted text-muted-foreground"
+                        ? "bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400"
+                        : "bg-muted text-muted-foreground"
                   }
                 >
                   {job.status === 'in_progress' ? 'In Progress' :
-                   job.status === 'claimed' ? 'Claimed' :
-                   job.status === 'completed' ? 'Completed' :
-                   job.status === 'closed' ? 'Closed' : 'Open'}
+                    job.status === 'claimed' ? 'Claimed' :
+                      job.status === 'completed' ? 'Completed' :
+                        job.status === 'closed' ? 'Closed' : 'Open'}
                 </Badge>
               </div>
             ))}
@@ -1210,12 +1208,12 @@ function AgentDetailPage() {
                     task.status === "done"
                       ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400"
                       : task.status === "in_progress"
-                      ? "bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400"
-                      : "bg-muted text-muted-foreground"
+                        ? "bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400"
+                        : "bg-muted text-muted-foreground"
                   }
                 >
                   {task.status === 'in_progress' ? 'In Progress' :
-                   task.status === 'todo' ? 'To Do' : 'Done'}
+                    task.status === 'todo' ? 'To Do' : 'Done'}
                 </Badge>
               </div>
             ))}

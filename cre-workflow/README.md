@@ -73,7 +73,7 @@ Edit `config.json`:
 | Field | Description | Default |
 |-------|-------------|---------|
 | `schedule` | Cron expression (min 10 min intervals) | `0 */10 * * * *` |
-| `swarmApiUrl` | Swarm Hub API base URL | `https://swarm.perkos.xyz` |
+| `swarmApiUrl` | Swarm Hub API base URL | `https://swarmprotocol.ai` |
 | `orgId` | Organization ID to monitor | — |
 | `agentId` | Agent ID for API auth | — |
 | `apiKey` | API key for auth | — |

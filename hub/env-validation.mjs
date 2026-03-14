@@ -64,7 +64,7 @@ const ENV_REQUIREMENTS = [
       return origins.every((o) => o.trim().startsWith("http"));
     },
     description: "Comma-separated allowed origins for CORS",
-    example: "https://swarm.perkos.xyz,http://localhost:3000",
+    example: "https://swarmprotocol.ai,http://localhost:3000",
   },
 
   // Optional - Instance Identity
@@ -144,8 +144,7 @@ export function validateHubEnv() {
     // Check if required var is missing
     if (req.required && !value) {
       errors.push(
-        `Missing required env var: ${req.key} - ${req.description}${
-          req.example ? ` (example: ${req.example})` : ""
+        `Missing required env var: ${req.key} - ${req.description}${req.example ? ` (example: ${req.example})` : ""
         }`
       );
       continue;
@@ -164,8 +163,7 @@ export function validateHubEnv() {
     // Validate value if validator provided
     if (req.validate && !req.validate(value)) {
       errors.push(
-        `Invalid value for ${req.key}: ${req.description}${
-          req.example ? ` (example: ${req.example})` : ""
+        `Invalid value for ${req.key}: ${req.description}${req.example ? ` (example: ${req.example})` : ""
         }`
       );
     }
@@ -234,8 +232,7 @@ export function printHubEnvSummary() {
     `  FIREBASE_PROJECT_ID: ${process.env.FIREBASE_PROJECT_ID || "❌ Missing"}`
   );
   console.log(
-    `  ALLOWED_ORIGINS: ${
-      process.env.ALLOWED_ORIGINS ? "✅ Set" : "❌ Missing"
+    `  ALLOWED_ORIGINS: ${process.env.ALLOWED_ORIGINS ? "✅ Set" : "❌ Missing"
     }`
   );
   console.log(

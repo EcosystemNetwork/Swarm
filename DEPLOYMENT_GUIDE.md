@@ -354,7 +354,7 @@ FIREBASE_MESSAGING_SENDER_ID=123456789
 FIREBASE_APP_ID=1:123456789:web:abc123
 
 # Security
-ALLOWED_ORIGINS=https://swarm.perkos.xyz,https://app.swarm.perkos.xyz
+ALLOWED_ORIGINS=https://swarmprotocol.ai,https://app.swarmprotocol.ai
 RATE_LIMIT_WINDOW_MS=60000
 RATE_LIMIT_MAX=60
 MAX_CONNECTIONS_PER_AGENT=5

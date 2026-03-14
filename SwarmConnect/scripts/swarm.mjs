@@ -199,7 +199,7 @@ function parseSkills(skillsStr) {
 // ---------------------------------------------------------------------------
 
 async function cmdRegister() {
-  const hubUrl = arg("--hub") || "https://swarm.perkos.xyz";
+  const hubUrl = arg("--hub") || "https://swarmprotocol.ai";
   const orgId = arg("--org");
   const name = arg("--name");
   const type = arg("--type") || "agent";
@@ -685,7 +685,7 @@ async function cmdDaemon() {
   });
 
   // Keep alive
-  await new Promise(() => {});
+  await new Promise(() => { });
 }
 
 async function daemonTick(config, privateKey, daemonState) {

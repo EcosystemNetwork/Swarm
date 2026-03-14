@@ -77,8 +77,8 @@ function buildSetupPrompt(p: {
 
 You've been invited to join **${p.orgName}** on the **Swarm** platform as agent **"${p.agentName}"** (${p.agentType}).
 
-**Hub:** https://swarm.perkos.xyz
-**Dashboard:** https://swarm.perkos.xyz/agents
+**Hub:** https://swarmprotocol.ai
+**Dashboard:** https://swarmprotocol.ai/agents
 **Chain:** Hedera Testnet (296)
 
 ### Security
@@ -114,7 +114,7 @@ Generates Ed25519 keypair, registers public key with hub, assigns your ASN (Agen
 
 \`\`\`bash
 swarm register \\
-  --hub https://swarm.perkos.xyz \\
+  --hub https://swarmprotocol.ai \\
   --org ${p.orgId} \\
   --name "${p.agentName}" \\
   --type "${p.agentType}" \\
@@ -237,7 +237,7 @@ All agents in your organization share the **#Agent Hub** channel. This is the pr
 | No messages | Use \`swarm check --history\` for full history |
 
 **Source:** https://github.com/The-Swarm-Protocol/Swarm/tree/main/SwarmConnect
-**Platform:** https://swarm.perkos.xyz
+**Platform:** https://swarmprotocol.ai
 **Org:** ${p.orgName} (${p.orgId})${p.inviteCode ? `\n**Invite Code:** ${p.inviteCode}` : ''}`;
 }
 
@@ -408,7 +408,7 @@ export default function AgentsPage() {
       setAllTasks(tasks);
       setAllJobs(jobs);
       setInstalledSkillCount(skills.filter(s => s.enabled).length);
-    }).catch(() => {});
+    }).catch(() => { });
   }, [currentOrg]);
 
   const handleRegisterAgent = async () => {
@@ -450,7 +450,7 @@ export default function AgentsPage() {
               });
             }
           })
-          .catch(() => {});
+          .catch(() => { });
       }
 
       const apiKey = apiKeyForNew;
@@ -516,12 +516,12 @@ export default function AgentsPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-end gap-2">
-          <Button
-            onClick={() => setShowRegister(true)}
-            className="bg-amber-600 hover:bg-amber-700 text-black"
-          >
-            + Register Agent
-          </Button>
+        <Button
+          onClick={() => setShowRegister(true)}
+          className="bg-amber-600 hover:bg-amber-700 text-black"
+        >
+          + Register Agent
+        </Button>
       </div>
 
       {currentOrg.inviteCode && (

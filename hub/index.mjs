@@ -322,16 +322,16 @@ async function unsubscribeFromChannel(ws, channelId) {
   if (subs) {
     subs.delete(ws);
 
-  // Untrack from Redis
-  try {
-    await redisUnsubscribeChannel(channelId, state.agentId);
-  } catch (err) {
-    log("warn", "Failed to untrack channel subscription from Redis", {
-      agentId: state.agentId,
-      channelId,
-      error: err.message,
-    });
-  }
+    // Untrack from Redis
+    try {
+      await redisUnsubscribeChannel(channelId, state.agentId);
+    } catch (err) {
+      log("warn", "Failed to untrack channel subscription from Redis", {
+        agentId: state.agentId,
+        channelId,
+        error: err.message,
+      });
+    }
     if (subs.size === 0) channelSubscribers.delete(channelId);
   }
   state.channels.delete(channelId);
@@ -591,7 +591,7 @@ app.use((req, res, next) => {
 });
 
 // Security: Lock down CORS to only allow requests from the main app
-const ALLOWED_ORIGINS = optionalEnv("ALLOWED_ORIGINS", "https://swarm.perkos.xyz,http://localhost:3000")
+const ALLOWED_ORIGINS = optionalEnv("ALLOWED_ORIGINS", "https://swarmprotocol.ai,http://localhost:3000")
   .split(",")
   .map(o => o.trim());
 
