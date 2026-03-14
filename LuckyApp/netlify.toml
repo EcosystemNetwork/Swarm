@@ -4,3 +4,10 @@
 
 [[plugins]]
   package = "@netlify/plugin-nextjs"
+
+# ── Canonical domain: redirect www → apex ──
+[[redirects]]
+  from = "https://www.swarmprotocol.fun/*"
+  to = "https://swarmprotocol.fun/:splat"
+  status = 301
+  force = true

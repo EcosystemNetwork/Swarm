@@ -47,13 +47,13 @@ export function getThirdwebAuth(domain: string) {
 
 /**
  * Extract the domain from a request's Host header.
- * Falls back to NEXT_PUBLIC_APP_DOMAIN env var or "localhost:3000".
+ * Falls back to NEXT_PUBLIC_APP_DOMAIN env var or "swarmprotocol.fun".
  */
 export function getDomainFromRequest(req: Request): string {
   const host = req.headers.get("host")
     || req.headers.get("x-forwarded-host")
     || process.env.NEXT_PUBLIC_APP_DOMAIN
-    || "localhost:3000";
+    || "swarmprotocol.fun";
   // Strip port for standard ports
   return host.replace(/:443$/, "").replace(/:80$/, "");
 }

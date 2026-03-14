@@ -245,28 +245,36 @@ export async function updateOrganization(orgId: string, data: Partial<Organizati
 }
 
 export async function getOrganizationsByWallet(walletAddress: string): Promise<Organization[]> {
-  // Get orgs where user is owner OR in members array
-  const ownerQuery = query(collection(db, "organizations"), where("ownerAddress", "==", walletAddress));
-  const memberQuery = query(collection(db, "organizations"), where("members", "array-contains", walletAddress));
+  // Firestore string matches are case-sensitive. Addresses may be stored
+  // checksummed (mixed-case) or lowercase, so query with all three forms:
+  // original, lowercase, and EIP-55 checksummed.
+  const lower = walletAddress.toLowerCase();
+  const variants = new Set([walletAddress, lower]);
 
-  const [ownerSnap, memberSnap] = await Promise.all([
-    getDocs(ownerQuery),
-    getDocs(memberQuery)
+  // Add checksummed (EIP-55) form — handles the case where the session
+  // stores lowercase but Firestore has the checksummed address.
+  try {
+    const { ethers } = await import("ethers");
+    variants.add(ethers.getAddress(walletAddress));
+  } catch {
+    // Invalid address or ethers not available — skip checksummed variant
+  }
+
+  const queries = [...variants].flatMap(addr => [
+    getDocs(query(collection(db, "organizations"), where("ownerAddress", "==", addr))),
+    getDocs(query(collection(db, "organizations"), where("members", "array-contains", addr))),
   ]);
 
+  const snapshots = await Promise.all(queries);
+
   const orgMap = new Map<string, Organization>();
-
-  // Add orgs where user is owner
-  ownerSnap.docs.forEach(d => {
-    orgMap.set(d.id, { id: d.id, ...d.data() } as Organization);
-  });
-
-  // Add orgs where user is member (avoid duplicates)
-  memberSnap.docs.forEach(d => {
-    if (!orgMap.has(d.id)) {
-      orgMap.set(d.id, { id: d.id, ...d.data() } as Organization);
-    }
-  });
+  for (const snap of snapshots) {
+    snap.docs.forEach(d => {
+      if (!orgMap.has(d.id)) {
+        orgMap.set(d.id, { id: d.id, ...d.data() } as Organization);
+      }
+    });
+  }
 
   return Array.from(orgMap.values());
 }
