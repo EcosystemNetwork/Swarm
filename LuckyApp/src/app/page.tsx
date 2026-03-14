@@ -7,6 +7,7 @@ import Link from "next/link";
 import { ConnectButton } from "thirdweb/react";
 import { thirdwebClient } from "@/lib/thirdweb-client";
 import { WALLET_CHAINS } from "@/lib/chains";
+import { swarmWallets } from "@/lib/wallets";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState, useEffect, Suspense, lazy, useRef } from "react";
 import Image from "next/image";
@@ -40,13 +41,14 @@ function LandingPageContent() {
 
   const redirectParam = searchParams.get('redirect');
 
-  // Redirect authenticated users to dashboard (or ?redirect= target)
+  // Only auto-redirect if there's an explicit ?redirect= param
+  // (e.g. from ProtectedRoute sending unauthenticated users here).
+  // Otherwise let the user see the landing page and click "Dashboard" themselves.
   useEffect(() => {
-    if (loading || !authenticated) return;
+    if (loading || !authenticated || !redirectParam) return;
 
-    const target = redirectParam || "/dashboard";
-    debug.log("[Swarm:Landing] Authenticated, redirecting to:", target);
-    router.replace(target);
+    debug.log("[Swarm:Landing] Authenticated with redirect param, navigating to:", redirectParam);
+    router.replace(redirectParam);
   }, [authenticated, loading, router, redirectParam]);
 
   // Stagger robot loading: center immediately, left at 4s, right at 8s
@@ -117,7 +119,7 @@ function LandingPageContent() {
                 </Button>
               </Link>
             ) : (
-              <ConnectButton client={thirdwebClient} chains={WALLET_CHAINS} auth={authConfig} autoConnect={false} connectButton={{ label: "Connect" }} />
+              <ConnectButton client={thirdwebClient} wallets={swarmWallets} chains={WALLET_CHAINS} auth={authConfig} autoConnect={false} connectButton={{ label: "Connect" }} />
             )}
           </div>
         </div>
@@ -186,7 +188,7 @@ function LandingPageContent() {
                   </Button>
                 </Link>
               ) : (
-                <ConnectButton client={thirdwebClient} chains={WALLET_CHAINS} auth={authConfig} autoConnect={false} connectButton={{ label: "Connect" }} />
+                <ConnectButton client={thirdwebClient} wallets={swarmWallets} chains={WALLET_CHAINS} auth={authConfig} autoConnect={false} connectButton={{ label: "Connect" }} />
               )}
               <Link href="/docs">
                 <Button variant="outline" size="lg" className="h-12 px-8 rounded-full border-white/10 hover:bg-white/5 group bg-black/20">
@@ -211,7 +213,7 @@ function LandingPageContent() {
                   </Button>
                 </Link>
               ) : (
-                <ConnectButton client={thirdwebClient} chains={WALLET_CHAINS} auth={authConfig} autoConnect={false} connectButton={{ label: "Connect" }} />
+                <ConnectButton client={thirdwebClient} wallets={swarmWallets} chains={WALLET_CHAINS} auth={authConfig} autoConnect={false} connectButton={{ label: "Connect" }} />
               )}
             </div>
           </div>

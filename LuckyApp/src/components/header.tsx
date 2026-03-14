@@ -10,6 +10,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { ConnectButton, useActiveAccount } from 'thirdweb/react';
 import { thirdwebClient } from '@/lib/thirdweb-client';
 import { WALLET_CHAINS } from '@/lib/chains';
+import { swarmWallets } from '@/lib/wallets';
 import { useOrg } from '@/contexts/OrgContext';
 import { getProjectsByOrg, createProject, createOrganization, type Project } from '@/lib/firestore';
 import GradientText from '@/components/reactbits/GradientText';
@@ -166,7 +167,7 @@ export function Header() {
                 {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
               </button>
             )}
-            <ConnectButton client={thirdwebClient} chains={WALLET_CHAINS} auth={authConfig} autoConnect={false} />
+            <ConnectButton client={thirdwebClient} wallets={swarmWallets} chains={WALLET_CHAINS} auth={authConfig} autoConnect={false} />
           </div>
         </div>
       </header>

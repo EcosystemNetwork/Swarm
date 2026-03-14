@@ -8,6 +8,7 @@ import {
   getOrganizationsByWallet,
   type Organization
 } from '@/lib/firestore';
+import { useSession } from './SessionContext';
 
 interface OrgContextValue {
   /** Currently selected organization */
@@ -50,7 +51,9 @@ const DISCONNECT_GRACE_MS = 6_000;
 export function OrgProvider({ children }: { children: ReactNode }) {
   const account = useActiveAccount();
   const connectionStatus = useActiveWalletConnectionStatus();
-  const address = account?.address;
+  const { address: sessionAddress, authenticated } = useSession();
+  // Use wallet address if connected, otherwise fall back to session address
+  const address = account?.address || (authenticated ? sessionAddress : null) || undefined;
 
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [currentOrg, setCurrentOrg] = useState<Organization | null>(null);
@@ -152,32 +155,28 @@ export function OrgProvider({ children }: { children: ReactNode }) {
     }
   }, [address, refreshOrgs, organizations]);
 
-  // Load orgs when wallet connects, debounce disconnects.
-  // Only re-fetch when the address actually changes — ignore connectionStatus
-  // transitions that don't affect the address (e.g. 'connecting' → 'connected').
+  // Load orgs when address is available (from wallet or session).
+  // Only re-fetch when the address actually changes.
   useEffect(() => {
     if (address) {
-      // Wallet (re-)connected — cancel any pending disconnect timer
+      // Address available — cancel any pending disconnect timer
       if (disconnectTimer.current) {
         clearTimeout(disconnectTimer.current);
         disconnectTimer.current = null;
       }
-      // Only fetch if this is a new address (prevents duplicate fetches
-      // when connectionStatus changes but address stays the same)
+      // Only fetch if this is a new address
       if (address !== lastFetchedAddress.current) {
         lastFetchedAddress.current = address;
         refreshOrgs();
       }
     } else if (connectionStatus === 'connecting' || connectionStatus === 'unknown') {
-      // Wallet is actively reconnecting (AutoConnect, page reload) — don't clear state yet.
-      // Cancel any existing timer since reconnection is in progress.
+      // Wallet is actively reconnecting — don't clear state yet.
       if (disconnectTimer.current) {
         clearTimeout(disconnectTimer.current);
         disconnectTimer.current = null;
       }
-    } else {
-      // Wallet address is falsy AND status is definitively disconnected —
-      // start grace period before clearing state.
+    } else if (!authenticated) {
+      // No wallet, no session — clear state after grace period
       lastFetchedAddress.current = null;
       if (!disconnectTimer.current) {
         disconnectTimer.current = setTimeout(() => {
@@ -195,7 +194,7 @@ export function OrgProvider({ children }: { children: ReactNode }) {
         disconnectTimer.current = null;
       }
     };
-  }, [address, connectionStatus, refreshOrgs]);
+  }, [address, connectionStatus, authenticated, refreshOrgs]);
 
   return (
     <OrgContext.Provider value={{
