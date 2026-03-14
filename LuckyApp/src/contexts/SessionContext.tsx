@@ -116,6 +116,25 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     }
   }, [fetchSession]);
 
+  // If session check completes as NOT authenticated, clear any stale
+  // thirdweb wallet state from localStorage. This prevents thirdweb from
+  // auto-reconnecting the wallet and re-triggering SIWE when the user
+  // cleared cookies externally (not through our logout flow).
+  const cleanedRef = useRef(false);
+  useEffect(() => {
+    if (loading || session.authenticated || cleanedRef.current) return;
+    cleanedRef.current = true;
+    try {
+      const twKeys = Object.keys(localStorage).filter(
+        k => k.startsWith("thirdweb:") || k.startsWith("walletConnect")
+      );
+      if (twKeys.length > 0) {
+        debug.log("[Swarm:Session] Not authenticated — clearing stale thirdweb state:", twKeys.length, "keys");
+        twKeys.forEach(k => localStorage.removeItem(k));
+      }
+    } catch { /* localStorage unavailable */ }
+  }, [loading, session.authenticated]);
+
   const logout = useCallback(async () => {
     try {
       await fetch("/api/auth/logout", {
