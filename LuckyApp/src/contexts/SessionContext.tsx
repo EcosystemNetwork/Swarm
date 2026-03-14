@@ -123,6 +123,15 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         credentials: "include",
       });
     } finally {
+      // Clear thirdweb wallet connection state from localStorage so the
+      // wallet doesn't auto-reconnect and re-trigger SIWE on next load.
+      try {
+        const keysToRemove = Object.keys(localStorage).filter(
+          k => k.startsWith("thirdweb:") || k.startsWith("walletConnect")
+        );
+        keysToRemove.forEach(k => localStorage.removeItem(k));
+      } catch { /* localStorage may be unavailable */ }
+
       setSession({
         authenticated: false,
         address: null,

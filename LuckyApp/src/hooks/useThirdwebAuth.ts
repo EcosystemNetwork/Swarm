@@ -11,10 +11,13 @@
 "use client";
 
 import { useMemo } from "react";
+import { useActiveWallet, useDisconnect } from "thirdweb/react";
 import { useSession } from "@/contexts/SessionContext";
 
 export function useThirdwebAuth() {
   const { refresh, logout } = useSession();
+  const activeWallet = useActiveWallet();
+  const { disconnect } = useDisconnect();
 
   return useMemo(() => ({
     getLoginPayload: async (params: { address: string; chainId?: number }) => {
@@ -58,8 +61,16 @@ export function useThirdwebAuth() {
       }
     },
     doLogout: async () => {
+      // 1. Clear server session (cookie)
       await fetch("/api/auth/logout", { method: "POST", credentials: "include" }).catch(() => {});
+      // 2. Disconnect wallet from thirdweb (clears localStorage state).
+      //    Without this, thirdweb auto-reconnects the wallet on next page load
+      //    and re-triggers SIWE, effectively re-logging the user in.
+      if (activeWallet) {
+        try { disconnect(activeWallet); } catch { /* wallet may already be disconnected */ }
+      }
+      // 3. Clear React session state
       await logout();
     },
-  }), [refresh, logout]);
+  }), [refresh, logout, activeWallet, disconnect]);
 }
