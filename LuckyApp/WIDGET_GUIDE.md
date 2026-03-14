@@ -172,7 +172,7 @@ swarm list-sessions --status active
 ### View Coordinators
 ```bash
 # Via API (coordinators are registered via API, not CLI directly)
-curl -X GET "https://swarm.perkos.xyz/api/v1/coordinators?agent=agent_123&sig=..."
+curl -X GET "https://swarmprotocol.ai/api/v1/coordinators?agent=agent_123&sig=..."
 ```
 
 ---

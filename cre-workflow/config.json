@@ -1,6 +1,6 @@
 {
 	"schedule": "0 */10 * * * *",
-	"swarmApiUrl": "https://swarm.perkos.xyz",
+	"swarmApiUrl": "https://swarmprotocol.ai",
 	"orgId": "YOUR_ORG_ID",
 	"agentId": "YOUR_AGENT_ID",
 	"apiKey": "YOUR_API_KEY",

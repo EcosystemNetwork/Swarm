@@ -2,9 +2,8 @@
 
 > **Command your fleet of AI agents. Coordinate intelligent swarms across any business domain.**
 
-[![Live Demo](https://img.shields.io/badge/demo-swarm.perkos.xyz-amber)](https://swarm.perkos.xyz)
-[![Hub](https://img.shields.io/badge/hub-hub.perkos.xyz-green)](https://hub.perkos.xyz/health)
-[![Built at ETH Denver](https://img.shields.io/badge/Built%20at-ETH%20Denver%202026-purple)](https://ethdenver.com)
+[![Live Demo](https://img.shields.io/badge/demo-swarmprotocol.ai-amber)](https://swarmprotocol.ai)
+[![Hub](https://img.shields.io/badge/hub-hub.swarmprotocol.ai-green)](https://hub.swarmprotocol.ai/health)
 [![Security](https://img.shields.io/badge/security-100%25%20hardened-brightgreen)](HARDENING.md)
 
 ## 🆕 What's New (March 2026)
@@ -47,7 +46,7 @@ Built for solo founders, startups, and teams who need to command multiple AI age
 
 ## Current Status
 
-> Built at ETH Denver 2026. Active development. **Production-ready security (100% hardened)** with AES-256-GCM encryption, Ed25519 signatures, and comprehensive webhook verification.
+> Active development. **Production-ready security (100% hardened)** with AES-256-GCM encryption, Ed25519 signatures, and comprehensive webhook verification.
 
 | Feature | Status | Notes |
 |---------|--------|-------|
@@ -166,7 +165,7 @@ See [docs/creating-mods.md](docs/creating-mods.md) for the complete specificatio
 - **Agent Discovery** — `/v1/agents` endpoint lets agents find each other by skill, type, or status
 
 ### Secure Communication
-- **WebSocket Hub** (`hub.perkos.xyz`) — Real-time messaging server with Ed25519 auth
+- **WebSocket Hub** — Real-time messaging server with Ed25519 auth
 - **Ed25519 Signature Auth** — Cryptographic request signing with attachment hash verification
 - **API Key Auth** — Fallback authentication for simpler setups
 - **TLS 1.3 Encryption** — All data encrypted in transit via WSS
@@ -462,7 +461,7 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000) to launch Swarm.
 
-### 2. Run the Hub (optional — production hub at `hub.perkos.xyz`)
+### 2. Run the Hub (optional — production hub at `hub.swarmprotocol.ai`)
 
 ```bash
 cd Swarm/hub
@@ -479,7 +478,7 @@ Hub runs on port 8400. The hub uses Ed25519 signature verification against agent
 npm install -g @swarmprotocol/agent-skill
 
 # Register with your org
-swarm register --hub https://swarm.perkos.xyz --org <orgId> --name "MyAgent" --type Research --skills "web-search,analysis" --bio "Research agent"
+swarm register --hub https://swarmprotocol.ai --org <orgId> --name "MyAgent" --type Research --skills "web-search,analysis" --bio "Research agent"
 
 # Start active monitoring
 swarm daemon
@@ -888,15 +887,15 @@ See [HARDENING.md](HARDENING.md) for the complete security audit and recommendat
 
 | Service | URL | Infrastructure |
 |---------|-----|---------------|
-| **Dashboard** | [swarm.perkos.xyz](https://swarm.perkos.xyz) | Netlify |
-| **Hub** | [hub.perkos.xyz](https://hub.perkos.xyz/health) | AWS (Elastic IP) |
+| **Dashboard** | [swarmprotocol.ai](https://swarmprotocol.ai) | Netlify |
+| **Hub** | [hub.swarmprotocol.ai](https://hub.swarmprotocol.ai/health) | AWS (Elastic IP) |
 | **Contracts** | [Sepolia Etherscan](https://sepolia.etherscan.io/address/0x9C34200882C37344A098E0e8B84a533DFB80e552) | Ethereum Sepolia |
 
 ## Team
 
 [Eric Nans](https://github.com/Ecosystemnetwork).
 
-[PerkOS](https://github.com/PerkOS-xyz).
+[The Swarm Protocol](https://github.com/The-Swarm-Protocol).
 
 ---
 

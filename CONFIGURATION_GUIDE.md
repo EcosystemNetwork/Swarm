@@ -136,7 +136,7 @@ FIREBASE_MESSAGING_SENDER_ID=123456789
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 # Comma-separated list of allowed origins (NO WILDCARDS)
-ALLOWED_ORIGINS=https://swarm.perkos.xyz,https://app.swarm.perkos.xyz,http://localhost:3000
+ALLOWED_ORIGINS=https://swarmprotocol.ai,https://app.swarmprotocol.ai,http://localhost:3000
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # OPTIONAL - Cloud Pub/Sub (Multi-Instance Only)
@@ -414,7 +414,7 @@ my-secret-key
 
 ✅ **Good** (specific domains):
 ```
-ALLOWED_ORIGINS=https://swarm.perkos.xyz,https://app.swarm.perkos.xyz
+ALLOWED_ORIGINS=https://swarmprotocol.ai,https://app.swarmprotocol.ai
 ```
 
 ❌ **Bad** (wildcard):
@@ -554,7 +554,7 @@ echo "SESSION_SECRET=$(openssl rand -hex 32)" >> .env.local
 **Solution**:
 ```bash
 # Add missing origin to hub .env
-ALLOWED_ORIGINS=https://swarm.perkos.xyz,https://your-new-domain.com
+ALLOWED_ORIGINS=https://swarmprotocol.ai,https://your-new-domain.com
 ```
 
 ### "Pub/Sub not initialized"
