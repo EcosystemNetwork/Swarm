@@ -41,14 +41,11 @@ export function useThirdwebAuth() {
         console.error("[Swarm] Login failed:", err);
         throw new Error(err.error || "Login failed");
       }
-      // Refresh session state so SessionContext picks up the new cookie
+      // Refresh session state so SessionContext picks up the new cookie.
+      // Do NOT hard-redirect here — let ConnectButton finish its internal
+      // state transition first. The landing page useEffect will handle
+      // navigation once `authenticated` flips to true.
       await refresh();
-      // Redirect: honour ?redirect= param (set by middleware when bouncing
-      // unauthenticated users), otherwise go straight to the dashboard.
-      try {
-        const target = new URLSearchParams(window.location.search).get("redirect") || "/dashboard";
-        window.location.href = target;
-      } catch {}
     },
     isLoggedIn: async () => {
       try {

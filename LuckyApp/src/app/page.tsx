@@ -40,17 +40,13 @@ function LandingPageContent() {
 
   const redirectParam = searchParams.get('redirect');
 
-  // Auto-redirect only when middleware bounced user here with ?redirect=
+  // Redirect authenticated users to dashboard (or ?redirect= target)
   useEffect(() => {
     if (loading || !authenticated) return;
 
-    if (redirectParam) {
-      debug.log("[Swarm:Landing] Bounced from protected route, redirecting to:", redirectParam);
-      router.replace(redirectParam);
-      return;
-    }
-
-    debug.log("[Swarm:Landing] Authenticated, showing landing page");
+    const target = redirectParam || "/dashboard";
+    debug.log("[Swarm:Landing] Authenticated, redirecting to:", target);
+    router.replace(target);
   }, [authenticated, loading, router, redirectParam]);
 
   // Stagger robot loading: center immediately, left at 4s, right at 8s
