@@ -17,7 +17,7 @@ import ShinyText from "@/components/reactbits/ShinyText";
 import DecryptedText from "@/components/reactbits/DecryptedText";
 import { VitalsWidget } from "@/components/vitals-widget";
 import { useActiveAccount } from "thirdweb/react";
-import { GripVertical, RotateCcw, Plus, X, Check, FolderKanban, Bot, Target, CheckCircle2, Briefcase, ListTodo, BarChart3, Handshake, Users } from "lucide-react";
+import { GripVertical, RotateCcw, Plus, X, Check, FolderKanban, Bot, Target, CheckCircle2, Briefcase, ListTodo, BarChart3, Handshake, Users, Loader2, Pencil } from "lucide-react";
 import {
   getOrgStats,
   getTasksByOrg,
@@ -30,6 +30,8 @@ import {
   type Task,
   type Agent,
   type Job,
+  ensureAgentGroupChat,
+  sendMessage,
 } from "@/lib/firestore";
 import { getAgentAvatarUrl } from "@/lib/agent-avatar";
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
@@ -53,6 +55,8 @@ import {
   computeActivityByHour,
 } from "@/lib/dashboard-data";
 import type { DailyCost } from "@/lib/usage";
+import { getCronJobs, createCronJob, updateCronJob, SCHEDULE_PRESETS, parseCronToHuman, type CronJob } from "@/lib/cron";
+import type { DailySummary } from "@/lib/daily-summary";
 
 const AgentMap = dynamic(
   () => import('@/components/agent-map/agent-map'),
@@ -319,6 +323,16 @@ export default function DashboardPage() {
   const [dashTab, setDashTab] = useState("overview");
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
+  // Daily Briefing state
+  const [briefingCronJob, setBriefingCronJob] = useState<CronJob | null>(null);
+  const [latestBriefing, setLatestBriefing] = useState<DailySummary | null>(null);
+  const [briefingSetupMode, setBriefingSetupMode] = useState(false);
+  const [briefingSchedule, setBriefingSchedule] = useState("0 9 * * *");
+  const [briefingPrompt, setBriefingPrompt] = useState(
+    "Generate a daily activity summary for the organization. Include task completion stats, agent activity highlights, any errors or failures, and key metrics like token usage and cost."
+  );
+  const [briefingSaving, setBriefingSaving] = useState(false);
+
   // Compute analytics data
   const taskVelocity = useMemo(() => computeTaskVelocity(allTasks), [allTasks]);
   const agentWorkload = useMemo(() => computeAgentWorkload(allTasks, agents), [allTasks, agents]);
@@ -427,6 +441,22 @@ export default function DashboardPage() {
       } catch {
         // Cost data is non-critical
       }
+
+      // Load daily briefing cron job + latest summary
+      try {
+        const cronJobs = await getCronJobs(currentOrg.id);
+        const briefingJob = cronJobs.find(j => j.name === "Daily Briefing" && j.enabled);
+        setBriefingCronJob(briefingJob || null);
+        if (briefingJob) {
+          const res = await fetch(`/api/summaries?orgId=${currentOrg.id}&limit=1`);
+          if (res.ok) {
+            const data = await res.json();
+            if (data.summaries?.length > 0) setLatestBriefing(data.summaries[0]);
+          }
+        }
+      } catch {
+        // Briefing data is non-critical
+      }
     } catch (err) {
       console.error('Failed to load dashboard data:', err);
       setError(err instanceof Error ? err.message : 'Failed to load dashboard data');
@@ -448,6 +478,78 @@ export default function DashboardPage() {
     }, 30_000);
     return () => clearInterval(interval);
   }, [currentOrg, loadDashboardData]);
+
+  // ── Daily Briefing setup/edit handler ──
+  const handleBriefingSetup = useCallback(async () => {
+    if (!currentOrg || !account) return;
+    setBriefingSaving(true);
+    try {
+      const slot = swarmSlots["daily-briefings"];
+      const briefingAgent = slot ? agents.find(a => a.id === slot.agentId) : null;
+      const scheduleLabel = parseCronToHuman(briefingSchedule);
+      const isEditing = !!briefingCronJob;
+
+      if (isEditing) {
+        await updateCronJob(briefingCronJob.id, {
+          message: briefingPrompt,
+          schedule: briefingSchedule,
+          scheduleLabel,
+          agentIds: briefingAgent ? [briefingAgent.id] : undefined,
+        });
+      } else {
+        await createCronJob({
+          orgId: currentOrg.id,
+          name: "Daily Briefing",
+          message: briefingPrompt,
+          schedule: briefingSchedule,
+          scheduleLabel,
+          agentIds: briefingAgent ? [briefingAgent.id] : undefined,
+          priority: "medium",
+          enabled: true,
+          createdBy: account.address || "unknown",
+        });
+      }
+
+      // Notify assigned briefing agent through Agent Hub
+      if (briefingAgent) {
+        ensureAgentGroupChat(currentOrg.id).then(hub => {
+          const action = isEditing ? "updated" : "configured";
+          sendMessage({
+            channelId: hub.id,
+            senderId: "system",
+            senderName: "Swarm Protocol",
+            senderType: "agent",
+            content: [
+              `📋 **Daily Briefing ${action}** — assigned to **@${briefingAgent.name}**`,
+              ``,
+              `**Schedule:** ${scheduleLabel}`,
+              `**Prompt:** ${briefingPrompt}`,
+              ``,
+              `You are responsible for generating briefings on this schedule. Begin operations when ready.`,
+            ].join("\n"),
+            orgId: currentOrg.id,
+            createdAt: new Date(),
+          });
+        }).catch(() => {});
+      }
+
+      setBriefingSetupMode(false);
+      await loadDashboardData();
+    } catch (err) {
+      console.error("Failed to set up daily briefing:", err);
+    } finally {
+      setBriefingSaving(false);
+    }
+  }, [currentOrg, account, briefingSchedule, briefingPrompt, briefingCronJob, swarmSlots, agents, loadDashboardData]);
+
+  // ── Open briefing editor pre-filled with current config ──
+  const openBriefingEditor = useCallback(() => {
+    if (briefingCronJob) {
+      setBriefingSchedule(briefingCronJob.schedule);
+      setBriefingPrompt(briefingCronJob.message);
+    }
+    setBriefingSetupMode(true);
+  }, [briefingCronJob]);
 
   // ── Dispatch handler — creates job, assigns agents, refreshes data ──
   const handleDispatch = useCallback(async (payload: DispatchPayload) => {
@@ -1038,7 +1140,81 @@ export default function DashboardPage() {
         const slot = swarmSlots["daily-briefings"];
         const briefingAgent = slot ? agents.find(a => a.id === slot.agentId) : null;
 
-        if (!briefingAgent) {
+        // ─── Setup / Edit mode: schedule picker + prompt editor ───
+        if (briefingSetupMode) {
+          const briefingPresets = SCHEDULE_PRESETS.filter(p =>
+            ["daily", "weekly"].includes(p.type) || p.value === "0 */6 * * *"
+          );
+          const isEditing = !!briefingCronJob;
+          return (
+            <SpotlightCard className="p-0 glass-card-enhanced h-full overflow-hidden">
+              <CardHeader className="px-2 pt-2 pb-1">
+                <CardTitle className="text-sm">
+                  📋 <DecryptedText text={isEditing ? "Edit Briefing" : "Set Up Daily Briefing"} speed={30} maxIterations={6} animateOn="view" sequential className="text-sm font-semibold" encryptedClassName="text-sm font-semibold text-amber-500/40" />
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="px-2 pb-2 space-y-3">
+                {/* Schedule picker */}
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1.5">Schedule</p>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {briefingPresets.map((preset) => (
+                      <button
+                        key={preset.value + preset.label}
+                        type="button"
+                        onClick={() => setBriefingSchedule(preset.value)}
+                        className={`flex items-center gap-2 px-2 py-1.5 rounded-lg border text-left text-xs transition-all ${
+                          briefingSchedule === preset.value
+                            ? "border-amber-500/50 bg-amber-500/10 text-amber-400"
+                            : "border-border hover:border-amber-500/30 text-muted-foreground hover:text-foreground"
+                        }`}
+                      >
+                        <span>{preset.icon}</span>
+                        <span className="truncate">{preset.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Prompt editor */}
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1.5">Briefing Prompt</p>
+                  <textarea
+                    value={briefingPrompt}
+                    onChange={(e) => setBriefingPrompt(e.target.value)}
+                    rows={3}
+                    className="w-full rounded-lg border border-border bg-background px-2.5 py-2 text-xs text-foreground placeholder:text-muted-foreground/50 focus:border-amber-500/50 focus:outline-none focus:ring-1 focus:ring-amber-500/20 resize-none"
+                    placeholder="Describe what the briefing should include..."
+                  />
+                </div>
+
+                {/* Action buttons */}
+                <div className="flex justify-end gap-2 pt-1">
+                  <Button variant="outline" size="sm" onClick={() => setBriefingSetupMode(false)}>
+                    Cancel
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={handleBriefingSetup}
+                    disabled={briefingSaving || !briefingPrompt.trim()}
+                    className="bg-amber-500 hover:bg-amber-600 text-black"
+                  >
+                    {briefingSaving ? (
+                      <><Loader2 className="h-3 w-3 animate-spin mr-1" /> Saving...</>
+                    ) : isEditing ? (
+                      "Save Changes"
+                    ) : (
+                      "Enable Briefings"
+                    )}
+                  </Button>
+                </div>
+              </CardContent>
+            </SpotlightCard>
+          );
+        }
+
+        // ─── Unconfigured: no cron job exists ───
+        if (!briefingCronJob) {
           return (
             <SpotlightCard className="p-0 glass-card-enhanced h-full overflow-hidden">
               <CardHeader className="px-2 pt-2 pb-1">
@@ -1049,27 +1225,35 @@ export default function DashboardPage() {
               <CardContent className="px-2 pb-2">
                 <div className="text-center py-4 space-y-2">
                   <div className="text-4xl opacity-30">📋</div>
-                  <p className="text-sm text-muted-foreground">No agent assigned to Daily Briefings</p>
-                  <p className="text-xs text-muted-foreground/60">Equip an agent in the Swarm inventory to start receiving daily briefings.</p>
-                  <Button asChild variant="outline" size="sm" className="mt-2">
-                    <Link href="/swarm">Go to Swarm Inventory</Link>
-                  </Button>
+                  <p className="text-sm text-muted-foreground">Daily briefings are not configured</p>
+                  <p className="text-xs text-muted-foreground/60">
+                    {briefingAgent
+                      ? "Set up a schedule to start receiving automated briefings."
+                      : "Assign an agent in the Swarm inventory, then set up a schedule."}
+                  </p>
+                  <div className="flex justify-center gap-2 mt-2">
+                    {!briefingAgent && (
+                      <Button asChild variant="outline" size="sm">
+                        <Link href="/swarm">Go to Swarm</Link>
+                      </Button>
+                    )}
+                    <Button
+                      size="sm"
+                      onClick={() => setBriefingSetupMode(true)}
+                      className="bg-amber-500 hover:bg-amber-600 text-black"
+                    >
+                      Set Up
+                    </Button>
+                  </div>
                 </div>
               </CardContent>
             </SpotlightCard>
           );
         }
 
-        // Briefing agent is equipped — show digest
-        const today = new Date();
-        const dateStr = today.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
-
-        const todoCount = stats?.todoTasks || 0;
-        const activeCount = stats?.activeTasks || 0;
-        const doneCount = stats?.completedTasks || 0;
-        const openJobCount = stats?.openJobs || 0;
-        const onlineCount = agents.filter(a => a.status === "online").length;
-        const totalAgents = agents.length;
+        // ─── Configured: show latest summary data ───
+        const scheduleLabel = briefingCronJob.scheduleLabel || parseCronToHuman(briefingCronJob.schedule);
+        const summary = latestBriefing?.summary;
 
         return (
           <SpotlightCard className="p-0 glass-card-enhanced h-full overflow-hidden">
@@ -1077,67 +1261,110 @@ export default function DashboardPage() {
               <CardTitle className="text-sm">
                 📋 <DecryptedText text="Daily Briefing" speed={30} maxIterations={6} animateOn="view" sequential className="text-sm font-semibold" encryptedClassName="text-sm font-semibold text-amber-500/40" />
               </CardTitle>
-              <Link href="/swarm" className="text-xs">
-                <ShinyText text="Swarm →" speed={3} color="#b5954a" shineColor="#FFD700" className="text-xs" />
-              </Link>
+              <div className="flex items-center gap-2">
+                <Badge variant="outline" className="text-[9px] px-1.5 py-0 bg-amber-500/10 border-amber-500/20 text-amber-400">
+                  {scheduleLabel}
+                </Badge>
+                <button
+                  onClick={openBriefingEditor}
+                  className="p-1 rounded hover:bg-muted/50 text-muted-foreground hover:text-foreground transition-colors"
+                  title="Edit briefing settings"
+                >
+                  <Pencil className="h-3 w-3" />
+                </button>
+                <Link href="/summaries" className="text-xs">
+                  <ShinyText text="View All →" speed={3} color="#b5954a" shineColor="#FFD700" className="text-xs" />
+                </Link>
+              </div>
             </CardHeader>
             <CardContent className="px-2 pb-2 space-y-2">
               {/* Agent badge */}
-              <div className="flex items-center gap-3 p-3 rounded-lg bg-amber-500/5 border border-amber-500/10">
-                <img
-                  src={briefingAgent.avatarUrl || getAgentAvatarUrl(briefingAgent.name, briefingAgent.type)}
-                  alt={briefingAgent.name}
-                  className="w-8 h-8 rounded-full border-2 border-amber-500/30"
-                />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate">{briefingAgent.name}</p>
-                  <p className="text-[10px] text-muted-foreground">Briefing Agent · {dateStr}</p>
-                </div>
-                <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${briefingAgent.status === "online" ? "bg-emerald-400" : briefingAgent.status === "busy" ? "bg-amber-400" : "bg-gray-400"}`} />
-              </div>
-
-              {/* Briefing digest */}
-              <div className="space-y-2.5">
-                <div className="flex items-center gap-2 text-sm">
-                  <span className="text-base">🤖</span>
-                  <span className="text-muted-foreground">Agents:</span>
-                  <span className="font-medium">{onlineCount} online</span>
-                  <span className="text-muted-foreground/50">/ {totalAgents} total</span>
-                </div>
-                <div className="flex items-center gap-2 text-sm">
-                  <span className="text-base">🎯</span>
-                  <span className="text-muted-foreground">Active tasks:</span>
-                  <span className="font-medium">{activeCount}</span>
-                  {todoCount > 0 && <span className="text-muted-foreground/50">({todoCount} pending)</span>}
-                </div>
-                <div className="flex items-center gap-2 text-sm">
-                  <span className="text-base">✅</span>
-                  <span className="text-muted-foreground">Completed:</span>
-                  <span className="font-medium text-emerald-400">{doneCount}</span>
-                </div>
-                {openJobCount > 0 && (
-                  <div className="flex items-center gap-2 text-sm">
-                    <span className="text-base">💼</span>
-                    <span className="text-muted-foreground">Open jobs:</span>
-                    <span className="font-medium text-amber-400">{openJobCount}</span>
+              {briefingAgent && (
+                <div className="flex items-center gap-3 p-3 rounded-lg bg-amber-500/5 border border-amber-500/10">
+                  <img
+                    src={briefingAgent.avatarUrl || getAgentAvatarUrl(briefingAgent.name, briefingAgent.type)}
+                    alt={briefingAgent.name}
+                    className="w-8 h-8 rounded-full border-2 border-amber-500/30"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">{briefingAgent.name}</p>
+                    <p className="text-[10px] text-muted-foreground">
+                      Briefing Agent · {latestBriefing?.date || new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
+                    </p>
                   </div>
-                )}
-              </div>
+                  <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${briefingAgent.status === "online" ? "bg-emerald-400" : briefingAgent.status === "busy" ? "bg-amber-400" : "bg-gray-400"}`} />
+                </div>
+              )}
 
-              {/* Recent activity summary */}
-              {activityFeed.length > 0 && (
-                <div className="pt-3 border-t border-border space-y-2">
-                  <p className="text-xs font-semibold text-muted-foreground/60 uppercase tracking-wider">Recent Activity</p>
-                  {activityFeed.slice(0, 4).map((event) => {
-                    const config = EVENT_TYPE_CONFIG[event.eventType] || { label: event.eventType, icon: "📌", color: "text-muted-foreground" };
-                    return (
-                      <div key={event.id} className="flex items-center gap-2 text-xs">
-                        <span className="shrink-0">{config.icon}</span>
-                        <span className="text-muted-foreground truncate flex-1">{event.description}</span>
-                        <span className="text-muted-foreground/40 shrink-0">{formatRelativeTime(event.createdAt)}</span>
-                      </div>
-                    );
-                  })}
+              {/* Summary data from Firestore */}
+              {summary ? (
+                <div className="space-y-2.5">
+                  <div className="flex items-center gap-2 text-sm">
+                    <span className="text-base">✅</span>
+                    <span className="text-muted-foreground">Tasks completed:</span>
+                    <span className="font-medium text-emerald-400">{summary.tasksCompleted}</span>
+                    {summary.tasksFailed > 0 && (
+                      <span className="text-red-400 text-xs">({summary.tasksFailed} failed)</span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2 text-sm">
+                    <span className="text-base">🪙</span>
+                    <span className="text-muted-foreground">Tokens used:</span>
+                    <span className="font-medium">{(summary.tokensUsed / 1000).toFixed(1)}K</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm">
+                    <span className="text-base">💰</span>
+                    <span className="text-muted-foreground">Cost:</span>
+                    <span className="font-medium">${summary.costUsd.toFixed(4)}</span>
+                  </div>
+
+                  {/* Highlights */}
+                  {summary.highlights.length > 0 && (
+                    <div className="pt-2 border-t border-border space-y-1.5">
+                      <p className="text-xs font-semibold text-muted-foreground/60 uppercase tracking-wider">Highlights</p>
+                      {summary.highlights.map((h, i) => (
+                        <div key={i} className="flex items-center gap-2 text-xs">
+                          <span className="shrink-0">✨</span>
+                          <span className="text-muted-foreground truncate">{h}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Top Activities */}
+                  {summary.topActivities.length > 0 && (
+                    <div className="pt-2 border-t border-border space-y-1.5">
+                      <p className="text-xs font-semibold text-muted-foreground/60 uppercase tracking-wider">Top Activities</p>
+                      {summary.topActivities.slice(0, 3).map((a, i) => (
+                        <div key={i} className="flex items-center gap-2 text-xs">
+                          <span className="shrink-0">🎯</span>
+                          <span className="text-muted-foreground truncate flex-1">{a.details}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Errors */}
+                  {summary.errors.length > 0 && (
+                    <div className="pt-2 border-t border-border space-y-1.5">
+                      <p className="text-xs font-semibold text-muted-foreground/60 uppercase tracking-wider text-red-400">Errors</p>
+                      {summary.errors.slice(0, 2).map((e, i) => (
+                        <div key={i} className="flex items-center gap-2 text-xs text-red-400/80">
+                          <span className="shrink-0">⚠️</span>
+                          <span className="truncate">{e.lastError}</span>
+                          <Badge variant="outline" className="text-[8px] px-1 border-red-500/20">{e.count}x</Badge>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                /* Cron job exists but no summary generated yet */
+                <div className="text-center py-3 space-y-1">
+                  <p className="text-sm text-muted-foreground">No briefing generated yet</p>
+                  <p className="text-xs text-muted-foreground/60">
+                    Schedule: {scheduleLabel}. Summaries will appear here automatically.
+                  </p>
                 </div>
               )}
             </CardContent>
