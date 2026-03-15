@@ -454,6 +454,171 @@ export default function SolanaPage() {
             </CardContent>
           </SpotlightCard>
 
+          {/* Agent Wallets */}
+          <div>
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-lg font-semibold">Agent Wallets</h2>
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <span>{agents.filter(a => a.solanaAddress).length}/{agents.length} wallets generated</span>
+                {agents.some(a => !a.solanaAddress) && (
+                  <Button
+                    onClick={handleBulkGenerateWallets}
+                    disabled={bulkGenerating}
+                    variant="outline"
+                    size="sm"
+                    className="text-[10px] h-6 px-2"
+                  >
+                    {bulkGenerating ? (
+                      <><Loader2 className="h-3 w-3 animate-spin mr-1" /> Generating...</>
+                    ) : (
+                      <>Generate All</>
+                    )}
+                  </Button>
+                )}
+              </div>
+            </div>
+            {bulkProgress && (
+              <p className="text-[10px] text-muted-foreground mb-2">{bulkProgress}</p>
+            )}
+            {agents.length > 0 ? (
+              <div className="space-y-2">
+                {agents.map(agent => (
+                  <SpotlightCard key={agent.id} className="p-0 glass-card-enhanced">
+                    <CardContent className="px-4 py-3 space-y-2">
+                      <div className="flex items-center gap-3">
+                        <img
+                          src={agent.avatarUrl || `https://api.dicebear.com/7.x/bottts/svg?seed=${agent.name}`}
+                          alt={agent.name}
+                          className="w-9 h-9 rounded-full border-2 border-purple-500/30"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">{agent.name}</p>
+                          <p className="text-[10px] text-muted-foreground">{agent.type}</p>
+                        </div>
+                        {agent.nftMintAddress ? (
+                          <Badge variant="outline" className="text-[9px] px-1.5 bg-emerald-500/10 border-emerald-500/20 text-emerald-400 shrink-0">
+                            <CheckCircle className="h-2.5 w-2.5 mr-0.5" /> NFT Minted
+                          </Badge>
+                        ) : agent.solanaAddress ? (
+                          <Badge variant="outline" className="text-[9px] px-1.5 bg-purple-500/10 border-purple-500/20 text-purple-400 shrink-0">
+                            Wallet Ready
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-[9px] px-1.5 text-muted-foreground shrink-0">
+                            No Wallet
+                          </Badge>
+                        )}
+                      </div>
+
+                      {agent.solanaAddress && (
+                        <div className="space-y-1.5 pl-12">
+                          {/* Solana Wallet Address */}
+                          <div className="flex items-center gap-2">
+                            <Wallet className="h-3 w-3 text-purple-400 shrink-0" />
+                            <span className="text-[10px] text-muted-foreground shrink-0">Wallet:</span>
+                            <code className="text-[10px] font-mono bg-muted/50 px-1.5 py-0.5 rounded truncate flex-1">{agent.solanaAddress}</code>
+                            <button
+                              onClick={() => navigator.clipboard.writeText(agent.solanaAddress!)}
+                              className="text-purple-400 hover:text-purple-300 shrink-0"
+                              title="Copy address"
+                            >
+                              <Copy className="h-3 w-3" />
+                            </button>
+                            <a
+                              href={`https://solscan.io/account/${agent.solanaAddress}?cluster=devnet`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-purple-400 hover:text-purple-300 shrink-0"
+                              title="View on Solscan"
+                            >
+                              <ExternalLink className="h-3 w-3" />
+                            </a>
+                          </div>
+
+                          {/* NFT Mint Address */}
+                          {agent.nftMintAddress && (
+                            <div className="flex items-center gap-2">
+                              <Sparkles className="h-3 w-3 text-pink-400 shrink-0" />
+                              <span className="text-[10px] text-muted-foreground shrink-0">NFT:</span>
+                              <code className="text-[10px] font-mono bg-muted/50 px-1.5 py-0.5 rounded truncate flex-1">{agent.nftMintAddress}</code>
+                              <button
+                                onClick={() => navigator.clipboard.writeText(agent.nftMintAddress!)}
+                                className="text-pink-400 hover:text-pink-300 shrink-0"
+                                title="Copy mint address"
+                              >
+                                <Copy className="h-3 w-3" />
+                              </button>
+                              <a
+                                href={`https://solscan.io/token/${agent.nftMintAddress}?cluster=devnet`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-pink-400 hover:text-pink-300 shrink-0"
+                                title="View NFT on Solscan"
+                              >
+                                <ExternalLink className="h-3 w-3" />
+                              </a>
+                            </div>
+                          )}
+
+                          {/* Scores */}
+                          <div className="flex items-center gap-4 text-[10px]">
+                            <div><span className="text-muted-foreground">Trust:</span> <span className="font-mono">{agent.trustScore ?? "—"}</span></div>
+                            <div><span className="text-muted-foreground">Credit:</span> <span className="font-mono">{agent.creditScore ?? "—"}</span></div>
+                            {agent.reportedSkills && agent.reportedSkills.length > 0 && (
+                              <div className="flex items-center gap-1">
+                                <span className="text-muted-foreground">Skills:</span>
+                                {agent.reportedSkills.slice(0, 3).map(s => (
+                                  <Badge key={s.id} variant="outline" className="text-[8px] px-1 bg-purple-500/5 border-purple-500/10 text-purple-400">{s.name}</Badge>
+                                ))}
+                                {agent.reportedSkills.length > 3 && (
+                                  <span className="text-muted-foreground">+{agent.reportedSkills.length - 3}</span>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {!agent.solanaAddress && (
+                        <div className="pl-12">
+                          <Button
+                            onClick={async () => {
+                              if (!currentOrg) return;
+                              try {
+                                const res = await fetch("/api/v1/solana/wallet/generate", {
+                                  method: "POST",
+                                  headers: authHeaders,
+                                  body: JSON.stringify({ agentId: agent.id, orgId: currentOrg.id }),
+                                });
+                                if (res.ok) {
+                                  const data = await res.json();
+                                  setAgents(prev => prev.map(a =>
+                                    a.id === agent.id ? { ...a, solanaAddress: data.solanaAddress } : a
+                                  ));
+                                }
+                              } catch { /* silently fail */ }
+                            }}
+                            variant="outline"
+                            size="sm"
+                            className="text-[10px] h-6 px-2"
+                          >
+                            <Wallet className="h-3 w-3 mr-1" /> Generate Wallet
+                          </Button>
+                        </div>
+                      )}
+                    </CardContent>
+                  </SpotlightCard>
+                ))}
+              </div>
+            ) : (
+              <SpotlightCard className="p-0 glass-card-enhanced">
+                <CardContent className="px-4 py-6 text-center">
+                  <p className="text-sm text-muted-foreground">No agents registered yet.</p>
+                </CardContent>
+              </SpotlightCard>
+            )}
+          </div>
+
           {/* Agent Skills */}
           <div>
             <h2 className="text-lg font-semibold mb-3">Agent Skills</h2>
