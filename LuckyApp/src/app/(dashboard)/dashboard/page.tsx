@@ -1213,7 +1213,7 @@ export default function DashboardPage() {
                   <select
                     value={briefingAgentId}
                     onChange={(e) => setBriefingAgentId(e.target.value)}
-                    className="w-full rounded-lg border border-border bg-background px-2.5 py-1.5 text-xs text-foreground focus:border-amber-500/50 focus:outline-none focus:ring-1 focus:ring-amber-500/20"
+                    className="w-full rounded-lg border border-border bg-zinc-900 px-2.5 py-1.5 text-xs text-white focus:border-amber-500/50 focus:outline-none focus:ring-1 focus:ring-amber-500/20 [&>option]:bg-zinc-900 [&>option]:text-white"
                   >
                     <option value="">No agent assigned</option>
                     {agents.map((a) => (
