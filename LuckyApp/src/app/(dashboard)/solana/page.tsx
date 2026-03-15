@@ -1,7 +1,7 @@
 /** Solana — Wallet, SPL tokens, staking, programs, and Metaplex integration. */
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -10,7 +10,7 @@ import { StatCard } from "@/components/analytics/stat-card";
 import { useOrg } from "@/contexts/OrgContext";
 import { useSession } from "@/contexts/SessionContext";
 import { getOwnedItems, SKILL_REGISTRY, type OwnedItem } from "@/lib/skills";
-import { getAgentsByOrg, type Agent } from "@/lib/firestore";
+import { getAgentsByOrg, getOrganization, type Agent } from "@/lib/firestore";
 import { useActiveAccount } from "thirdweb/react";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -65,6 +65,25 @@ export default function SolanaPage() {
   const { address } = useSession();
   const account = useActiveAccount();
 
+  // Platform Solana wallet state (live from devnet)
+  const [walletInfo, setWalletInfo] = useState<{
+    publicKey: string;
+    solBalance: number;
+    tokenAccountCount: number;
+    stakedSol: number;
+    cluster: string;
+  } | null>(null);
+  const [walletLoading, setWalletLoading] = useState(false);
+
+  // Collection state
+  const [collectionMint, setCollectionMint] = useState<string | null>(null);
+  const [creatingCollection, setCreatingCollection] = useState(false);
+
+  // Bulk action state
+  const [bulkGenerating, setBulkGenerating] = useState(false);
+  const [bulkMinting, setBulkMinting] = useState(false);
+  const [bulkProgress, setBulkProgress] = useState("");
+
   // Mint Agent Identity NFT state
   const [selectedAgentId, setSelectedAgentId] = useState("");
   const [useCustomWallet, setUseCustomWallet] = useState(false);
@@ -88,6 +107,9 @@ export default function SolanaPage() {
     if (!currentOrg) return;
     getOwnedItems(currentOrg.id).then(setInventory).catch(() => {});
     getAgentsByOrg(currentOrg.id).then(setAgents).catch(() => {});
+    getOrganization(currentOrg.id).then(org => {
+      if (org?.metaplexCollectionMint) setCollectionMint(org.metaplexCollectionMint);
+    }).catch(() => {});
   }, [currentOrg]);
 
   // Sync tab from URL param
@@ -96,6 +118,25 @@ export default function SolanaPage() {
     if (urlTab && urlTab !== tab) setTab(urlTab);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
+
+  // Fetch platform Solana wallet info from devnet
+  const fetchWalletInfo = useCallback(async () => {
+    setWalletLoading(true);
+    try {
+      const res = await fetch("/api/v1/solana/wallet");
+      if (res.ok) {
+        setWalletInfo(await res.json());
+      }
+    } catch {
+      // Silently fail — stats will show loading state
+    } finally {
+      setWalletLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchWalletInfo();
+  }, [fetchWalletInfo]);
 
   const tabs: { id: SolanaTab; label: string; icon: typeof Zap }[] = [
     { id: "overview", label: "Overview", icon: Zap },
@@ -140,6 +181,86 @@ export default function SolanaPage() {
     } finally {
       setMinting(false);
     }
+  }
+
+  const authHeaders = {
+    "Content-Type": "application/json",
+    "x-wallet-address": account?.address || address || "",
+  };
+
+  async function handleCreateCollection() {
+    if (!currentOrg) return;
+    setCreatingCollection(true);
+    try {
+      const res = await fetch("/api/v1/metaplex/collection", {
+        method: "POST",
+        headers: authHeaders,
+        body: JSON.stringify({ orgId: currentOrg.id }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setCollectionMint(data.collectionMint);
+      }
+    } catch (err) {
+      console.error("Collection creation failed:", err);
+    } finally {
+      setCreatingCollection(false);
+    }
+  }
+
+  async function handleBulkGenerateWallets() {
+    if (!currentOrg) return;
+    setBulkGenerating(true);
+    const pending = agents.filter(a => !a.solanaAddress);
+    for (let i = 0; i < pending.length; i++) {
+      setBulkProgress(`Generating wallet ${i + 1}/${pending.length}...`);
+      try {
+        const res = await fetch("/api/v1/solana/wallet/generate", {
+          method: "POST",
+          headers: authHeaders,
+          body: JSON.stringify({ agentId: pending[i].id, orgId: currentOrg.id }),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setAgents(prev => prev.map(a =>
+            a.id === pending[i].id ? { ...a, solanaAddress: data.solanaAddress } : a
+          ));
+        }
+      } catch { /* continue */ }
+    }
+    setBulkProgress("");
+    setBulkGenerating(false);
+  }
+
+  async function handleBulkMint() {
+    if (!currentOrg) return;
+    setBulkMinting(true);
+    const pending = agents.filter(a => a.solanaAddress && !a.nftMintAddress);
+    for (let i = 0; i < pending.length; i++) {
+      setBulkProgress(`Minting NFT ${i + 1}/${pending.length}...`);
+      try {
+        const res = await fetch("/api/v1/metaplex/mint", {
+          method: "POST",
+          headers: authHeaders,
+          body: JSON.stringify({
+            agentId: pending[i].id,
+            orgId: currentOrg.id,
+            recipientAddress: pending[i].solanaAddress,
+          }),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setAgents(prev => prev.map(a =>
+            a.id === pending[i].id ? { ...a, nftMintAddress: data.mintAddress, nftMintedAt: new Date() } : a
+          ));
+        }
+      } catch { /* continue */ }
+      // Small delay between mints to avoid RPC rate limits
+      if (i < pending.length - 1) await new Promise(r => setTimeout(r, 500));
+    }
+    setBulkProgress("");
+    setBulkMinting(false);
+    fetchWalletInfo(); // Refresh balance after minting
   }
 
   return (
@@ -255,11 +376,62 @@ export default function SolanaPage() {
       {/* ─── Wallet Tab ─── */}
       {tab === "wallet" && (
         <div className="space-y-6">
+          {/* Platform Solana Wallet */}
           <SpotlightCard className="p-0 glass-card-enhanced">
             <CardHeader className="px-4 pt-4 pb-2">
               <CardTitle className="text-sm flex items-center gap-2">
                 <Wallet className="h-4 w-4 text-purple-400" />
-                Connected Wallet
+                Platform Wallet (Solana)
+                <Badge variant="outline" className="ml-auto text-[9px] px-1.5 bg-purple-500/10 border-purple-500/20 text-purple-400">
+                  {walletInfo?.cluster || "devnet"}
+                </Badge>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="px-4 pb-4 space-y-3">
+              {walletInfo ? (
+                <>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground">Address:</span>
+                    <code className="text-xs font-mono bg-muted/50 px-2 py-0.5 rounded truncate flex-1">{walletInfo.publicKey}</code>
+                    <button onClick={() => navigator.clipboard.writeText(walletInfo.publicKey)} className="text-purple-400 hover:text-purple-300 shrink-0">
+                      <Copy className="h-3 w-3" />
+                    </button>
+                    <a
+                      href={`https://solscan.io/account/${walletInfo.publicKey}?cluster=devnet`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-purple-400 hover:text-purple-300 shrink-0"
+                    >
+                      <ExternalLink className="h-3 w-3" />
+                    </a>
+                  </div>
+                  <div className="flex items-center gap-4 text-xs">
+                    <div><span className="text-muted-foreground">Balance:</span> <span className="font-mono">{walletInfo.solBalance} SOL</span></div>
+                    <div><span className="text-muted-foreground">Token Accounts:</span> <span className="font-mono">{walletInfo.tokenAccountCount}</span></div>
+                    <div><span className="text-muted-foreground">Staked:</span> <span className="font-mono">{walletInfo.stakedSol} SOL</span></div>
+                  </div>
+                  <p className="text-xs text-muted-foreground/60">
+                    Platform wallet pays gas for on-chain operations (NFT minting, agent registration). NFTs for EVM-wallet users are held custodially here.
+                  </p>
+                </>
+              ) : walletLoading ? (
+                <div className="flex items-center gap-2 py-2">
+                  <Loader2 className="h-4 w-4 animate-spin text-purple-400" />
+                  <p className="text-sm text-muted-foreground">Loading...</p>
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">Failed to load platform wallet info.</p>
+              )}
+            </CardContent>
+          </SpotlightCard>
+
+          {/* User Session Wallet */}
+          <SpotlightCard className="p-0 glass-card-enhanced">
+            <CardHeader className="px-4 pt-4 pb-2">
+              <CardTitle className="text-sm flex items-center gap-2">
+                <Wallet className="h-4 w-4 text-purple-400" />
+                Your Wallet (EVM)
+                <Badge variant="outline" className="ml-auto text-[9px] px-1.5">thirdweb</Badge>
               </CardTitle>
             </CardHeader>
             <CardContent className="px-4 pb-4 space-y-3">
@@ -267,14 +439,13 @@ export default function SolanaPage() {
                 <>
                   <div className="flex items-center gap-2">
                     <span className="text-xs text-muted-foreground">Address:</span>
-                    <code className="text-xs font-mono bg-muted/50 px-2 py-0.5 rounded">{address}</code>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-muted-foreground">Cluster:</span>
-                    <Badge variant="outline" className="text-[10px]">{clusterInfo.label}</Badge>
+                    <code className="text-xs font-mono bg-muted/50 px-2 py-0.5 rounded truncate flex-1">{address}</code>
+                    <button onClick={() => navigator.clipboard.writeText(address)} className="text-purple-400 hover:text-purple-300 shrink-0">
+                      <Copy className="h-3 w-3" />
+                    </button>
                   </div>
                   <p className="text-xs text-muted-foreground/60">
-                    Connect a Solana wallet (Phantom, Solflare) for native SOL operations. Currently showing your Swarm session address.
+                    Your EVM wallet is used for on-chain agent registration on Sepolia and as the ownership record for Solana NFTs.
                   </p>
                 </>
               ) : (
@@ -390,18 +561,63 @@ export default function SolanaPage() {
       {tab === "treasury" && (
         <div className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <StatCard title="SOL Balance" value="—" icon="◎" />
-            <StatCard title="Token Accounts" value="—" icon="🪙" />
-            <StatCard title="Staked SOL" value="—" icon="🔒" />
+            <StatCard
+              title="SOL Balance"
+              value={walletLoading ? "..." : walletInfo ? `${walletInfo.solBalance} SOL` : "Error"}
+              icon="◎"
+            />
+            <StatCard
+              title="Token Accounts"
+              value={walletLoading ? "..." : walletInfo ? String(walletInfo.tokenAccountCount) : "Error"}
+              icon="🪙"
+            />
+            <StatCard
+              title="Staked SOL"
+              value={walletLoading ? "..." : walletInfo ? `${walletInfo.stakedSol} SOL` : "Error"}
+              icon="🔒"
+            />
           </div>
           <SpotlightCard className="p-0 glass-card-enhanced">
-            <CardContent className="px-4 py-6 text-center">
-              <p className="text-sm text-muted-foreground">
-                Connect a Solana wallet to view treasury balances and token accounts.
-              </p>
-              <p className="text-xs text-muted-foreground/60 mt-1">
-                Treasury tracking will show SOL holdings, SPL token balances, and staking positions.
-              </p>
+            <CardHeader className="px-4 pt-4 pb-2">
+              <CardTitle className="text-sm flex items-center gap-2">
+                <Landmark className="h-4 w-4 text-purple-400" />
+                Platform Wallet
+                <Badge variant="outline" className="ml-auto text-[9px] px-1.5 bg-purple-500/10 border-purple-500/20 text-purple-400">
+                  {walletInfo?.cluster || "devnet"}
+                </Badge>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="px-4 pb-4 space-y-3">
+              {walletInfo ? (
+                <>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground">Address:</span>
+                    <code className="text-xs font-mono bg-muted/50 px-2 py-0.5 rounded truncate">{walletInfo.publicKey}</code>
+                    <a
+                      href={`https://solscan.io/account/${walletInfo.publicKey}?cluster=devnet`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-purple-400 hover:text-purple-300 shrink-0"
+                    >
+                      <ExternalLink className="h-3 w-3" />
+                    </a>
+                  </div>
+                  <p className="text-xs text-muted-foreground/60">
+                    This is the Swarm platform wallet on Solana devnet. It pays gas for NFT minting and holds custodial NFTs for EVM-wallet users.
+                  </p>
+                  <Button variant="outline" size="sm" onClick={fetchWalletInfo} disabled={walletLoading} className="text-xs">
+                    {walletLoading ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : null}
+                    Refresh
+                  </Button>
+                </>
+              ) : walletLoading ? (
+                <div className="flex items-center gap-2 py-2">
+                  <Loader2 className="h-4 w-4 animate-spin text-purple-400" />
+                  <p className="text-sm text-muted-foreground">Loading wallet info from devnet...</p>
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">Failed to load wallet info. Check server configuration.</p>
+              )}
             </CardContent>
           </SpotlightCard>
         </div>
@@ -465,6 +681,145 @@ export default function SolanaPage() {
               Docs <ExternalLink className="h-3 w-3" />
             </a>
           </div>
+
+          {/* ── Organization Collection ── */}
+          <SpotlightCard className="p-0 glass-card-enhanced" spotlightColor="rgba(236,72,153,0.06)">
+            <CardHeader className="px-4 pt-4 pb-2">
+              <CardTitle className="text-sm flex items-center gap-2">
+                <Layers className="h-4 w-4 text-pink-400" />
+                Organization Collection
+                {collectionMint && (
+                  <Badge variant="outline" className="ml-auto text-[9px] px-1.5 bg-emerald-500/10 border-emerald-500/20 text-emerald-400">Active</Badge>
+                )}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="px-4 pb-4">
+              {collectionMint ? (
+                <div className="flex items-center gap-3">
+                  <CheckCircle className="h-5 w-5 text-emerald-400 shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-medium text-emerald-400">Collection Active</p>
+                    <code className="text-[10px] font-mono text-muted-foreground break-all">{collectionMint}</code>
+                  </div>
+                  <a
+                    href={`https://solscan.io/token/${collectionMint}?cluster=devnet`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-pink-400 hover:underline flex items-center gap-1 shrink-0"
+                  >
+                    Solscan <ExternalLink className="h-3 w-3" />
+                  </a>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <p className="text-xs text-muted-foreground">Create a collection to group all your agent identity NFTs together.</p>
+                  <Button
+                    onClick={handleCreateCollection}
+                    disabled={creatingCollection}
+                    size="sm"
+                    className="bg-pink-600 hover:bg-pink-700 text-white text-xs"
+                  >
+                    {creatingCollection ? (
+                      <><Loader2 className="h-3 w-3 animate-spin mr-1" /> Creating...</>
+                    ) : (
+                      <><Layers className="h-3 w-3 mr-1" /> Create Collection</>
+                    )}
+                  </Button>
+                </div>
+              )}
+            </CardContent>
+          </SpotlightCard>
+
+          {/* ── Bulk Actions ── */}
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              onClick={handleBulkGenerateWallets}
+              disabled={bulkGenerating || agents.every(a => a.solanaAddress)}
+              variant="outline"
+              size="sm"
+              className="text-xs"
+            >
+              {bulkGenerating ? (
+                <><Loader2 className="h-3 w-3 animate-spin mr-1" /> Generating...</>
+              ) : (
+                <>Generate All Wallets ({agents.filter(a => !a.solanaAddress).length} remaining)</>
+              )}
+            </Button>
+            <Button
+              onClick={handleBulkMint}
+              disabled={bulkMinting || agents.filter(a => a.solanaAddress && !a.nftMintAddress).length === 0}
+              variant="outline"
+              size="sm"
+              className="text-xs"
+            >
+              {bulkMinting ? (
+                <><Loader2 className="h-3 w-3 animate-spin mr-1" /> Minting...</>
+              ) : (
+                <>Mint All NFTs ({agents.filter(a => a.solanaAddress && !a.nftMintAddress).length} remaining)</>
+              )}
+            </Button>
+            {bulkProgress && (
+              <span className="text-[10px] text-muted-foreground">{bulkProgress}</span>
+            )}
+          </div>
+
+          {/* ── NFT Gallery ── */}
+          {agents.filter(a => a.nftMintAddress).length > 0 && (
+            <div>
+              <h2 className="text-lg font-semibold mb-3">Agent NFT Gallery</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                {agents.filter(a => a.nftMintAddress).map(agent => (
+                  <SpotlightCard key={agent.id} className="p-0 glass-card-enhanced" spotlightColor="rgba(236,72,153,0.06)">
+                    <CardContent className="px-4 py-4 space-y-2">
+                      <div className="flex items-center gap-3">
+                        <img
+                          src={agent.avatarUrl || `https://api.dicebear.com/9.x/bottts/svg?seed=${agent.name}-${agent.type || "agent"}`}
+                          alt={agent.name}
+                          className="w-12 h-12 rounded-lg border-2 border-pink-500/30 bg-zinc-900"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold truncate">{agent.name}</p>
+                          <p className="text-[10px] text-muted-foreground">{agent.type} · {agent.asn?.split("-").slice(0, 4).join("-") || "—"}</p>
+                        </div>
+                        <Badge variant="outline" className="text-[8px] px-1 bg-emerald-500/10 border-emerald-500/20 text-emerald-400 shrink-0">NFT</Badge>
+                      </div>
+                      <div className="grid grid-cols-2 gap-1 text-[10px]">
+                        <div><span className="text-muted-foreground">Trust:</span> {agent.trustScore ?? "—"}</div>
+                        <div><span className="text-muted-foreground">Credit:</span> {agent.creditScore ?? "—"}</div>
+                      </div>
+                      {agent.solanaAddress && (
+                        <div className="text-[9px] text-muted-foreground">
+                          <span className="text-muted-foreground/60">Wallet:</span>{" "}
+                          <code className="font-mono">{agent.solanaAddress.slice(0, 6)}...{agent.solanaAddress.slice(-4)}</code>
+                        </div>
+                      )}
+                      <div className="flex items-center gap-2">
+                        <code className="text-[9px] font-mono text-muted-foreground truncate flex-1">{agent.nftMintAddress}</code>
+                        <a
+                          href={`https://solscan.io/token/${agent.nftMintAddress}?cluster=devnet`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-pink-400 hover:text-pink-300 shrink-0"
+                        >
+                          <ExternalLink className="h-3 w-3" />
+                        </a>
+                      </div>
+                      {(agent.reportedSkills || []).length > 0 && (
+                        <div className="flex flex-wrap gap-1">
+                          {agent.reportedSkills!.slice(0, 4).map(s => (
+                            <Badge key={s.id} variant="outline" className="text-[8px] px-1 bg-pink-500/10 border-pink-500/20 text-pink-400">{s.name}</Badge>
+                          ))}
+                          {agent.reportedSkills!.length > 4 && (
+                            <Badge variant="outline" className="text-[8px] px-1">+{agent.reportedSkills!.length - 4}</Badge>
+                          )}
+                        </div>
+                      )}
+                    </CardContent>
+                  </SpotlightCard>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* ── Mint Agent Identity NFT ── */}
           <SpotlightCard className="p-0 glass-card-enhanced" spotlightColor="rgba(236,72,153,0.06)">
@@ -671,7 +1026,7 @@ export default function SolanaPage() {
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <StatCard title="Programs" value="Core, Token Metadata, Bubblegum" icon="📜" />
             <StatCard title="Agent Registry" value="Available" icon="🤖" />
-            <StatCard title="Collections" value="—" icon="📁" />
+            <StatCard title="Platform Balance" value={walletLoading ? "..." : walletInfo ? `${walletInfo.solBalance} SOL` : "Error"} icon="◎" />
             <StatCard title="NFTs Minted" value={String(agents.filter(a => a.nftMintAddress).length)} icon="🎨" />
           </div>
 

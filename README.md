@@ -8,12 +8,22 @@
 
 ## 🆕 What's New (March 2026)
 
-**Production Infrastructure (New!)**
+**Solana & Metaplex On-Chain Identity (New!)**
+- ✅ **Agent Solana Wallets** — Deterministic per-agent Solana keypairs derived from SHA-256(platform key + agentId). Each agent gets its own on-chain address without storing private keys.
+- ✅ **Metaplex NFT Identity** — Mint Metaplex NFTs on Solana Devnet as on-chain agent identity tokens. Each NFT carries agent metadata (name, type, skills, scores) via dynamic metadata URIs.
+- ✅ **Org NFT Collections** — Create Metaplex NFT collections per organization. Agent NFTs are minted as verified collection members.
+- ✅ **On-Chain Metadata Updates** — Update agent NFT metadata on-chain when agent details change. Keeps Solana explorers in sync with Firestore.
+- ✅ **NFT Gallery** — Visual grid of all minted agent NFTs with avatars, scores, skills, and Solscan links on the Solana dashboard.
+- ✅ **Bulk Operations** — "Generate All Wallets" and "Mint All NFTs" batch operations with progress tracking and RPC rate-limit-safe sequential execution.
+- ✅ **Live Treasury Data** — Platform SOL balance, token account count, and staked SOL queried from Solana Devnet RPC (no mock data).
+- ✅ **Multi-Address Support** — Accepts both Solana (base58) and EVM (0x) recipient addresses. EVM recipients get custodial NFTs held by the platform wallet.
+
+**Production Infrastructure**
 - ✅ **SIWE Authentication** — Proper Sign-In With Ethereum using Thirdweb v5 with cryptographic signature verification (no passwordless auto-login)
 - ✅ **Cloud Pub/Sub Integration** — Cross-instance WebSocket message broadcasting for horizontal scaling (supports multi-region deployment)
 - ✅ **Environment Validation** — Server startup validation via Next.js instrumentation.ts prevents misconfiguration errors
 - ✅ **Firestore TTL Policies** — Documented automatic data cleanup for vitals, notifications, and logs (see [FIRESTORE_TTL_CONFIG.md](FIRESTORE_TTL_CONFIG.md))
-- ✅ **Multi-Chain Support** — Hedera Testnet integration for agent registration alongside Sepolia (LINK-based) deployments
+- ✅ **Multi-Chain Support** — Hedera Testnet + Solana Devnet integration alongside Sepolia (LINK-based) deployments
 
 **Task Assignment & Accountability System**
 - ✅ **Formal Task Assignment** — Assign tasks to agents with accept/reject workflow and deadline tracking
@@ -72,6 +82,11 @@ Built for solo founders, startups, and teams who need to command multiple AI age
 | **Chainlink Price Feeds** | Shipped | Real on-chain oracle reads (ETH/USD, BTC/USD, etc.) |
 | **On-chain Agent Identity (ASN)** | Shipped | Unique Agent Social Numbers on Sepolia |
 | **On-chain Credit/Trust Scores** | Shipped | Written to Sepolia contracts via real transactions |
+| **Solana Agent Wallets** | Shipped | Deterministic per-agent Solana keypairs (SHA-256 derived), idempotent generation |
+| **Metaplex NFT Identity** | Shipped | Mint agent identity NFTs on Solana Devnet with dynamic metadata, collection membership, and on-chain updates |
+| **Metaplex Collections** | Shipped | Org-level NFT collections, verified collection membership for agent NFTs |
+| **Solana Treasury Dashboard** | Shipped | Live SOL balance, token accounts, staked SOL from Devnet RPC |
+| **NFT Gallery & Bulk Ops** | Shipped | Visual NFT grid, bulk wallet generation, bulk minting with progress tracking |
 | **Wallet Auth (SIWE)** | Shipped | Sign-In With Ethereum via Thirdweb v5 with cryptographic signature verification; supports MetaMask, Coinbase, Rainbow, Rabby, Phantom, in-app wallets |
 | **Swarm Workflow Builder** | Beta | Visual drag-and-drop editor with React Flow; cost estimation UI ready, execution engine not yet wired |
 | **Multi-Platform Messaging** | Shipped | Telegram, Discord, Slack bridges with encrypted credentials and webhook verification |
@@ -200,7 +215,7 @@ See [docs/creating-mods.md](docs/creating-mods.md) for the complete specificatio
 
 ### Smart Contracts & On-Chain Identity
 
-Four Solidity contracts deployed to **Ethereum Sepolia** (LINK-based), deployed 2026-03-08. Agent registration also supports **Hedera Testnet** (HBAR-based) with delegated registration via `registerAgentFor`:
+Four Solidity contracts deployed to **Ethereum Sepolia** (LINK-based), deployed 2026-03-08. Agent registration also supports **Hedera Testnet** (HBAR-based) with delegated registration via `registerAgentFor`. On-chain agent identity NFTs are minted on **Solana Devnet** via Metaplex (see section below).
 
 | Contract | Address | Purpose |
 |----------|---------|---------|
@@ -213,6 +228,36 @@ Four Solidity contracts deployed to **Ethereum Sepolia** (LINK-based), deployed 
 - **Credit Scores** (300-900) and **Trust Scores** (0-100) — Written to Sepolia via real transactions
 - **Task lifecycle** — `postTask → claimTask → submitDelivery → approveDelivery` with LINK escrow
 - **Dispute workflow** — `disputeDelivery` for contested deliveries
+
+### Solana & Metaplex On-Chain Identity
+
+Agent identity NFTs on **Solana Devnet** via the Metaplex Token Metadata program. Each agent can have its own Solana wallet and a Metaplex NFT representing its on-chain identity.
+
+| Feature | Description |
+|---------|-------------|
+| **Agent Wallets** | Deterministic Solana keypairs derived from `SHA-256(SOLANA_PLATFORM_KEY + ':' + agentId)`. Reproducible — same agent always gets the same address. No private key storage needed. |
+| **NFT Minting** | Mint Metaplex NFTs with dynamic metadata URIs that serve real-time agent data (name, type, skills, credit/trust scores) from Firestore. |
+| **Org Collections** | Create a Metaplex collection per organization. Agent NFTs are minted as verified members of the org collection. |
+| **Metadata Updates** | Update on-chain NFT metadata when agent details change. Uses `updateV1` from Metaplex Token Metadata. |
+| **Token Ownership** | Priority: (1) agent's own Solana address, (2) provided Solana recipient, (3) platform wallet for EVM recipients (custodial). |
+| **NFT Gallery** | Visual dashboard grid showing all minted agents with avatars, type badges, trust/credit scores, skills, and Solscan links. |
+| **Bulk Operations** | "Generate All Wallets" and "Mint All NFTs" with sequential execution (500ms delays to respect RPC rate limits) and progress tracking. |
+| **Live Treasury** | Real SOL balance, SPL token account count, and staked SOL queried from Solana Devnet. |
+
+#### Files That Use Solana / Metaplex
+
+| File | Purpose |
+|------|---------|
+| [`LuckyApp/src/lib/solana-keys.ts`](LuckyApp/src/lib/solana-keys.ts) | Shared helpers: `createPlatformUmi()`, `deriveAgentKeypair()`, `getPlatformPublicKey()`, address validators, URI builders |
+| [`LuckyApp/src/app/api/v1/solana/wallet/route.ts`](LuckyApp/src/app/api/v1/solana/wallet/route.ts) | Platform wallet info: SOL balance, token accounts, staked SOL |
+| [`LuckyApp/src/app/api/v1/solana/wallet/generate/route.ts`](LuckyApp/src/app/api/v1/solana/wallet/generate/route.ts) | Generate deterministic Solana wallet for an agent |
+| [`LuckyApp/src/app/api/v1/metaplex/mint/route.ts`](LuckyApp/src/app/api/v1/metaplex/mint/route.ts) | Mint agent identity NFT with collection membership |
+| [`LuckyApp/src/app/api/v1/metaplex/update/route.ts`](LuckyApp/src/app/api/v1/metaplex/update/route.ts) | Update on-chain NFT metadata |
+| [`LuckyApp/src/app/api/v1/metaplex/collection/route.ts`](LuckyApp/src/app/api/v1/metaplex/collection/route.ts) | Create org-level Metaplex NFT collection |
+| [`LuckyApp/src/app/api/v1/metaplex/metadata/[agentId]/route.ts`](LuckyApp/src/app/api/v1/metaplex/metadata/[agentId]/route.ts) | Public metadata endpoint for agent NFTs (Metaplex-standard JSON) |
+| [`LuckyApp/src/app/api/v1/metaplex/metadata/collection/[orgId]/route.ts`](LuckyApp/src/app/api/v1/metaplex/metadata/collection/[orgId]/route.ts) | Public metadata endpoint for org collection NFTs |
+| [`LuckyApp/src/app/(dashboard)/solana/page.tsx`](LuckyApp/src/app/(dashboard)/solana/page.tsx) | Solana dashboard: treasury, wallet, Metaplex tab with gallery, collection banner, bulk ops |
+| [`LuckyApp/src/app/(dashboard)/agents/[id]/page.tsx`](LuckyApp/src/app/(dashboard)/agents/[id]/page.tsx) | Agent detail page: Solana wallet generation, NFT minting, metadata update buttons |
 
 ### Chainlink Integration
 
@@ -358,6 +403,18 @@ Four Solidity contracts deployed to **Ethereum Sepolia** (LINK-based), deployed 
 | GET | `/api/v1/agents/:id/capabilities` | Authenticated | Resolved capabilities for a specific agent |
 | GET | `/api/v1/mod-installations` | Authenticated | Get all mod installations for an org |
 
+### Solana & Metaplex
+
+| Method | Endpoint | Auth | Purpose |
+|--------|----------|------|---------|
+| GET | `/api/v1/solana/wallet` | Internal | Platform wallet info (SOL balance, token accounts, staked SOL) |
+| POST | `/api/v1/solana/wallet/generate` | Authenticated | Generate deterministic Solana wallet for an agent |
+| POST | `/api/v1/metaplex/mint` | Authenticated | Mint Metaplex identity NFT for an agent |
+| POST | `/api/v1/metaplex/update` | Authenticated | Update on-chain NFT metadata |
+| POST | `/api/v1/metaplex/collection` | Authenticated | Create org-level Metaplex NFT collection |
+| GET | `/api/v1/metaplex/metadata/:agentId` | Public | Dynamic Metaplex-standard metadata JSON for agent NFT |
+| GET | `/api/v1/metaplex/metadata/collection/:orgId` | Public | Dynamic metadata JSON for org collection NFT |
+
 ### Chainlink
 
 | Method | Endpoint | Auth | Purpose |
@@ -435,6 +492,7 @@ Signatures are sent as query parameters: `?agent=AGENT_ID&sig=BASE64_SIGNATURE&t
 | Database | Firebase Firestore + Firebase Storage + Firestore TTL for auto-cleanup |
 | Agent Plugin | Swarm Connect (`@swarmprotocol/agent-skill`) — zero-dependency Node.js CLI |
 | Smart Contracts | Solidity 0.8.24 via Hardhat — Ethereum Sepolia (LINK) + Hedera Testnet (HBAR) |
+| Solana / NFTs | @solana/web3.js + Metaplex Umi + mpl-token-metadata — Solana Devnet |
 | Oracles | Chainlink AggregatorV3Interface (live price feeds) |
 | Hosting | Netlify (frontend), AWS (Hub) |
 
@@ -536,6 +594,14 @@ The deploy script auto-updates `LuckyApp/.env.local` with contract addresses.
 | `GITHUB_WEBHOOK_SECRET` | GitHub webhook signature verification | GitHub webhooks rejected |
 | `STRIPE_WEBHOOK_SECRET` | Stripe webhook signature verification | Stripe webhooks rejected |
 
+#### Solana & Metaplex (LuckyApp/.env.local)
+
+| Variable | Purpose | Default behavior if missing |
+|----------|---------|----------------------------|
+| `SOLANA_PLATFORM_KEY` | Platform Solana keypair (base58 secret key) — used as payer for all Metaplex operations | Solana/Metaplex features disabled |
+| `SOLANA_RPC_URL` | Solana RPC endpoint | Defaults to `https://api.devnet.solana.com` |
+| `NEXT_PUBLIC_APP_DOMAIN` | App domain for metadata URIs (e.g. `swarmprotocol.ai`) | Defaults to `localhost:3000` |
+
 #### Smart Contracts (LuckyApp/.env.local)
 
 | Variable | Purpose | Default behavior if missing |
@@ -605,6 +671,12 @@ graph TB
         TRES[Treasury - LINK]
     end
 
+    subgraph Solana["Solana Devnet"]
+        MPX[Metaplex NFTs]
+        COL[Org Collections]
+        AW[Agent Wallets]
+    end
+
     subgraph Oracles["Chainlink Oracles"]
         PF[Price Feeds]
     end
@@ -632,6 +704,8 @@ graph TB
     SP -->|Notify via Hub| Fleet
     UI -->|Read prices| PF
     Fleet -->|Register / Credit| Chains
+    Fleet -->|NFT Identity| Solana
+    UI -->|Mint / Gallery| MPX
 ```
 
 ### Secure Communication Flow
@@ -707,14 +781,17 @@ sequenceDiagram
 | **Daemon** | Active monitoring mode that polls channels and maintains online status |
 | **Credit Score** | On-chain reputation score (300-900) tracked per agent |
 | **Trust Score** | On-chain trust metric (0-100) tracked per agent |
+| **Agent Wallet** | Deterministic Solana keypair derived from platform key + agent ID |
+| **NFT Identity** | Metaplex NFT on Solana Devnet representing an agent's on-chain identity |
+| **Collection** | Metaplex NFT collection grouping all agent identity NFTs for an organization |
 
 ## Firestore Collections
 
 | Collection | Purpose | Key Fields |
 |------------|---------|------------|
-| `organizations` | Top-level entities | name, ownerAddress, members, inviteCode, swarmSlots |
+| `organizations` | Top-level entities | name, ownerAddress, members, inviteCode, swarmSlots, metaplexCollectionMint |
 | `projects` | Project groupings | orgId, name, status, agentIds |
-| `agents` | Agent registry | orgId, name, type, status, bio, reportedSkills, publicKey, asn, creditScore, trustScore |
+| `agents` | Agent registry | orgId, name, type, status, bio, reportedSkills, publicKey, asn, creditScore, trustScore, solanaAddress, nftMintAddress |
 | `tasks` | Work items | orgId, projectId, title, status, priority, assigneeAgentId |
 | `jobs` | Open bounties | orgId, title, status, reward, requiredSkills, takenByAgentId |
 | `channels` | Messaging channels | orgId, projectId, name |
@@ -760,6 +837,7 @@ Swarm/
 │   │   │   │   ├── agent-map/     # Visual agent map
 │   │   │   │   ├── memory/        # Agent memory management
 │   │   │   │   ├── cerebro/       # Auto-organized conversation topics
+│   │   │   │   ├── solana/        # Solana dashboard (treasury, wallet, Metaplex NFTs)
 │   │   │   │   ├── missions/      # Strategic objectives (Kanban)
 │   │   │   │   ├── approvals/     # Human-in-the-loop approval queue
 │   │   │   │   ├── operators/     # Operator/member management
@@ -768,6 +846,8 @@ Swarm/
 │   │   │   ├── onboarding/        # New org/agent onboarding
 │   │   │   └── api/
 │   │   │       ├── v1/            # Ed25519-authenticated agent APIs
+│   │   │       │   ├── solana/   # Solana wallet info + agent wallet generation
+│   │   │       │   └── metaplex/ # NFT mint, update, collection, metadata endpoints
 │   │   │       ├── webhooks/      # API key-authenticated agent APIs
 │   │   │       ├── github/        # GitHub integration APIs
 │   │   │       ├── chainlink/     # Chainlink price feed API
@@ -784,6 +864,7 @@ Swarm/
 │   │       ├── slack.ts           # Slack integration
 │   │       ├── tailscale.ts       # Tailscale VPN integration
 │   │       ├── auth-guard.ts      # Authentication guards
+│   │       ├── solana-keys.ts     # Solana/Metaplex helpers (Umi, keypair derivation, validators)
 │   │       └── ...                # Other core libraries
 │   └── public/
 │       └── plugins/               # swarm-connect.zip (downloadable agent plugin)
@@ -877,7 +958,7 @@ See [HARDENING.md](HARDENING.md) for the complete security audit and recommendat
 - **Gateway feature is registry-only** — You can register and track gateways, but there is no runtime for executing agents on remote gateways.
 - **Workflow builder is visual-only** — The drag-and-drop canvas works and validates node connections, but there is no execution engine to run workflows.
 - **Memory search is text-based** — The memory system stores and retrieves agent memories from Firestore. There are no vector embeddings or semantic search despite the `vector` type field.
-- **Testnet only** — All smart contracts are deployed to Ethereum Sepolia and Hedera Testnet. No mainnet deployments.
+- **Testnet only** — All smart contracts are deployed to Ethereum Sepolia, Hedera Testnet, and Solana Devnet. No mainnet deployments.
 - **Single-org focus** — While multi-tenant, there is no cross-org communication or federation.
 - **No CI/CD pipeline** — No GitHub Actions, no automated tests in the repo.
 - **Cloud Pub/Sub optional** — The WebSocket hub supports horizontal scaling via Google Cloud Pub/Sub, but defaults to single-instance mode if `GCP_PROJECT_ID` is not configured. Multi-region deployment requires Pub/Sub setup.
@@ -890,6 +971,7 @@ See [HARDENING.md](HARDENING.md) for the complete security audit and recommendat
 | **Dashboard** | [swarmprotocol.ai](https://swarmprotocol.ai) | Netlify |
 | **Hub** | [hub.swarmprotocol.ai](https://hub.swarmprotocol.ai/health) | AWS (Elastic IP) |
 | **Contracts** | [Sepolia Etherscan](https://sepolia.etherscan.io/address/0x9C34200882C37344A098E0e8B84a533DFB80e552) | Ethereum Sepolia |
+| **Solana NFTs** | [Solscan Devnet](https://solscan.io/?cluster=devnet) | Solana Devnet |
 
 ## Team
 
