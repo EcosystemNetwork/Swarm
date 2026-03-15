@@ -23,7 +23,8 @@ import {
   Zap, Wallet, Globe, Landmark, Users, Palette,
   Wrench, GitBranch, Code, Play, ExternalLink,
   Sparkles, Layers, FileEdit, Image,
-  CheckCircle, Copy, Loader2, Send,
+  CheckCircle, Copy, Loader2, Send, ChevronDown, ChevronRight,
+  Coins,
 } from "lucide-react";
 
 // ═══════════════════════════════════════════════════════════════
@@ -83,6 +84,17 @@ export default function SolanaPage() {
   const [bulkGenerating, setBulkGenerating] = useState(false);
   const [bulkMinting, setBulkMinting] = useState(false);
   const [bulkProgress, setBulkProgress] = useState("");
+
+  // Agent wallet expansion state
+  const [expandedWallets, setExpandedWallets] = useState<Set<string>>(new Set());
+  const [walletDetails, setWalletDetails] = useState<Record<string, {
+    solBalance: number;
+    tokenAccounts: Array<{ mint: string; balance: string; decimals: number; uiAmount: number }>;
+    tokenAccountCount: number;
+    stakedSol: number;
+    loading: boolean;
+    error?: string;
+  }>>({});
 
   // Mint Agent Identity NFT state
   const [selectedAgentId, setSelectedAgentId] = useState("");
@@ -261,6 +273,74 @@ export default function SolanaPage() {
     setBulkProgress("");
     setBulkMinting(false);
     fetchWalletInfo(); // Refresh balance after minting
+  }
+
+  async function toggleWalletExpansion(agentId: string, solanaAddress: string) {
+    const isExpanded = expandedWallets.has(agentId);
+
+    if (isExpanded) {
+      // Collapse
+      setExpandedWallets(prev => {
+        const next = new Set(prev);
+        next.delete(agentId);
+        return next;
+      });
+    } else {
+      // Expand and fetch wallet details
+      setExpandedWallets(prev => new Set(prev).add(agentId));
+
+      // Only fetch if we don't have cached data
+      if (!walletDetails[agentId]) {
+        setWalletDetails(prev => ({
+          ...prev,
+          [agentId]: {
+            solBalance: 0,
+            tokenAccounts: [],
+            tokenAccountCount: 0,
+            stakedSol: 0,
+            loading: true,
+          }
+        }));
+
+        try {
+          const res = await fetch(`/api/v1/solana/wallet/${solanaAddress}`);
+          if (res.ok) {
+            const data = await res.json();
+            setWalletDetails(prev => ({
+              ...prev,
+              [agentId]: {
+                ...data,
+                loading: false,
+              }
+            }));
+          } else {
+            setWalletDetails(prev => ({
+              ...prev,
+              [agentId]: {
+                solBalance: 0,
+                tokenAccounts: [],
+                tokenAccountCount: 0,
+                stakedSol: 0,
+                loading: false,
+                error: "Failed to load wallet details",
+              }
+            }));
+          }
+        } catch (err) {
+          setWalletDetails(prev => ({
+            ...prev,
+            [agentId]: {
+              solBalance: 0,
+              tokenAccounts: [],
+              tokenAccountCount: 0,
+              stakedSol: 0,
+              loading: false,
+              error: err instanceof Error ? err.message : "Unknown error",
+            }
+          }));
+        }
+      }
+    }
   }
 
   return (
@@ -482,10 +562,23 @@ export default function SolanaPage() {
             )}
             {agents.length > 0 ? (
               <div className="space-y-2">
-                {agents.map(agent => (
+                {agents.map(agent => {
+                  const isExpanded = expandedWallets.has(agent.id);
+                  const details = walletDetails[agent.id];
+
+                  return (
                   <SpotlightCard key={agent.id} className="p-0 glass-card-enhanced">
                     <CardContent className="px-4 py-3 space-y-2">
                       <div className="flex items-center gap-3">
+                        {agent.solanaAddress && (
+                          <button
+                            onClick={() => toggleWalletExpansion(agent.id, agent.solanaAddress!)}
+                            className="text-purple-400 hover:text-purple-300 shrink-0 transition-transform"
+                            title={isExpanded ? "Collapse wallet details" : "Expand wallet details"}
+                          >
+                            {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                          </button>
+                        )}
                         <img
                           src={agent.avatarUrl || `https://api.dicebear.com/7.x/bottts/svg?seed=${agent.name}`}
                           alt={agent.name}
@@ -576,6 +669,65 @@ export default function SolanaPage() {
                               </div>
                             )}
                           </div>
+
+                          {/* Expanded Wallet Details */}
+                          {isExpanded && (
+                            <div className="mt-3 pt-3 border-t border-border space-y-2">
+                              {details?.loading ? (
+                                <div className="flex items-center gap-2 py-2">
+                                  <Loader2 className="h-4 w-4 animate-spin text-purple-400" />
+                                  <p className="text-xs text-muted-foreground">Loading wallet contents...</p>
+                                </div>
+                              ) : details?.error ? (
+                                <div className="rounded-lg border border-red-500/20 bg-red-500/5 p-2">
+                                  <p className="text-xs text-red-400">{details.error}</p>
+                                </div>
+                              ) : details ? (
+                                <>
+                                  {/* Balance Summary */}
+                                  <div className="grid grid-cols-3 gap-2">
+                                    <div className="rounded-lg bg-purple-500/5 border border-purple-500/10 p-2">
+                                      <p className="text-[9px] text-muted-foreground uppercase tracking-wider">SOL Balance</p>
+                                      <p className="text-sm font-mono text-purple-400">{details.solBalance}</p>
+                                    </div>
+                                    <div className="rounded-lg bg-purple-500/5 border border-purple-500/10 p-2">
+                                      <p className="text-[9px] text-muted-foreground uppercase tracking-wider">Tokens</p>
+                                      <p className="text-sm font-mono text-purple-400">{details.tokenAccountCount}</p>
+                                    </div>
+                                    <div className="rounded-lg bg-purple-500/5 border border-purple-500/10 p-2">
+                                      <p className="text-[9px] text-muted-foreground uppercase tracking-wider">Staked</p>
+                                      <p className="text-sm font-mono text-purple-400">{details.stakedSol}</p>
+                                    </div>
+                                  </div>
+
+                                  {/* Token Accounts */}
+                                  {details.tokenAccounts.length > 0 && (
+                                    <div className="space-y-1">
+                                      <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">Token Accounts</p>
+                                      <div className="space-y-1 max-h-32 overflow-y-auto">
+                                        {details.tokenAccounts.map((token, idx) => (
+                                          <div key={idx} className="flex items-center gap-2 rounded bg-muted/30 px-2 py-1">
+                                            <Coins className="h-3 w-3 text-purple-400 shrink-0" />
+                                            <div className="flex-1 min-w-0">
+                                              <code className="text-[9px] font-mono text-muted-foreground truncate block">{token.mint}</code>
+                                            </div>
+                                            <span className="text-[10px] font-mono text-purple-400 shrink-0">{token.balance}</span>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  {/* Empty state */}
+                                  {details.solBalance === 0 && details.tokenAccountCount === 0 && details.stakedSol === 0 && (
+                                    <div className="rounded-lg bg-muted/20 p-3 text-center">
+                                      <p className="text-[10px] text-muted-foreground">Wallet is empty. No SOL, tokens, or stake accounts.</p>
+                                    </div>
+                                  )}
+                                </>
+                              ) : null}
+                            </div>
+                          )}
                         </div>
                       )}
 
@@ -608,7 +760,8 @@ export default function SolanaPage() {
                       )}
                     </CardContent>
                   </SpotlightCard>
-                ))}
+                  );
+                })}
               </div>
             ) : (
               <SpotlightCard className="p-0 glass-card-enhanced">

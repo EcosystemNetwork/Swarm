@@ -8,7 +8,16 @@
 
 ## 🆕 What's New (March 2026)
 
-**Solana & Metaplex On-Chain Identity (New!)**
+**SwarmCare Bittensor Subnet (New!)**
+- ✅ **Decentralized AI Training** — Miners train care coordination models on GPU. Validators score model quality. Best models earn TAO.
+- ✅ **Elderly Care Coordination** — Models optimize robot-to-resident assignments, medication delivery, emergency response, supply routes.
+- ✅ **5-Scenario Bank** — Hydration rounds, emergency falls, medication delivery, night checks, supply runs with optimal plans.
+- ✅ **4-Metric Scoring** — Accuracy (40%), Generalization (25%), Efficiency (20%), Novelty (15%) determine TAO emissions.
+- ✅ **Model Deployment Pipeline** — Best community-trained models deploy directly to Swarm agent fleet via `pull_best_model.py`.
+- ✅ **Sovereignty** — No dependency on OpenAI/Anthropic/cloud providers. Open-source models (LLaMA) + miner-owned GPUs.
+- ✅ **Economic Viability** — Care facilities pay per-task API fees. Revenue supplements then replaces TAO emissions.
+
+**Solana & Metaplex On-Chain Identity**
 - ✅ **Agent Solana Wallets** — Deterministic per-agent Solana keypairs derived from SHA-256(platform key + agentId). Each agent gets its own on-chain address without storing private keys.
 - ✅ **Metaplex NFT Identity** — Mint Metaplex NFTs on Solana Devnet as on-chain agent identity tokens. Each NFT carries agent metadata (name, type, skills, scores) via dynamic metadata URIs.
 - ✅ **Org NFT Collections** — Create Metaplex NFT collections per organization. Agent NFTs are minted as verified collection members.
@@ -87,6 +96,7 @@ Built for solo founders, startups, and teams who need to command multiple AI age
 | **Metaplex Collections** | Shipped | Org-level NFT collections, verified collection membership for agent NFTs |
 | **Solana Treasury Dashboard** | Shipped | Live SOL balance, token accounts, staked SOL from Devnet RPC |
 | **NFT Gallery & Bulk Ops** | Shipped | Visual NFT grid, bulk wallet generation, bulk minting with progress tracking |
+| **SwarmCare Bittensor Subnet** | Shipped | Decentralized AI training for elderly care coordination. Miners train models, validators score quality, best models deploy to Swarm. |
 | **Wallet Auth (SIWE)** | Shipped | Sign-In With Ethereum via Thirdweb v5 with cryptographic signature verification; supports MetaMask, Coinbase, Rainbow, Rabby, Phantom, in-app wallets |
 | **Swarm Workflow Builder** | Beta | Visual drag-and-drop editor with React Flow; cost estimation UI ready, execution engine not yet wired |
 | **Multi-Platform Messaging** | Shipped | Telegram, Discord, Slack bridges with encrypted credentials and webhook verification |
@@ -888,6 +898,12 @@ Swarm/
 │   ├── index.ts                   # Monitor workflow (simulation-ready)
 │   ├── config.json
 │   └── workflow.yaml
+├── bittensor-mod/                 # SwarmCare Bittensor Subnet
+│   ├── demo.py                    # Full end-to-end demo (RUN THIS)
+│   ├── subnet/                    # Protocol, miner, validator
+│   ├── scenarios/                 # 5 elderly care scenarios
+│   ├── scripts/                   # Model deployment
+│   └── README.md                  # Subnet documentation
 └── docs/
     └── creating-mods.md           # Mod creation guide + ModManifest spec
 ```
