@@ -44,6 +44,7 @@ import {
 } from "@/lib/skills";
 import { shortAddress } from "@/lib/chains";
 import { getAgentAvatarUrl } from "@/lib/agent-avatar";
+import { useSession } from "@/contexts/SessionContext";
 
 // ---------------------------------------------------------------------------
 // Error Boundary — prevents uncaught errors from crashing the entire React
@@ -126,6 +127,7 @@ function AgentDetailPage() {
   const router = useRouter();
   const agentId = params.id as string;
   const { currentOrg } = useOrg();
+  const { address: sessionAddress } = useSession();
   const swarm = useSwarmData();
   const swarmWrite = useSwarmWrite();
   const linkChain = useLinkData();
@@ -152,6 +154,9 @@ function AgentDetailPage() {
   // Delete state
   const [showDelete, setShowDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
+
+  // Solana / Metaplex state
+  const [solanaLoading, setSolanaLoading] = useState(false);
 
   // Pause/Resume state
   const [showPause, setShowPause] = useState(false);
@@ -377,6 +382,74 @@ function AgentDetailPage() {
       console.error("Failed to remove skill from agent:", err);
     } finally {
       setSkillBusy(null);
+    }
+  };
+
+  // ── Solana / Metaplex handlers ──
+  const solanaAuthHeaders = {
+    "Content-Type": "application/json",
+    "x-wallet-address": sessionAddress || "",
+  };
+
+  const handleGenerateSolanaWallet = async () => {
+    if (!agent || !currentOrg) return;
+    setSolanaLoading(true);
+    try {
+      const res = await fetch("/api/v1/solana/wallet/generate", {
+        method: "POST",
+        headers: solanaAuthHeaders,
+        body: JSON.stringify({ agentId: agent.id, orgId: currentOrg.id }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setAgent({ ...agent, solanaAddress: data.solanaAddress });
+      }
+    } catch (err) {
+      console.error("Wallet generation failed:", err);
+    } finally {
+      setSolanaLoading(false);
+    }
+  };
+
+  const handleMintSolanaNft = async () => {
+    if (!agent || !currentOrg) return;
+    setSolanaLoading(true);
+    try {
+      const recipientAddress = agent.solanaAddress || sessionAddress || "";
+      const res = await fetch("/api/v1/metaplex/mint", {
+        method: "POST",
+        headers: solanaAuthHeaders,
+        body: JSON.stringify({
+          agentId: agent.id,
+          orgId: currentOrg.id,
+          recipientAddress,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setAgent({ ...agent, nftMintAddress: data.mintAddress, nftMintedAt: new Date() });
+      }
+    } catch (err) {
+      console.error("NFT mint failed:", err);
+    } finally {
+      setSolanaLoading(false);
+    }
+  };
+
+  const handleUpdateSolanaMetadata = async () => {
+    if (!agent || !currentOrg || !agent.nftMintAddress) return;
+    setSolanaLoading(true);
+    try {
+      const res = await fetch("/api/v1/metaplex/update", {
+        method: "POST",
+        headers: solanaAuthHeaders,
+        body: JSON.stringify({ agentId: agent.id, orgId: currentOrg.id }),
+      });
+      await res.json();
+    } catch (err) {
+      console.error("Metadata update failed:", err);
+    } finally {
+      setSolanaLoading(false);
     }
   };
 
@@ -946,6 +1019,12 @@ function AgentDetailPage() {
                   Sepolia {linkMatch ? "✓" : "✗"}
                 </Badge>
               )}
+              <Badge className={agent.nftMintAddress
+                ? "bg-purple-100 text-purple-700 dark:bg-purple-950/40 dark:text-purple-400"
+                : "bg-muted text-muted-foreground"
+              }>
+                Solana {agent.nftMintAddress ? "✓" : "✗"}
+              </Badge>
             </div>
           </div>
           <CardDescription>Smart contract registration across chains</CardDescription>
@@ -1053,6 +1132,79 @@ function AgentDetailPage() {
                 )}
               </div>
             )}
+
+            {/* Solana Devnet Chain */}
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-xs font-medium">Solana Devnet</span>
+                <Badge variant="outline" className="text-[9px]">SOL</Badge>
+              </div>
+              {agent.nftMintAddress ? (
+                <div className="grid grid-cols-2 gap-3 text-sm pl-2 border-l-2 border-purple-500/30">
+                  <div>
+                    <span className="text-xs text-muted-foreground">Solana Address</span>
+                    <p className="font-mono text-xs mt-0.5">{shortAddress(agent.solanaAddress || '')}</p>
+                  </div>
+                  <div>
+                    <span className="text-xs text-muted-foreground">NFT Mint</span>
+                    <p className="font-mono text-xs mt-0.5">{shortAddress(agent.nftMintAddress)}</p>
+                  </div>
+                  <div>
+                    <span className="text-xs text-muted-foreground">Status</span>
+                    <p className="text-xs mt-0.5">
+                      <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
+                        <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                        Minted
+                      </span>
+                    </p>
+                  </div>
+                  <div className="space-y-1">
+                    <a
+                      href={`https://solscan.io/token/${agent.nftMintAddress}?cluster=devnet`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[10px] text-purple-600 dark:text-purple-400 hover:underline"
+                    >
+                      View on Solscan ↗
+                    </a>
+                    <br />
+                    <button
+                      onClick={handleUpdateSolanaMetadata}
+                      disabled={solanaLoading}
+                      className="text-[10px] text-purple-600 dark:text-purple-400 hover:underline disabled:opacity-50"
+                    >
+                      {solanaLoading ? "Updating..." : "Update Metadata ↻"}
+                    </button>
+                  </div>
+                </div>
+              ) : agent.solanaAddress ? (
+                <div className="pl-2 border-l-2 border-purple-500/30">
+                  <p className="text-xs">
+                    Wallet: <code className="font-mono text-xs">{shortAddress(agent.solanaAddress)}</code>
+                  </p>
+                  <Button
+                    onClick={handleMintSolanaNft}
+                    disabled={solanaLoading}
+                    size="sm"
+                    className="mt-2 bg-purple-600 hover:bg-purple-700 text-white text-xs h-7"
+                  >
+                    {solanaLoading ? "Minting..." : "Mint Identity NFT"}
+                  </Button>
+                </div>
+              ) : (
+                <div className="pl-2 border-l-2 border-muted">
+                  <p className="text-xs text-muted-foreground">No Solana wallet</p>
+                  <Button
+                    onClick={handleGenerateSolanaWallet}
+                    disabled={solanaLoading}
+                    size="sm"
+                    className="mt-2 bg-purple-600 hover:bg-purple-700 text-white text-xs h-7"
+                  >
+                    {solanaLoading ? "Generating..." : "Generate Wallet"}
+                  </Button>
+                </div>
+              )}
+            </div>
 
             {/* On-Chain Skills (from Hedera match) */}
             {onchainMatch?.skills && (

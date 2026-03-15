@@ -46,6 +46,8 @@ export interface Organization {
   swarmSlots?: {
     [slotId: string]: { agentId: string; assignedAt: unknown } | null;
   };
+  /** Metaplex collection NFT mint address (Solana devnet) */
+  metaplexCollectionMint?: string;
 }
 
 export interface GitHubRepoLink {
@@ -137,6 +139,8 @@ export interface Agent {
   nftMintedAt?: unknown;
   /** EVM address of the NFT owner (when minted via EVM wallet, held by platform on-chain) */
   nftOwnerEvmAddress?: string;
+  /** Deterministic Solana wallet address for this agent */
+  solanaAddress?: string;
   /** Number of completed tasks (denormalized counter) */
   tasksCompleted?: number;
   createdAt: unknown;
