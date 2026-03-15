@@ -135,6 +135,8 @@ export interface Agent {
   nftMintAddress?: string;
   /** When the agent identity NFT was minted */
   nftMintedAt?: unknown;
+  /** EVM address of the NFT owner (when minted via EVM wallet, held by platform on-chain) */
+  nftOwnerEvmAddress?: string;
   /** Number of completed tasks (denormalized counter) */
   tasksCompleted?: number;
   createdAt: unknown;

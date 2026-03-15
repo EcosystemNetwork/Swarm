@@ -72,6 +72,7 @@ export default function SolanaPage() {
   const [minting, setMinting] = useState(false);
   const [mintSuccess, setMintSuccess] = useState<string | null>(null);
   const [mintError, setMintError] = useState<string | null>(null);
+  const [mintCustodial, setMintCustodial] = useState(false);
 
   const selectedAgent = agents.find(a => a.id === selectedAgentId) || null;
   const recipientAddress = useCustomWallet ? customWallet : (account?.address || address || "");
@@ -110,6 +111,7 @@ export default function SolanaPage() {
     setMinting(true);
     setMintError(null);
     setMintSuccess(null);
+    setMintCustodial(false);
     try {
       const res = await fetch("/api/v1/metaplex/mint", {
         method: "POST",
@@ -132,6 +134,7 @@ export default function SolanaPage() {
         a.id === selectedAgent.id ? { ...a, nftMintAddress: data.mintAddress, nftMintedAt: new Date() } : a
       ));
       setMintSuccess(data.mintAddress);
+      setMintCustodial(data.custodial || false);
     } catch (err) {
       setMintError(err instanceof Error ? err.message : "Mint failed");
     } finally {
@@ -580,7 +583,7 @@ export default function SolanaPage() {
 
                   {useCustomWallet ? (
                     <Input
-                      placeholder="Enter wallet address..."
+                      placeholder="Enter Solana (base58) or EVM (0x) wallet address..."
                       value={customWallet}
                       onChange={(e) => setCustomWallet(e.target.value)}
                       className="font-mono text-xs bg-zinc-900 text-white"
@@ -593,6 +596,13 @@ export default function SolanaPage() {
                       </code>
                       <Badge variant="outline" className="text-[9px] px-1.5">thirdweb</Badge>
                     </div>
+                  )}
+
+                  {/* EVM address notice */}
+                  {recipientAddress && /^0x[0-9a-fA-F]{40}$/.test(recipientAddress) && (
+                    <p className="text-[10px] text-amber-400/80 bg-amber-500/5 border border-amber-500/10 rounded px-2 py-1.5">
+                      EVM address detected. NFT will be held by the Swarm platform wallet on Solana with your EVM address recorded in the metadata for ownership tracking.
+                    </p>
                   )}
 
                   {/* Mint button */}
@@ -631,9 +641,20 @@ export default function SolanaPage() {
                   <div className="flex items-center gap-2">
                     <Send className="h-3 w-3 text-muted-foreground" />
                     <span className="text-[10px] text-muted-foreground">
-                      Sent to: <code className="font-mono">{recipientAddress.slice(0, 6)}...{recipientAddress.slice(-4)}</code>
+                      {mintCustodial
+                        ? <>Held by platform wallet · Owner: <code className="font-mono">{recipientAddress.slice(0, 6)}...{recipientAddress.slice(-4)}</code></>
+                        : <>Sent to: <code className="font-mono">{recipientAddress.slice(0, 6)}...{recipientAddress.slice(-4)}</code></>
+                      }
                     </span>
                   </div>
+                  <a
+                    href={`https://solscan.io/token/${mintSuccess}?cluster=devnet`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-[10px] text-pink-400 hover:underline"
+                  >
+                    View on Solscan <ExternalLink className="h-3 w-3" />
+                  </a>
                 </div>
               )}
 

@@ -3,7 +3,7 @@
  *
  * Mint a Metaplex NFT representing an agent's on-chain identity on Solana devnet.
  * Uses the platform keypair (SOLANA_PLATFORM_KEY) as the payer and mint authority.
- * Metadata JSON is uploaded to Firebase Storage.
+ * Metadata is served via the public API route /api/v1/metaplex/metadata/[agentId].
  *
  * Body: { agentId, orgId, recipientAddress }
  * Returns: { mintAddress, signature, metadataUri, agentId }
@@ -11,8 +11,6 @@
 import { NextRequest } from "next/server";
 import { requireOrgMember } from "@/lib/auth-guard";
 import { getAgent, updateAgent, type Agent } from "@/lib/firestore";
-import { storage } from "@/lib/firebase";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 
 import { createUmi } from "@metaplex-foundation/umi-bundle-defaults";
 import { mplTokenMetadata, createNft } from "@metaplex-foundation/mpl-token-metadata";
@@ -28,40 +26,14 @@ import bs58 from "bs58";
 // Helpers
 // ═══════════════════════════════════════════════════════════════
 
-/** Build Metaplex-standard metadata JSON from an agent record. */
-function buildNftMetadata(agent: Agent) {
-  return {
-    name: agent.name,
-    symbol: "SWARM",
-    description:
-      agent.bio || agent.description || `${agent.type} agent in the Swarm protocol`,
-    image:
-      agent.avatarUrl ||
-      `https://api.dicebear.com/9.x/bottts/svg?seed=${agent.name}-${agent.type || "agent"}`,
-    external_url: "https://swarmprotocol.fun",
-    attributes: [
-      { trait_type: "Type", value: agent.type },
-      { trait_type: "ASN", value: agent.asn || "unassigned" },
-      { trait_type: "Trust Score", value: agent.trustScore ?? 0 },
-      { trait_type: "Credit Score", value: agent.creditScore ?? 0 },
-      { trait_type: "Status", value: agent.status },
-      ...(agent.reportedSkills || []).map((s) => ({
-        trait_type: "Skill",
-        value: s.name,
-      })),
-    ],
-  };
+/** Check if an address is an EVM hex address (0x-prefixed). */
+function isEvmAddress(addr: string): boolean {
+  return /^0x[0-9a-fA-F]{40}$/.test(addr);
 }
 
-/** Upload metadata JSON to Firebase Storage and return the public download URL. */
-async function uploadMetadata(
-  agentId: string,
-  metadata: Record<string, unknown>,
-): Promise<string> {
-  const jsonBuffer = Buffer.from(JSON.stringify(metadata, null, 2));
-  const storageRef = ref(storage, `nft-metadata/${agentId}.json`);
-  await uploadBytes(storageRef, jsonBuffer, { contentType: "application/json" });
-  return getDownloadURL(storageRef);
+/** Check if an address is a valid Solana base58 address. */
+function isSolanaAddress(addr: string): boolean {
+  return /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(addr);
 }
 
 /** Create a Umi instance configured with the platform keypair. */
@@ -116,10 +88,15 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // 3. Validate recipient looks like a Solana address (base58, 32-44 chars)
-  if (!/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(recipientAddress)) {
+  // 3. Validate recipient address — accept Solana (base58) or EVM (0x) addresses.
+  //    EVM addresses: NFT is held by the platform wallet on-chain, EVM address recorded in metadata.
+  //    Solana addresses: NFT goes directly to the provided Solana wallet.
+  const recipientIsEvm = isEvmAddress(recipientAddress);
+  const recipientIsSolana = isSolanaAddress(recipientAddress);
+
+  if (!recipientIsEvm && !recipientIsSolana) {
     return Response.json(
-      { error: "Invalid Solana wallet address" },
+      { error: "Invalid wallet address. Provide a Solana (base58) or EVM (0x) address." },
       { status: 400 },
     );
   }
@@ -146,13 +123,22 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 5. Build & upload metadata
-    const metadata = buildNftMetadata(agent);
-    const metadataUri = await uploadMetadata(agentId, metadata);
+    // 5. Build metadata URI — served by the public API route
+    const appDomain = process.env.NEXT_PUBLIC_APP_DOMAIN || "localhost:3000";
+    const protocol = appDomain.startsWith("localhost") ? "http" : "https";
+    const metadataUri = `${protocol}://${appDomain}/api/v1/metaplex/metadata/${agentId}`;
 
     // 6. Mint NFT via Metaplex / Umi
     const umi = createPlatformUmi();
     const mint = generateSigner(umi);
+
+    // If recipient is an EVM address, mint to the platform wallet (Solana NFTs
+    // require a Solana public key as token owner). The EVM address is recorded
+    // in the on-chain metadata attributes for ownership tracking.
+    const platformPublicKey = umi.identity.publicKey;
+    const tokenOwner = recipientIsSolana
+      ? umiPublicKey(recipientAddress)
+      : platformPublicKey;
 
     const { signature } = await createNft(umi, {
       mint,
@@ -160,7 +146,7 @@ export async function POST(request: NextRequest) {
       symbol: "SWARM",
       uri: metadataUri,
       sellerFeeBasisPoints: percentAmount(0),
-      tokenOwner: umiPublicKey(recipientAddress),
+      tokenOwner,
     }).sendAndConfirm(umi);
 
     const mintAddress = mint.publicKey.toString();
@@ -170,6 +156,7 @@ export async function POST(request: NextRequest) {
     await updateAgent(agentId, {
       nftMintAddress: mintAddress,
       nftMintedAt: new Date(),
+      ...(recipientIsEvm ? { nftOwnerEvmAddress: recipientAddress } : {}),
     } as Partial<Agent>);
 
     // 8. Success
@@ -178,6 +165,8 @@ export async function POST(request: NextRequest) {
       signature: signatureStr,
       metadataUri,
       agentId,
+      tokenOwner: tokenOwner.toString(),
+      custodial: recipientIsEvm,
     });
   } catch (err) {
     console.error("Metaplex mint error:", err);
