@@ -1174,6 +1174,29 @@ export default function DashboardPage() {
                       </button>
                     ))}
                   </div>
+                  {/* Custom time input */}
+                  <div className="mt-1.5">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground whitespace-nowrap">Custom time:</span>
+                      <input
+                        type="time"
+                        value={(() => {
+                          const parts = briefingSchedule.split(" ");
+                          if (parts.length === 5 && /^\d+$/.test(parts[1]) && /^\d+$/.test(parts[0])) {
+                            return `${parts[1].padStart(2, "0")}:${parts[0].padStart(2, "0")}`;
+                          }
+                          return "";
+                        })()}
+                        onChange={(e) => {
+                          const [h, m] = e.target.value.split(":");
+                          if (h !== undefined && m !== undefined) {
+                            setBriefingSchedule(`${parseInt(m)} ${parseInt(h)} * * *`);
+                          }
+                        }}
+                        className="flex-1 rounded-lg border border-border bg-background px-2 py-1 text-xs text-foreground focus:border-amber-500/50 focus:outline-none focus:ring-1 focus:ring-amber-500/20"
+                      />
+                    </div>
+                  </div>
                 </div>
 
                 {/* Prompt editor */}
