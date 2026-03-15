@@ -131,6 +131,10 @@ export interface Agent {
   soulUpdatedAt?: unknown;
   /** Wallet address that owns/controls this agent */
   walletAddress?: string;
+  /** Solana NFT mint address (Metaplex agent identity) */
+  nftMintAddress?: string;
+  /** When the agent identity NFT was minted */
+  nftMintedAt?: unknown;
   /** Number of completed tasks (denormalized counter) */
   tasksCompleted?: number;
   createdAt: unknown;

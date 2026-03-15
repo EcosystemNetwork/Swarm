@@ -11,6 +11,9 @@ import { useOrg } from "@/contexts/OrgContext";
 import { useSession } from "@/contexts/SessionContext";
 import { getOwnedItems, SKILL_REGISTRY, type OwnedItem } from "@/lib/skills";
 import { getAgentsByOrg, type Agent } from "@/lib/firestore";
+import { useActiveAccount } from "thirdweb/react";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SOLANA_MANIFEST } from "@/lib/solana";
 import { METAPLEX_MANIFEST } from "@/lib/metaplex";
 import { cn } from "@/lib/utils";
@@ -20,6 +23,7 @@ import {
   Zap, Wallet, Globe, Landmark, Users, Palette,
   Wrench, GitBranch, Code, Play, ExternalLink,
   Sparkles, Layers, FileEdit, Image,
+  CheckCircle, Copy, Loader2, Send,
 } from "lucide-react";
 
 // ═══════════════════════════════════════════════════════════════
@@ -59,6 +63,18 @@ export default function SolanaPage() {
   const [agents, setAgents] = useState<Agent[]>([]);
   const { currentOrg } = useOrg();
   const { address } = useSession();
+  const account = useActiveAccount();
+
+  // Mint Agent Identity NFT state
+  const [selectedAgentId, setSelectedAgentId] = useState("");
+  const [useCustomWallet, setUseCustomWallet] = useState(false);
+  const [customWallet, setCustomWallet] = useState("");
+  const [minting, setMinting] = useState(false);
+  const [mintSuccess, setMintSuccess] = useState<string | null>(null);
+  const [mintError, setMintError] = useState<string | null>(null);
+
+  const selectedAgent = agents.find(a => a.id === selectedAgentId) || null;
+  const recipientAddress = useCustomWallet ? customWallet : (account?.address || address || "");
 
   const hasMetaplex = useMemo(
     () => inventory.some(i => i.skillId === "metaplex-nft" && i.enabled),
@@ -88,6 +104,40 @@ export default function SolanaPage() {
     { id: "agents", label: "Agents", icon: Users },
     ...(hasMetaplex ? [{ id: "metaplex" as const, label: "Metaplex", icon: Palette }] : []),
   ];
+
+  async function handleMintNft() {
+    if (!selectedAgent || !recipientAddress || !currentOrg) return;
+    setMinting(true);
+    setMintError(null);
+    setMintSuccess(null);
+    try {
+      const res = await fetch("/api/v1/metaplex/mint", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-wallet-address": account?.address || address || "",
+        },
+        body: JSON.stringify({
+          agentId: selectedAgent.id,
+          orgId: currentOrg.id,
+          recipientAddress,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || `Mint failed (${res.status})`);
+
+      // Update local state with the real mint address
+      setAgents(prev => prev.map(a =>
+        a.id === selectedAgent.id ? { ...a, nftMintAddress: data.mintAddress, nftMintedAt: new Date() } : a
+      ));
+      setMintSuccess(data.mintAddress);
+    } catch (err) {
+      setMintError(err instanceof Error ? err.message : "Mint failed");
+    } finally {
+      setMinting(false);
+    }
+  }
 
   return (
     <div className="max-w-6xl mx-auto px-6 py-8">
@@ -413,12 +463,195 @@ export default function SolanaPage() {
             </a>
           </div>
 
+          {/* ── Mint Agent Identity NFT ── */}
+          <SpotlightCard className="p-0 glass-card-enhanced" spotlightColor="rgba(236,72,153,0.06)">
+            <CardHeader className="px-4 pt-4 pb-2">
+              <CardTitle className="text-sm flex items-center gap-2">
+                <Sparkles className="h-4 w-4 text-pink-400" />
+                Mint Agent Identity NFT
+                <Badge variant="outline" className="ml-auto text-[9px] px-1.5 bg-pink-500/10 border-pink-500/20 text-pink-400">Devnet</Badge>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="px-4 pb-4 space-y-4">
+              {/* Agent selector */}
+              <div className="space-y-1.5">
+                <p className="text-xs text-muted-foreground font-medium">Select Agent</p>
+                <Select value={selectedAgentId} onValueChange={(v) => { setSelectedAgentId(v); setMintSuccess(null); setMintError(null); }}>
+                  <SelectTrigger className="bg-zinc-900 text-white">
+                    <SelectValue placeholder="Choose an agent to mint..." />
+                  </SelectTrigger>
+                  <SelectContent className="bg-zinc-900 text-white border-border">
+                    {agents.map(agent => (
+                      <SelectItem key={agent.id} value={agent.id}>
+                        <span className="flex items-center gap-2">
+                          {agent.name} <span className="text-muted-foreground">({agent.type})</span>
+                          {agent.asn && <span className="text-muted-foreground text-[10px] font-mono">{agent.asn.split("-").slice(0, 4).join("-")}</span>}
+                          {agent.nftMintAddress && <Badge className="text-[9px] px-1 bg-pink-500/10 text-pink-400 border-pink-500/20 ml-1">Minted</Badge>}
+                        </span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* NFT Preview */}
+              {selectedAgent && (
+                <div className="rounded-lg border border-pink-500/20 bg-pink-500/5 p-4 space-y-3">
+                  <p className="text-xs font-medium text-pink-400 uppercase tracking-wider">NFT Preview</p>
+                  <div className="flex items-start gap-4">
+                    <img
+                      src={selectedAgent.avatarUrl || `https://api.dicebear.com/9.x/bottts/svg?seed=${selectedAgent.name}-${selectedAgent.type || "agent"}`}
+                      alt={selectedAgent.name}
+                      className="w-20 h-20 rounded-lg border-2 border-pink-500/30 bg-zinc-900"
+                    />
+                    <div className="flex-1 space-y-2">
+                      <p className="text-sm font-semibold">{selectedAgent.name}</p>
+                      <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                        <div><span className="text-muted-foreground">Type:</span> {selectedAgent.type}</div>
+                        <div><span className="text-muted-foreground">ASN:</span> {selectedAgent.asn || "N/A"}</div>
+                        <div><span className="text-muted-foreground">Status:</span> {selectedAgent.status}</div>
+                        <div><span className="text-muted-foreground">Trust:</span> {selectedAgent.trustScore ?? "—"}</div>
+                      </div>
+                      {selectedAgent.reportedSkills && selectedAgent.reportedSkills.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {selectedAgent.reportedSkills.map(s => (
+                            <Badge key={s.id} variant="outline" className="text-[9px] px-1.5 bg-pink-500/10 border-pink-500/20 text-pink-400">{s.name}</Badge>
+                          ))}
+                        </div>
+                      )}
+                      {selectedAgent.bio && (
+                        <p className="text-[10px] text-muted-foreground italic mt-1">{selectedAgent.bio}</p>
+                      )}
+                    </div>
+                  </div>
+                  <pre className="p-2 rounded bg-zinc-900 text-[10px] overflow-x-auto border border-border text-muted-foreground">
+                    <code>{JSON.stringify({
+                      name: selectedAgent.name,
+                      symbol: "SWARM",
+                      description: selectedAgent.bio || selectedAgent.description,
+                      image: selectedAgent.avatarUrl || `dicebear:${selectedAgent.name}`,
+                      attributes: [
+                        { trait_type: "Type", value: selectedAgent.type },
+                        { trait_type: "ASN", value: selectedAgent.asn || "unassigned" },
+                        { trait_type: "Trust Score", value: selectedAgent.trustScore ?? 0 },
+                        { trait_type: "Credit Score", value: selectedAgent.creditScore ?? 0 },
+                      ],
+                    }, null, 2)}</code>
+                  </pre>
+                </div>
+              )}
+
+              {/* Already minted indicator */}
+              {selectedAgent?.nftMintAddress && !mintSuccess && (
+                <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-3 flex items-center gap-3">
+                  <CheckCircle className="h-5 w-5 text-emerald-400 shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-medium text-emerald-400">Already Minted</p>
+                    <code className="text-[10px] text-muted-foreground font-mono break-all">{selectedAgent.nftMintAddress}</code>
+                  </div>
+                  <a
+                    href={`https://solscan.io/token/${selectedAgent.nftMintAddress}?cluster=devnet`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-pink-400 hover:underline flex items-center gap-1 shrink-0"
+                  >
+                    Solscan <ExternalLink className="h-3 w-3" />
+                  </a>
+                </div>
+              )}
+
+              {/* Recipient wallet (only if not yet minted) */}
+              {selectedAgent && !selectedAgent.nftMintAddress && (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs text-muted-foreground font-medium">Recipient Wallet</p>
+                    <button
+                      onClick={() => setUseCustomWallet(!useCustomWallet)}
+                      className={cn(
+                        "text-[10px] px-2 py-0.5 rounded-full border transition-all",
+                        useCustomWallet
+                          ? "bg-pink-500/10 text-pink-400 border-pink-500/20"
+                          : "text-muted-foreground border-border hover:border-pink-500/20"
+                      )}
+                    >
+                      {useCustomWallet ? "Using custom wallet" : "Custom wallet"}
+                    </button>
+                  </div>
+
+                  {useCustomWallet ? (
+                    <Input
+                      placeholder="Enter wallet address..."
+                      value={customWallet}
+                      onChange={(e) => setCustomWallet(e.target.value)}
+                      className="font-mono text-xs bg-zinc-900 text-white"
+                    />
+                  ) : (
+                    <div className="flex items-center gap-2 rounded-md border border-border bg-muted/30 px-3 py-2">
+                      <Wallet className="h-4 w-4 text-pink-400" />
+                      <code className="text-xs font-mono truncate flex-1">
+                        {recipientAddress || "No wallet connected"}
+                      </code>
+                      <Badge variant="outline" className="text-[9px] px-1.5">thirdweb</Badge>
+                    </div>
+                  )}
+
+                  {/* Mint button */}
+                  <div className="flex items-center gap-3">
+                    <Button
+                      onClick={handleMintNft}
+                      disabled={minting || !recipientAddress}
+                      className="bg-pink-600 hover:bg-pink-700 text-white"
+                    >
+                      {minting ? (
+                        <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Minting...</>
+                      ) : (
+                        <><Sparkles className="h-4 w-4 mr-2" /> Mint Agent Identity NFT</>
+                      )}
+                    </Button>
+                    <span className="text-[10px] text-muted-foreground">
+                      Solana Devnet
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {/* Success state */}
+              {mintSuccess && (
+                <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-3 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle className="h-5 w-5 text-emerald-400" />
+                    <p className="text-sm font-medium text-emerald-400">NFT Minted Successfully!</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <code className="text-[10px] font-mono text-muted-foreground break-all flex-1">{mintSuccess}</code>
+                    <button onClick={() => navigator.clipboard.writeText(mintSuccess)} className="text-pink-400 hover:text-pink-300">
+                      <Copy className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Send className="h-3 w-3 text-muted-foreground" />
+                    <span className="text-[10px] text-muted-foreground">
+                      Sent to: <code className="font-mono">{recipientAddress.slice(0, 6)}...{recipientAddress.slice(-4)}</code>
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {/* Error state */}
+              {mintError && (
+                <div className="rounded-lg border border-red-500/20 bg-red-500/5 p-3">
+                  <p className="text-xs text-red-400">{mintError}</p>
+                </div>
+              )}
+            </CardContent>
+          </SpotlightCard>
+
           {/* Metaplex stats */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <StatCard title="Programs" value="Core, Token Metadata, Bubblegum" icon="📜" />
             <StatCard title="Agent Registry" value="Available" icon="🤖" />
             <StatCard title="Collections" value="—" icon="📁" />
-            <StatCard title="NFTs Minted" value="—" icon="🎨" />
+            <StatCard title="NFTs Minted" value={String(agents.filter(a => a.nftMintAddress).length)} icon="🎨" />
           </div>
 
           {/* Metaplex Tools */}

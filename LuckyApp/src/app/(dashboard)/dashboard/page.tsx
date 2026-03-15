@@ -17,6 +17,7 @@ import ShinyText from "@/components/reactbits/ShinyText";
 import DecryptedText from "@/components/reactbits/DecryptedText";
 import { VitalsWidget } from "@/components/vitals-widget";
 import { useActiveAccount } from "thirdweb/react";
+import { useSession } from "@/contexts/SessionContext";
 import { GripVertical, RotateCcw, Plus, X, Check, FolderKanban, Bot, Target, CheckCircle2, Briefcase, ListTodo, BarChart3, Handshake, Users, Loader2, Pencil } from "lucide-react";
 import {
   getOrgStats,
@@ -307,6 +308,8 @@ export default function DashboardPage() {
   const { currentOrg } = useOrg();
   const currencySymbol = "$";
   const account = useActiveAccount();
+  const { address: sessionAddress, authenticated } = useSession();
+  const userAddress = account?.address || sessionAddress || "";
   const [stats, setStats] = useState<OrgStats | null>(null);
   const [recentTasks, setRecentTasks] = useState<(Task & { agentName?: string; projectName?: string })[]>([]);
   const [recentJobs, setRecentJobs] = useState<Job[]>([]);
@@ -482,7 +485,7 @@ export default function DashboardPage() {
 
   // ── Daily Briefing setup/edit handler ──
   const handleBriefingSetup = useCallback(async () => {
-    if (!currentOrg || !account) return;
+    if (!currentOrg || (!account && !authenticated)) return;
     setBriefingSaving(true);
     try {
       const briefingAgent = briefingAgentId ? agents.find(a => a.id === briefingAgentId) : null;
@@ -506,7 +509,7 @@ export default function DashboardPage() {
           agentIds: briefingAgent ? [briefingAgent.id] : undefined,
           priority: "medium",
           enabled: true,
-          createdBy: account.address || "unknown",
+          createdBy: userAddress || "unknown",
         });
       }
 
@@ -540,7 +543,7 @@ export default function DashboardPage() {
     } finally {
       setBriefingSaving(false);
     }
-  }, [currentOrg, account, briefingSchedule, briefingPrompt, briefingCronJob, briefingAgentId, agents, loadDashboardData]);
+  }, [currentOrg, account, authenticated, userAddress, briefingSchedule, briefingPrompt, briefingCronJob, briefingAgentId, agents, loadDashboardData]);
 
   // ── Open briefing editor pre-filled with current config ──
   const openBriefingEditor = useCallback(() => {
@@ -575,7 +578,7 @@ export default function DashboardPage() {
         status: "open",
         reward: reward || undefined,
         requiredSkills: [],
-        postedByAddress: account?.address || "unknown",
+        postedByAddress: userAddress || "unknown",
         priority,
         createdAt: new Date(),
       });
@@ -1084,7 +1087,7 @@ export default function DashboardPage() {
       colSpan: "lg:col-span-2",
       render: () => {
         // Get current user's agent (if any)
-        const userAgent = agents.find(a => a.walletAddress === account?.address);
+        const userAgent = agents.find(a => a.walletAddress === userAddress);
         if (!userAgent || !currentOrg) {
           return (
             <SpotlightCard className="p-0 glass-card-enhanced h-full overflow-hidden">
@@ -1109,7 +1112,7 @@ export default function DashboardPage() {
       label: "Agent Sessions",
       colSpan: "lg:col-span-2",
       render: () => {
-        const userAgent = agents.find(a => a.walletAddress === account?.address);
+        const userAgent = agents.find(a => a.walletAddress === userAddress);
         if (!userAgent || !currentOrg) {
           return (
             <SpotlightCard className="p-0 glass-card-enhanced h-full overflow-hidden">
