@@ -332,6 +332,7 @@ export default function DashboardPage() {
     "Generate a daily activity summary for the organization. Include task completion stats, agent activity highlights, any errors or failures, and key metrics like token usage and cost."
   );
   const [briefingSaving, setBriefingSaving] = useState(false);
+  const [briefingAgentId, setBriefingAgentId] = useState<string>("");
 
   // Compute analytics data
   const taskVelocity = useMemo(() => computeTaskVelocity(allTasks), [allTasks]);
@@ -484,8 +485,7 @@ export default function DashboardPage() {
     if (!currentOrg || !account) return;
     setBriefingSaving(true);
     try {
-      const slot = swarmSlots["daily-briefings"];
-      const briefingAgent = slot ? agents.find(a => a.id === slot.agentId) : null;
+      const briefingAgent = briefingAgentId ? agents.find(a => a.id === briefingAgentId) : null;
       const scheduleLabel = parseCronToHuman(briefingSchedule);
       const isEditing = !!briefingCronJob;
 
@@ -540,16 +540,21 @@ export default function DashboardPage() {
     } finally {
       setBriefingSaving(false);
     }
-  }, [currentOrg, account, briefingSchedule, briefingPrompt, briefingCronJob, swarmSlots, agents, loadDashboardData]);
+  }, [currentOrg, account, briefingSchedule, briefingPrompt, briefingCronJob, briefingAgentId, agents, loadDashboardData]);
 
   // ── Open briefing editor pre-filled with current config ──
   const openBriefingEditor = useCallback(() => {
     if (briefingCronJob) {
       setBriefingSchedule(briefingCronJob.schedule);
       setBriefingPrompt(briefingCronJob.message);
+      setBriefingAgentId(briefingCronJob.agentIds?.[0] || "");
+    } else {
+      // Default to swarm slot agent if one is assigned
+      const slot = swarmSlots["daily-briefings"];
+      setBriefingAgentId(slot?.agentId || "");
     }
     setBriefingSetupMode(true);
-  }, [briefingCronJob]);
+  }, [briefingCronJob, swarmSlots]);
 
   // ── Dispatch handler — creates job, assigns agents, refreshes data ──
   const handleDispatch = useCallback(async (payload: DispatchPayload) => {
@@ -1137,8 +1142,11 @@ export default function DashboardPage() {
       label: "Daily Briefing",
       colSpan: "lg:col-span-3",
       render: () => {
+        const cronAgentId = briefingCronJob?.agentIds?.[0];
         const slot = swarmSlots["daily-briefings"];
-        const briefingAgent = slot ? agents.find(a => a.id === slot.agentId) : null;
+        const briefingAgent = cronAgentId
+          ? agents.find(a => a.id === cronAgentId)
+          : slot ? agents.find(a => a.id === slot.agentId) : null;
 
         // ─── Setup / Edit mode: schedule picker + prompt editor ───
         if (briefingSetupMode) {
@@ -1197,6 +1205,23 @@ export default function DashboardPage() {
                       />
                     </div>
                   </div>
+                </div>
+
+                {/* Agent picker */}
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1.5">Assigned Agent</p>
+                  <select
+                    value={briefingAgentId}
+                    onChange={(e) => setBriefingAgentId(e.target.value)}
+                    className="w-full rounded-lg border border-border bg-background px-2.5 py-1.5 text-xs text-foreground focus:border-amber-500/50 focus:outline-none focus:ring-1 focus:ring-amber-500/20"
+                  >
+                    <option value="">No agent assigned</option>
+                    {agents.map((a) => (
+                      <option key={a.id} value={a.id}>
+                        {a.name} ({a.type}{a.status === "online" ? " · online" : ""})
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
                 {/* Prompt editor */}
@@ -1262,7 +1287,7 @@ export default function DashboardPage() {
                     )}
                     <Button
                       size="sm"
-                      onClick={() => setBriefingSetupMode(true)}
+                      onClick={() => { setBriefingAgentId(slot?.agentId || ""); setBriefingSetupMode(true); }}
                       className="bg-amber-500 hover:bg-amber-600 text-black"
                     >
                       Set Up
