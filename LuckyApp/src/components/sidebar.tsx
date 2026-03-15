@@ -13,7 +13,7 @@ import {
   LayoutGrid, Shield, Clock, Activity, BarChart3, Settings,
   Map, FileText, ChevronLeft, ChevronRight, ChevronDown, GripVertical,
   Command, Coins, Stethoscope, Brain, UserCog, Network, HardDrive, BookOpen, Store, Building2,
-  Link as LinkIcon, Zap,
+  Link as LinkIcon, Zap, Palette,
 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
@@ -21,6 +21,8 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 const ICON_MAP: Record<string, typeof LayoutDashboard> = {
   Link: LinkIcon,
   Coins: Coins,
+  Zap: Zap,
+  Palette: Palette,
 };
 
 // ═══════════════════════════════════════════════════════════════
@@ -33,6 +35,8 @@ export interface NavItem {
   label: string;
   icon: typeof LayoutDashboard;
   badge?: string;
+  /** Child mods rendered indented under this item */
+  children?: NavItem[];
 }
 
 export interface NavSection {
@@ -304,29 +308,58 @@ export function Sidebar() {
       const owned = await getOwnedItems(orgId);
       const ownedIds = new Set(owned.filter(o => o.enabled).map(o => o.skillId));
 
-      const dynamicItems: { sectionId: string; item: NavItem }[] = [];
+      // Separate parent items from child items
+      const parentItems: { sectionId: string; item: NavItem }[] = [];
+      const childItems: { parentModId: string; sectionId: string; item: NavItem }[] = [];
+
       for (const skill of SKILL_REGISTRY) {
         if (skill.sidebarConfig && ownedIds.has(skill.id)) {
           const icon = ICON_MAP[skill.sidebarConfig.iconName] as typeof LayoutDashboard | undefined;
           if (icon != null) {
-            dynamicItems.push({
-              sectionId: skill.sidebarConfig.sectionId,
-              item: {
-                id: `mod-${skill.id}`,
-                href: skill.sidebarConfig.href,
-                label: skill.sidebarConfig.label,
-                icon,
-              },
-            });
+            const navItem: NavItem = {
+              id: `mod-${skill.id}`,
+              href: skill.sidebarConfig.href,
+              label: skill.sidebarConfig.label,
+              icon,
+            };
+            if (skill.sidebarConfig.parentModId) {
+              childItems.push({
+                parentModId: skill.sidebarConfig.parentModId,
+                sectionId: skill.sidebarConfig.sectionId,
+                item: navItem,
+              });
+            } else {
+              parentItems.push({
+                sectionId: skill.sidebarConfig.sectionId,
+                item: navItem,
+              });
+            }
           }
         }
       }
 
       const base = DEFAULT_SECTIONS.map(s => ({ ...s, items: [...s.items] }));
-      for (const { sectionId, item } of dynamicItems) {
+
+      // Add parent items first
+      for (const { sectionId, item } of parentItems) {
         const section = base.find(s => s.id === sectionId);
         if (section && !section.items.some(i => i.id === item.id)) {
           section.items.push(item);
+        }
+      }
+
+      // Attach children to their parent items
+      for (const { parentModId, sectionId, item } of childItems) {
+        const parentId = `mod-${parentModId}`;
+        const section = base.find(s => s.id === sectionId);
+        if (section) {
+          const parent = section.items.find(i => i.id === parentId);
+          if (parent) {
+            if (!parent.children) parent.children = [];
+            if (!parent.children.some(c => c.id === item.id)) {
+              parent.children.push(item);
+            }
+          }
         }
       }
 
@@ -552,12 +585,12 @@ export function Sidebar() {
             {/* Items — hidden when section is collapsed (but always visible in icon mode) */}
             {(!isSectionCollapsed || collapsed) && (
               <div className={cn("space-y-0.5", collapsed ? "px-1" : "px-2")}>
-                {section.items.map((item) => {
+                {section.items.flatMap((item) => {
                   const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
                   const isBeingDragged = dragging?.kind === "item" && dragging.itemId === item.id;
                   const isDropTarget = dropTarget?.sectionId === section.id && dropTarget?.itemId === item.id;
 
-                  return (
+                  const elements = [
                     <div
                       key={item.id}
                       draggable={!collapsed}
@@ -616,8 +649,35 @@ export function Sidebar() {
                           )}
                         </Link>
                       )}
-                    </div>
-                  );
+                    </div>,
+                  ];
+
+                  // Render child mod items indented under parent
+                  if (item.children && item.children.length > 0 && !collapsed) {
+                    for (const child of item.children) {
+                      const childHrefBase = child.href.split("?")[0];
+                      const isChildActive = pathname === childHrefBase || pathname.startsWith(childHrefBase + "/");
+                      elements.push(
+                        <div key={child.id} className="relative group/item">
+                          <Link
+                            href={child.href}
+                            className={cn(
+                              "relative flex items-center gap-2 rounded-lg text-xs font-medium transition-all duration-200",
+                              "pl-9 pr-2.5 py-1",
+                              isChildActive
+                                ? `${colors.activeBg} ${colors.activeText} border ${colors.activeBorder}`
+                                : "text-muted-foreground/70 hover:text-foreground hover:bg-muted/50 border border-transparent"
+                            )}
+                          >
+                            <child.icon className="shrink-0 h-3.5 w-3.5" />
+                            <span className="truncate">{child.label}</span>
+                          </Link>
+                        </div>
+                      );
+                    }
+                  }
+
+                  return elements;
                 })}
               </div>
             )}

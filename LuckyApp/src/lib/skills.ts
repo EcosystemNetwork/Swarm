@@ -22,6 +22,8 @@ import {
 import { db } from "./firebase";
 import { CHAINLINK_MANIFEST } from "./chainlink";
 import { HBAR_MANIFEST } from "./hbar";
+import { SOLANA_MANIFEST } from "./solana";
+import { METAPLEX_MANIFEST } from "./metaplex";
 
 // ═══════════════════════════════════════════════════════════════
 // Types
@@ -114,12 +116,16 @@ export interface Skill {
     enabled?: boolean;
     /** Install date */
     installedAt?: Date | null;
+    /** Dependency mod IDs that must be installed first */
+    requires?: string[];
     /** If present, this item adds a sidebar tab when installed */
     sidebarConfig?: {
         sectionId: string;
         label: string;
         href: string;
         iconName: string;
+        /** If set, render as child under this mod's sidebar entry instead of top-level */
+        parentModId?: string;
     };
     /** Mod manifest — tools, workflows, examples, agent skills */
     modManifest?: ModManifest;
@@ -438,6 +444,48 @@ export const SKILL_REGISTRY: Skill[] = [
             iconName: "Coins",
         },
         modManifest: HBAR_MANIFEST,
+    },
+    {
+        id: "solana-web3",
+        name: "Solana",
+        description: "Wallet connectivity, SPL token operations, staking, and program interactions on Solana. The foundational chain integration for Solana ecosystem mods.",
+        type: "mod",
+        source: "verified",
+        category: "Web3",
+        icon: "◎",
+        version: "1.0.0",
+        author: "Swarm Core",
+        tags: ["solana", "spl", "web3", "defi", "staking"],
+        pricing: { model: "free" },
+        sidebarConfig: {
+            sectionId: "modifications",
+            label: "Solana",
+            href: "/solana",
+            iconName: "Zap",
+        },
+        modManifest: SOLANA_MANIFEST,
+    },
+    {
+        id: "metaplex-nft",
+        name: "Metaplex",
+        description: "NFT minting, collections, and metadata management on Solana via Metaplex. Mint agent identity NFTs, create collections, and manage on-chain metadata.",
+        type: "mod",
+        source: "verified",
+        category: "Web3",
+        icon: "🎨",
+        version: "1.0.0",
+        author: "Swarm Core",
+        requires: ["solana-web3"],
+        tags: ["metaplex", "nft", "solana", "metadata", "collections"],
+        pricing: { model: "free" },
+        sidebarConfig: {
+            sectionId: "modifications",
+            label: "Metaplex",
+            href: "/solana?tab=metaplex",
+            iconName: "Palette",
+            parentModId: "solana-web3",
+        },
+        modManifest: METAPLEX_MANIFEST,
     },
 
     // ── Plugins ──

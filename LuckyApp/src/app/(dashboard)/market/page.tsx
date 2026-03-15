@@ -18,6 +18,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useOrg } from "@/contexts/OrgContext";
 import { useActiveAccount } from "thirdweb/react";
+import { useSession } from "@/contexts/SessionContext";
 import {
     type Skill, type OwnedItem, type MarketItemType, type CommunityMarketItem,
     type MarketSubscription, type SubscriptionPlan, type AgentInstall, type AgentDistribution,
@@ -342,6 +343,8 @@ function MarketItemCard({
 export default function MarketPage() {
     const { currentOrg } = useOrg();
     const account = useActiveAccount();
+    const { address: sessionAddress, authenticated } = useSession();
+    const userAddress = account?.address || sessionAddress || "";
     const [inventory, setInventory] = useState<OwnedItem[]>([]);
     const [communityItems, setCommunityItems] = useState<CommunityMarketItem[]>([]);
     const [userSubmissions, setUserSubmissions] = useState<CommunityMarketItem[]>([]);
@@ -385,7 +388,7 @@ export default function MarketPage() {
     const loadUserSubmissions = useCallback(async () => {
         if (!account) return;
         try {
-            const subs = await getUserSubmissions(account.address);
+            const subs = await getUserSubmissions(userAddress);
             setUserSubmissions(subs);
         } catch (err) {
             console.error("Failed to load submissions:", err);
@@ -503,18 +506,34 @@ export default function MarketPage() {
     const subscriptionMap = useMemo(() => new Map(subscriptions.map((s) => [s.itemId, s])), [subscriptions]);
 
     const handleGet = async (skillId: string) => {
-        if (!currentOrg || !account) return;
+        if (!currentOrg || (!account && !authenticated)) return;
         setBusyId(skillId);
         try {
-            await acquireItem(currentOrg.id, skillId, account.address);
+            // Auto-install missing dependencies first
+            const skill = SKILL_REGISTRY.find((s) => s.id === skillId);
+            if (skill?.requires?.length) {
+                const missing = skill.requires.filter((dep) => !inventoryMap.has(dep));
+                for (const dep of missing) {
+                    await acquireItem(currentOrg.id, dep, userAddress);
+                }
+            }
+            await acquireItem(currentOrg.id, skillId, userAddress);
             await loadInventory();
             window.dispatchEvent(new Event("swarm-inventory-changed"));
         } finally { setBusyId(null); }
     };
 
     const handleRemove = async (item: OwnedItem) => {
+        // Also remove any child mods that depend on this one
+        const dependents = SKILL_REGISTRY.filter(
+            (s) => s.requires?.includes(item.skillId) && inventoryMap.has(s.id)
+        );
         setBusyId(item.skillId);
         try {
+            for (const dep of dependents) {
+                const depOwned = inventoryMap.get(dep.id);
+                if (depOwned) await removeFromInventory(depOwned.id);
+            }
             await removeFromInventory(item.id);
             await loadInventory();
             window.dispatchEvent(new Event("swarm-inventory-changed"));
@@ -528,7 +547,7 @@ export default function MarketPage() {
             await acquireBundle(
                 currentOrg.id,
                 bundleId,
-                account.address,
+                userAddress,
                 inventory.map((i) => i.skillId),
             );
             await loadInventory();
@@ -540,7 +559,7 @@ export default function MarketPage() {
         if (!currentOrg || !account) return;
         setBusyId(itemId);
         try {
-            await subscribeToItem(currentOrg.id, itemId, plan, account.address);
+            await subscribeToItem(currentOrg.id, itemId, plan, userAddress);
             await loadSubscriptions();
             setSubscribeTarget(null);
         } finally { setBusyId(null); }
@@ -624,11 +643,11 @@ export default function MarketPage() {
     const skinCount = allItems.filter((s) => s.type === "skin").length;
     const tabCounts: Record<Tab, number> = { agents: agentCount, mods: modCount, plugins: pluginCount, skills: skillCount, skins: skinCount, bundles: bundleCount, inventory: inventoryCount, submit: submitCount };
 
-    if (!account) {
+    if (!account && !authenticated) {
         return (
             <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4 text-muted-foreground">
                 <Store className="h-12 w-12 opacity-30" />
-                <p>Connect your wallet to browse the market</p>
+                <p>Sign in to browse the market</p>
             </div>
         );
     }
