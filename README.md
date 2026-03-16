@@ -106,7 +106,7 @@ Built for solo founders, startups, and teams who need to command multiple AI age
 | **Swarm Protocol Slots** | Beta | Visual role assignment with hub notifications; no automated execution |
 | **Gateway Management** | Beta | CRUD + status tracking in Firestore; no remote agent deployment runtime |
 | **Marketplace Framework** | Partial | Full type system, install/uninstall API, ModManifest spec. In-app catalog ships 6 official mods (Chainlink, HBAR, Solana, Metaplex, Bittensor, BrandMover) via static SKILL_REGISTRY. External community marketplace is empty. |
-| **Capability Resolver** | Partial | Code complete; waiting on marketplace content |
+| **Capability Resolver** | Partial | Code complete; resolves capabilities from installed official mods. No dynamic community content yet. |
 | **Community Submissions** | Partial | Submission UI + approval queue exist; no review pipeline active |
 | **Chainlink CRE Workflow** | Partial | Workflow defined; simulation-ready, not deployed to production |
 | **Payment Processing** | Planned | Pricing models defined (USD/HBAR); no Stripe/PayPal integration |
@@ -153,7 +153,7 @@ A Diablo-style slot-based inventory system where you assign agents to protocol r
 
 ### Marketplace & Vendor Mod System
 
-A runtime capability registration system for extending agent capabilities. The framework is fully built; the registry is currently empty and awaiting community content.
+A runtime capability registration system for extending agent capabilities. The framework is fully built and ships 6 official mods via a static in-app catalog. A dynamic external community marketplace is not yet built.
 
 **Vendor Mod → Capability Registry → Agent Resolution**
 
@@ -976,7 +976,7 @@ See [HARDENING.md](HARDENING.md) for the complete security audit and recommendat
 - **Memory search is text-based** — The memory system stores and retrieves agent memories from Firestore. There are no vector embeddings or semantic search despite the `vector` type field.
 - **Testnet only** — All smart contracts are deployed to Ethereum Sepolia, Hedera Testnet, and Solana Devnet. No mainnet deployments.
 - **Single-org focus** — While multi-tenant, there is no cross-org communication or federation.
-- **No CI/CD pipeline** — No GitHub Actions, no automated tests in the repo.
+- **No CI/CD pipeline** — No GitHub Actions. Unit tests exist (Vitest) but no automated CI runs them.
 - **Cloud Pub/Sub optional** — The WebSocket hub supports horizontal scaling via Google Cloud Pub/Sub, but defaults to single-instance mode if `GCP_PROJECT_ID` is not configured. Multi-region deployment requires Pub/Sub setup.
 - **Thirdweb social API workaround** — The app patches `fetch` with a circuit-breaker interceptor for `social.thirdweb.com`. After 3 consecutive failures, the circuit opens and returns clearly-marked degraded responses (`X-Swarm-Degraded` header, `_degraded` body flag) to prevent infinite retry loops from the Thirdweb SDK. See [`LuckyApp/src/lib/fetch-interceptor.ts`](LuckyApp/src/lib/fetch-interceptor.ts).
 
