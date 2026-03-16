@@ -14,6 +14,7 @@ import {
   Map, FileText, ChevronLeft, ChevronRight, ChevronDown, GripVertical,
   Command, Coins, Stethoscope, Brain, UserCog, Network, HardDrive, BookOpen, Store, Building2,
   Link as LinkIcon, Zap, Palette, Megaphone, Wrench, Plug, Puzzle, Sparkles,
+  Monitor, Globe, Code as CodeIcon,
 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
@@ -107,6 +108,18 @@ const DEFAULT_SECTIONS: NavSection[] = [
       { id: "operators", href: "/operators", label: "Operators", icon: UserCog },
       { id: "cron", href: "/cron", label: "Scheduler", icon: Clock },
       { id: "market", href: "/market", label: "Market", icon: Store },
+    ],
+  },
+  {
+    id: "compute",
+    label: "Compute",
+    collapsible: true,
+    items: [
+      { id: "compute-overview", href: "/compute", label: "Overview", icon: Monitor },
+      { id: "compute-workspaces", href: "/compute/workspaces", label: "Workspaces", icon: FolderKanban },
+      { id: "compute-computers", href: "/compute/computers", label: "Computers", icon: HardDrive },
+      { id: "compute-templates", href: "/compute/templates", label: "Templates", icon: LayoutGrid },
+      { id: "compute-sessions", href: "/compute/sessions", label: "Sessions", icon: Clock },
     ],
   },
   {
