@@ -1,0 +1,65 @@
+"use client";
+
+import { Clock, User, Bot, Cpu } from "lucide-react";
+import type { ComputerSession } from "@/lib/compute/types";
+
+interface SessionTimelineProps {
+  sessions: ComputerSession[];
+}
+
+const CONTROLLER_ICONS: Record<string, React.ReactNode> = {
+  human: <User className="h-3.5 w-3.5" />,
+  agent: <Bot className="h-3.5 w-3.5" />,
+  hybrid: <Cpu className="h-3.5 w-3.5" />,
+};
+
+export function SessionTimeline({ sessions }: SessionTimelineProps) {
+  const formatDuration = (start: Date | null, end: Date | null) => {
+    if (!start) return "—";
+    const ms = (end?.getTime() || Date.now()) - start.getTime();
+    const mins = Math.floor(ms / 60000);
+    if (mins < 60) return `${mins}m`;
+    const hrs = Math.floor(mins / 60);
+    return `${hrs}h ${mins % 60}m`;
+  };
+
+  const formatDate = (d: Date | null) => {
+    if (!d) return "—";
+    return d.toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+  };
+
+  if (sessions.length === 0) {
+    return (
+      <div className="flex h-32 items-center justify-center text-sm text-muted-foreground">
+        No sessions yet
+      </div>
+    );
+  }
+
+  return (
+    <div className="divide-y divide-border rounded-lg border border-border">
+      {sessions.map((session) => (
+        <div key={session.id} className="flex items-center justify-between px-4 py-3">
+          <div className="flex items-center gap-3">
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted">
+              {CONTROLLER_ICONS[session.controllerType] || <Clock className="h-3.5 w-3.5" />}
+            </div>
+            <div>
+              <p className="text-sm font-medium capitalize">{session.controllerType} session</p>
+              <p className="text-xs text-muted-foreground">
+                {formatDate(session.startedAt)}
+                {session.modelKey && ` · ${session.modelKey}`}
+              </p>
+            </div>
+          </div>
+          <div className="text-right">
+            <p className="text-sm">{formatDuration(session.startedAt, session.endedAt)}</p>
+            <p className="text-xs text-muted-foreground">
+              {session.totalActions} actions · {session.totalScreenshots} shots
+            </p>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
