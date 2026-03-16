@@ -2,7 +2,8 @@
  * POST /api/v1/marketplace/publish
  *
  * Unified publish endpoint for all marketplace item types.
- * Agents, humans, or companies can publish skills, plugins, skins, mods, and personas.
+ * Integrates Swarm Submission Protocol v1: intake validation, security scanning,
+ * trust-tier-aware pipeline routing, and cooldown enforcement.
  *
  * Auth: x-wallet-address header (wallet-based) or platform admin secret (auto-approves).
  */
@@ -14,9 +15,18 @@ import {
     type MarketItemType,
     type MarketPricing,
     type AgentDistribution,
+    type PermissionScope,
 } from "@/lib/skills";
+import {
+    runIntakeValidation,
+    runSecurityScan,
+    recordSubmission,
+    getStartingStage,
+    type ReviewEntry,
+} from "@/lib/submission-protocol";
 
 const VALID_TYPES: MarketItemType[] = ["mod", "plugin", "skill", "skin", "agent"];
+const VALID_TRACKS = ["prd_only", "open_repo", "private_repo", "managed_partner"] as const;
 
 export async function POST(req: NextRequest) {
     // Auth — wallet or platform admin
@@ -68,9 +78,57 @@ export async function POST(req: NextRequest) {
         : undefined;
     const publisherName = ((body.publisherName as string) || publisherWallet.slice(0, 8) + "...").trim();
 
+    // ── Submission Protocol v1: Intake Validation ──
+    // Platform admins bypass intake checks
+    if (!admin.ok) {
+        const intake = await runIntakeValidation(publisherWallet, name, description, type as MarketItemType, publisherName);
+        if (!intake.passed) {
+            return Response.json(
+                { error: "Intake validation failed", reasons: intake.reasons },
+                { status: 429 },
+            );
+        }
+    }
+
+    // ── Submission Protocol v1: Security Scan ──
+    const modManifest = body.modManifest as { tools?: string[]; workflows?: string[]; agentSkills?: string[] } | undefined;
+    const permissionsRequired = Array.isArray(body.permissionsRequired)
+        ? (body.permissionsRequired as string[]).filter(p =>
+            ["read", "write", "execute", "external_api", "wallet_access", "webhook_access", "cross_chain_message", "sensitive_data_access"].includes(p),
+        ) as PermissionScope[]
+        : undefined;
+
+    const secScan = runSecurityScan(description, modManifest, permissionsRequired);
+    if (!secScan.passed) {
+        return Response.json(
+            { error: "Security scan failed — critical issues detected", findings: secScan.findings },
+            { status: 400 },
+        );
+    }
+
+    // ── Submission Protocol v1: Parse new fields ──
+    const submissionType = body.submissionType === "concept" ? "concept" as const : "build" as const;
+    const rawTrack = body.submissionTrack as string | undefined;
+    const submissionTrack = rawTrack && VALID_TRACKS.includes(rawTrack as typeof VALID_TRACKS[number])
+        ? rawTrack as typeof VALID_TRACKS[number]
+        : undefined;
+    const repoUrl = (body.repoUrl as string)?.trim().slice(0, 500) || undefined;
+    const demoUrl = (body.demoUrl as string)?.trim().slice(0, 500) || undefined;
+    const updateOf = (body.updateOf as string)?.trim() || undefined;
+
+    // Build initial review history entry
+    const intakeEntry: ReviewEntry = {
+        stage: "intake",
+        result: "passed",
+        reviewedBy: "system",
+        reviewedAt: new Date().toISOString(),
+        findings: secScan.findings.length > 0 ? secScan.findings : undefined,
+    };
+
     try {
         let id: string;
         let status: string;
+        let stage: string;
 
         if (type === "agent") {
             // Agent/Persona publishing — uses publishAgentPackage()
@@ -118,9 +176,14 @@ export async function POST(req: NextRequest) {
                 creatorRevShare: 0.85,
             });
             status = "review";
+            stage = admin.ok ? "decision" : "security_scan";
         } else {
             // Standard item — mod, plugin, skill, skin
             const pricing: MarketPricing = (body.pricing as MarketPricing) || { model: "free" as const };
+
+            // Determine starting stage based on publisher tier (admin = auto-approve)
+            const startStage = admin.ok ? "decision" : getStartingStage(0); // tier looked up during intake
+            const itemStatus = admin.ok ? "approved" : "pending";
 
             id = await submitMarketItem({
                 name,
@@ -136,9 +199,23 @@ export async function POST(req: NextRequest) {
                 submittedBy: publisherWallet,
                 submittedByName: publisherName,
                 skinConfig: body.skinConfig as { colors?: Record<string, string>; features?: string[] } | undefined,
-                modManifest: body.modManifest as { tools?: string[]; workflows?: string[]; agentSkills?: string[] } | undefined,
-            });
-            status = "pending";
+                modManifest,
+                submissionType,
+                submissionTrack,
+                stage: startStage,
+                reviewHistory: [intakeEntry],
+                repoUrl,
+                demoUrl,
+                permissionsRequired,
+                updateOf,
+            }, { status: itemStatus, stage: startStage });
+            status = itemStatus;
+            stage = startStage;
+        }
+
+        // Record submission for cooldown + quota tracking (skip for admins)
+        if (!admin.ok) {
+            await recordSubmission(publisherWallet);
         }
 
         return Response.json({
@@ -146,7 +223,9 @@ export async function POST(req: NextRequest) {
             id,
             type,
             status,
+            stage,
             name,
+            securityFindings: secScan.findings.length > 0 ? secScan.findings : undefined,
         });
     } catch (err) {
         return Response.json(

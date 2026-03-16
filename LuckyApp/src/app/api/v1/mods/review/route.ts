@@ -2,10 +2,10 @@
  * /api/v1/mods/review
  *
  * Admin review endpoint for community submissions and agent packages.
- * Approves or rejects pending marketplace items.
+ * Supports multi-stage pipeline: intake → security_scan → sandbox → product_review → decision.
  *
- * GET  ?status=pending&collection=community|agents
- * POST { itemId, action: "approve" | "reject", collection?: "community" | "agents", reviewComment? }
+ * GET  ?status=pending&collection=community|agents&stage=security_scan
+ * POST { itemId, action: "advance"|"approve"|"reject"|"request_changes", collection?, reviewComment?, skipTo? }
  *
  * Auth: Platform admin only
  */
@@ -13,6 +13,12 @@ import { NextRequest } from "next/server";
 import { doc, getDoc, updateDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { requirePlatformAdmin, unauthorized } from "@/lib/auth-guard";
+import {
+    getNextStage,
+    updatePublisherStats,
+    type ReviewEntry,
+    type SubmissionStage,
+} from "@/lib/submission-protocol";
 
 const COLLECTIONS = {
     community: "communityMarketItems",
@@ -31,6 +37,8 @@ function pendingStatus(col: CollectionKey): string {
     return col === "agents" ? "review" : "pending";
 }
 
+const VALID_STAGES: SubmissionStage[] = ["intake", "security_scan", "sandbox", "product_review", "decision"];
+
 /**
  * GET /api/v1/mods/review — List pending submissions
  */
@@ -42,19 +50,25 @@ export async function GET(req: NextRequest) {
 
     const col = resolveCollection(req.nextUrl.searchParams.get("collection"));
     const status = req.nextUrl.searchParams.get("status") || pendingStatus(col);
+    const stageFilter = req.nextUrl.searchParams.get("stage");
 
     const q = query(
         collection(db, COLLECTIONS[col]),
         where("status", "==", status),
     );
     const snap = await getDocs(q);
-    const items = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    let items = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+
+    // Filter by pipeline stage if requested
+    if (stageFilter && VALID_STAGES.includes(stageFilter as SubmissionStage)) {
+        items = items.filter((item) => (item as Record<string, unknown>).stage === stageFilter);
+    }
 
     return Response.json({ collection: col, count: items.length, items });
 }
 
 /**
- * POST /api/v1/mods/review — Approve or reject a submission
+ * POST /api/v1/mods/review — Review a submission (multi-stage pipeline)
  */
 export async function POST(req: NextRequest) {
     const admin = requirePlatformAdmin(req);
@@ -71,6 +85,7 @@ export async function POST(req: NextRequest) {
     const action = body.action as string | undefined;
     const reviewComment = (body.reviewComment as string) || "";
     const col = resolveCollection((body.collection as string) || null);
+    const skipTo = body.skipTo as string | undefined;
 
     if (!itemId || !action) {
         return Response.json(
@@ -79,9 +94,10 @@ export async function POST(req: NextRequest) {
         );
     }
 
-    if (action !== "approve" && action !== "reject") {
+    const validActions = ["advance", "approve", "reject", "request_changes"];
+    if (!validActions.includes(action)) {
         return Response.json(
-            { error: 'action must be "approve" or "reject"' },
+            { error: `action must be one of: ${validActions.join(", ")}` },
             { status: 400 },
         );
     }
@@ -94,18 +110,81 @@ export async function POST(req: NextRequest) {
     }
 
     const current = snap.data();
-    const expectedPending = pendingStatus(col);
-    if (current.status !== expectedPending) {
-        return Response.json(
-            { error: `Submission already ${current.status}` },
-            { status: 409 },
-        );
+    const currentStage = (current.stage as SubmissionStage) || "intake";
+    const reviewHistory: ReviewEntry[] = Array.isArray(current.reviewHistory) ? current.reviewHistory : [];
+
+    // Build new review entry
+    const newEntry: ReviewEntry = {
+        stage: currentStage,
+        result: action === "reject" || action === "request_changes" ? "failed" : "passed",
+        reviewedBy: "platform-admin",
+        reviewedAt: new Date().toISOString(),
+        comment: reviewComment || undefined,
+    };
+
+    let newStatus: string;
+    let newStage: SubmissionStage | string = currentStage;
+
+    switch (action) {
+        case "advance": {
+            // Move to next stage (or skip to a specific stage)
+            if (skipTo && VALID_STAGES.includes(skipTo as SubmissionStage)) {
+                newStage = skipTo as SubmissionStage;
+            } else {
+                const next = getNextStage(currentStage);
+                if (!next) {
+                    return Response.json(
+                        { error: `Cannot advance past ${currentStage}` },
+                        { status: 400 },
+                    );
+                }
+                newStage = next;
+            }
+            newStatus = current.status; // Keep current status (pending/review)
+            newEntry.result = "passed";
+            break;
+        }
+
+        case "approve": {
+            newStatus = "approved";
+            newStage = "decision";
+            newEntry.stage = currentStage;
+            newEntry.result = "passed";
+
+            // Auto-upgrade publisher tier
+            const publisherWallet = current.submittedBy || current.authorWallet;
+            if (publisherWallet && publisherWallet !== "platform-admin") {
+                try {
+                    await updatePublisherStats(publisherWallet);
+                } catch {
+                    // Non-blocking — tier upgrade is best-effort
+                }
+            }
+            break;
+        }
+
+        case "reject": {
+            newStatus = "rejected";
+            newEntry.result = "failed";
+            break;
+        }
+
+        case "request_changes": {
+            newStatus = "changes_requested";
+            newEntry.result = "failed";
+            break;
+        }
+
+        default:
+            newStatus = current.status;
     }
 
-    const newStatus = action === "approve" ? "approved" : "rejected";
+    reviewHistory.push(newEntry);
 
     await updateDoc(ref, {
         status: newStatus,
+        stage: newStage,
+        reviewHistory,
         reviewedAt: serverTimestamp(),
         reviewComment,
     });
@@ -114,7 +193,9 @@ export async function POST(req: NextRequest) {
         reviewed: true,
         collection: col,
         itemId,
+        action,
         status: newStatus,
+        stage: newStage,
         reviewComment: reviewComment || undefined,
     });
 }

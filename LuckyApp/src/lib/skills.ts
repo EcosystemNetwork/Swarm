@@ -1097,7 +1097,7 @@ export interface CommunityMarketItem {
     submittedBy: string;
     submittedByName?: string;
     submittedAt: Date | null;
-    status: "pending" | "approved" | "rejected";
+    status: "pending" | "approved" | "rejected" | "changes_requested" | "suspended";
     /** Skin theme config (type === "skin") */
     skinConfig?: {
         colors?: Record<string, string>;
@@ -1109,6 +1109,36 @@ export interface CommunityMarketItem {
         workflows?: string[];
         agentSkills?: string[];
     };
+    // ── Submission Protocol v1 fields ──
+    /** "concept" (PRD/idea) or "build" (working code) */
+    submissionType?: "concept" | "build";
+    /** Submission track */
+    submissionTrack?: "prd_only" | "open_repo" | "private_repo" | "managed_partner";
+    /** Current pipeline stage */
+    stage?: import("./submission-protocol").SubmissionStage;
+    /** Audit trail of review decisions */
+    reviewHistory?: import("./submission-protocol").ReviewEntry[];
+    /** Appeal comment if re-submitting after rejection */
+    appealComment?: string;
+    appealedAt?: Date | null;
+    /** Post-approval visibility */
+    publicationStatus?: "live" | "unlisted" | "suspended";
+    /** GitHub repo URL (open_repo track) */
+    repoUrl?: string;
+    /** Demo URL */
+    demoUrl?: string;
+    /** Screenshot URLs */
+    screenshotUrls?: string[];
+    /** Declared permission scopes */
+    permissionsRequired?: PermissionScope[];
+    /** Doc ID of item being updated (version bump) */
+    updateOf?: string;
+    /** Previous version string (for updates) */
+    previousVersion?: string;
+    /** Number of user reports */
+    reportCount?: number;
+    /** Last install or update date */
+    lastActiveAt?: Date | null;
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -1192,12 +1222,17 @@ export async function getOrgSubscriptions(orgId: string): Promise<MarketSubscrip
 /** Submit a new community market item */
 export async function submitMarketItem(
     data: Omit<CommunityMarketItem, "id" | "submittedAt" | "status">,
+    overrides?: { status?: CommunityMarketItem["status"]; stage?: CommunityMarketItem["stage"] },
 ): Promise<string> {
     const ref = await addDoc(collection(db, COMMUNITY_COLLECTION), {
         ...data,
         pricing: data.pricing ?? { model: "free" },
-        status: "pending",
+        status: overrides?.status ?? "pending",
+        stage: overrides?.stage ?? data.stage ?? "intake",
+        publicationStatus: "live",
+        reportCount: 0,
         submittedAt: serverTimestamp(),
+        lastActiveAt: serverTimestamp(),
     });
     return ref.id;
 }

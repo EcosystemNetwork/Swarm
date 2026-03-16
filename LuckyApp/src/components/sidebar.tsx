@@ -13,7 +13,7 @@ import {
   LayoutGrid, Shield, Clock, Activity, BarChart3, Settings,
   Map, FileText, ChevronLeft, ChevronRight, ChevronDown, GripVertical,
   Command, Coins, Stethoscope, Brain, UserCog, Network, HardDrive, BookOpen, Store, Building2,
-  Link as LinkIcon, Zap, Palette, Megaphone,
+  Link as LinkIcon, Zap, Palette, Megaphone, Wrench, Plug, Puzzle, Sparkles,
 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
@@ -25,6 +25,18 @@ const ICON_MAP: Record<string, typeof LayoutDashboard> = {
   Palette: Palette,
   Brain: Brain,
   Megaphone: Megaphone,
+  Wrench: Wrench,
+  Plug: Plug,
+  Puzzle: Puzzle,
+  Sparkles: Sparkles,
+};
+
+/** Default icon per item type for mods without explicit sidebarConfig */
+const TYPE_ICON: Record<string, typeof LayoutDashboard> = {
+  mod: Wrench,
+  plugin: Plug,
+  skill: Puzzle,
+  skin: Palette,
 };
 
 // ═══════════════════════════════════════════════════════════════
@@ -309,16 +321,18 @@ export function Sidebar() {
     try {
       const owned = await getOwnedItems(orgId);
       const ownedIds = new Set(owned.filter(o => o.enabled).map(o => o.skillId));
-      console.log('[Sidebar] Owned items:', Array.from(ownedIds));
 
       // Separate parent items from child items
       const parentItems: { sectionId: string; item: NavItem }[] = [];
       const childItems: { parentModId: string; sectionId: string; item: NavItem }[] = [];
+      const handled = new Set<string>(); // track items with explicit sidebarConfig
 
       for (const skill of SKILL_REGISTRY) {
-        if (skill.sidebarConfig && ownedIds.has(skill.id)) {
+        if (!ownedIds.has(skill.id)) continue;
+
+        if (skill.sidebarConfig) {
+          handled.add(skill.id);
           const icon = ICON_MAP[skill.sidebarConfig.iconName] as typeof LayoutDashboard | undefined;
-          console.log('[Sidebar] Processing mod:', skill.id, 'icon:', skill.sidebarConfig.iconName, 'found:', icon != null);
           if (icon != null) {
             const navItem: NavItem = {
               id: `mod-${skill.id}`,
@@ -340,6 +354,24 @@ export function Sidebar() {
             }
           }
         }
+      }
+
+      // Auto-generate sidebar entries for owned items WITHOUT explicit sidebarConfig
+      for (const skill of SKILL_REGISTRY) {
+        if (!ownedIds.has(skill.id) || handled.has(skill.id)) continue;
+        // Only add mods, plugins, and skills — skins don't need sidebar entries
+        if (skill.type === "skin") continue;
+
+        const icon = TYPE_ICON[skill.type] || Wrench;
+        parentItems.push({
+          sectionId: "modifications",
+          item: {
+            id: `mod-${skill.id}`,
+            href: `/market/${skill.id}`,
+            label: skill.name,
+            icon,
+          },
+        });
       }
 
       const base = DEFAULT_SECTIONS.map(s => ({ ...s, items: [...s.items] }));

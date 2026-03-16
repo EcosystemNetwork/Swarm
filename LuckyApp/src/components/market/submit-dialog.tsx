@@ -75,6 +75,12 @@ export function SubmitMarketItemDialog({
     const [modTools, setModTools] = useState("");
     const [modWorkflows, setModWorkflows] = useState("");
     const [modAgentSkills, setModAgentSkills] = useState("");
+    // Submission Protocol v1 fields
+    const [submissionType, setSubmissionType] = useState<"concept" | "build">("build");
+    const [submissionTrack, setSubmissionTrack] = useState("");
+    const [repoUrl, setRepoUrl] = useState("");
+    const [demoUrl, setDemoUrl] = useState("");
+    const [selectedPermissions, setSelectedPermissions] = useState<string[]>([]);
 
     const resetForm = () => {
         setName("");
@@ -113,6 +119,11 @@ export function SubmitMarketItemDialog({
         setModTools("");
         setModWorkflows("");
         setModAgentSkills("");
+        setSubmissionType("build");
+        setSubmissionTrack("");
+        setRepoUrl("");
+        setDemoUrl("");
+        setSelectedPermissions([]);
     };
 
     const handleSubmit = async () => {
@@ -250,6 +261,14 @@ export function SubmitMarketItemDialog({
                     submittedBy: submitterAddress,
                     skinConfig,
                     modManifest,
+                    // Submission Protocol v1 fields
+                    submissionType,
+                    submissionTrack: submissionTrack as "prd_only" | "open_repo" | "private_repo" | "managed_partner" | undefined || undefined,
+                    repoUrl: repoUrl.trim() || undefined,
+                    demoUrl: demoUrl.trim() || undefined,
+                    permissionsRequired: selectedPermissions.length > 0
+                        ? selectedPermissions as import("@/lib/skills").PermissionScope[]
+                        : undefined,
                 });
             }
 
@@ -317,6 +336,62 @@ export function SubmitMarketItemDialog({
                                 onChange={(e) => setCategory(e.target.value)}
                             />
                         </div>
+                    </div>
+
+                    {/* Submission Protocol — Type & Track */}
+                    <div className="space-y-2 p-3 rounded-lg border border-border bg-muted/20">
+                        <p className="text-xs font-medium text-muted-foreground">Submission Details</p>
+                        <div className="flex gap-4">
+                            <label className="flex items-center gap-1.5 text-sm cursor-pointer">
+                                <input
+                                    type="radio"
+                                    checked={submissionType === "build"}
+                                    onChange={() => setSubmissionType("build")}
+                                    className="accent-amber-500"
+                                />
+                                Build (working code)
+                            </label>
+                            <label className="flex items-center gap-1.5 text-sm cursor-pointer">
+                                <input
+                                    type="radio"
+                                    checked={submissionType === "concept"}
+                                    onChange={() => setSubmissionType("concept")}
+                                    className="accent-amber-500"
+                                />
+                                Concept (idea / PRD)
+                            </label>
+                        </div>
+                        {submissionType === "build" && (
+                            <div className="grid grid-cols-2 gap-2 mt-1">
+                                <div>
+                                    <label className="text-[11px] font-medium mb-0.5 block text-muted-foreground">Track</label>
+                                    <Select value={submissionTrack} onValueChange={setSubmissionTrack}>
+                                        <SelectTrigger className="h-8 text-sm">
+                                            <SelectValue placeholder="Select track" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="open_repo">Open Repo</SelectItem>
+                                            <SelectItem value="private_repo">Private Repo</SelectItem>
+                                            <SelectItem value="managed_partner">Managed Partner</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                {submissionTrack === "open_repo" && (
+                                    <div>
+                                        <label className="text-[11px] font-medium mb-0.5 block text-muted-foreground">Repository URL</label>
+                                        <Input
+                                            placeholder="https://github.com/..."
+                                            value={repoUrl}
+                                            onChange={(e) => setRepoUrl(e.target.value)}
+                                            className="h-8 text-sm"
+                                        />
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                        {submissionType === "concept" && (
+                            <p className="text-[10px] text-muted-foreground">Concept submissions are listed for community builders to pick up and develop.</p>
+                        )}
                     </div>
 
                     <div>
@@ -609,6 +684,43 @@ export function SubmitMarketItemDialog({
                             </div>
                         </div>
                     )}
+
+                    {/* Permissions (mod/plugin types) */}
+                    {(type === "mod" || type === "plugin") && (
+                        <div className="space-y-2 p-3 rounded-lg border border-orange-500/20 bg-orange-500/5">
+                            <p className="text-xs font-medium text-orange-400">Required Permissions</p>
+                            <div className="grid grid-cols-2 gap-1.5">
+                                {(["read", "write", "execute", "external_api", "wallet_access", "webhook_access", "cross_chain_message", "sensitive_data_access"] as const).map(perm => (
+                                    <label key={perm} className="flex items-center gap-1.5 text-[11px] cursor-pointer">
+                                        <input
+                                            type="checkbox"
+                                            checked={selectedPermissions.includes(perm)}
+                                            onChange={(e) => {
+                                                if (e.target.checked) {
+                                                    setSelectedPermissions([...selectedPermissions, perm]);
+                                                } else {
+                                                    setSelectedPermissions(selectedPermissions.filter(p => p !== perm));
+                                                }
+                                            }}
+                                            className="accent-orange-500"
+                                        />
+                                        {perm.replace(/_/g, " ")}
+                                    </label>
+                                ))}
+                            </div>
+                            <p className="text-[10px] text-muted-foreground">Users will be prompted to grant these permissions at install time.</p>
+                        </div>
+                    )}
+
+                    {/* Demo URL */}
+                    <div>
+                        <label className="text-sm font-medium mb-1 block">Demo URL (optional)</label>
+                        <Input
+                            placeholder="https://demo.example.com"
+                            value={demoUrl}
+                            onChange={(e) => setDemoUrl(e.target.value)}
+                        />
+                    </div>
 
                     <div className="grid grid-cols-2 gap-3">
                         <div>

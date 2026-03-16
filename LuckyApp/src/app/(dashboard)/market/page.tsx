@@ -69,6 +69,55 @@ const CATEGORIES_BY_TYPE: Record<MarketItemType, string[]> = {
 };
 
 // ═══════════════════════════════════════════════════════════════
+// Publisher Tier Badge
+// ═══════════════════════════════════════════════════════════════
+
+const TIER_BADGE_STYLES: Record<number, { label: string; color: string }> = {
+    0: { label: "New Publisher", color: "border-zinc-500/30 text-zinc-400 bg-zinc-500/5" },
+    1: { label: "Approved", color: "border-emerald-500/30 text-emerald-400 bg-emerald-500/5" },
+    2: { label: "Trusted", color: "border-blue-500/30 text-blue-400 bg-blue-500/5" },
+    3: { label: "Strategic Partner", color: "border-amber-500/30 text-amber-400 bg-amber-500/5" },
+};
+
+function PublisherTierBadge({ walletAddress }: { walletAddress?: string }) {
+    const [tier, setTier] = useState<number | null>(null);
+    const [quota, setQuota] = useState<{ used: number; max: number } | null>(null);
+
+    useEffect(() => {
+        if (!walletAddress) return;
+        fetch(`/api/v1/marketplace/publisher/${walletAddress}`)
+            .then(r => r.ok ? r.json() : null)
+            .then(data => {
+                if (data) {
+                    setTier(data.tier ?? 0);
+                    setQuota({
+                        used: data.stats?.totalSubmissions ?? 0,
+                        max: data.quota?.maxPerWeek ?? 2,
+                    });
+                }
+            })
+            .catch(() => {});
+    }, [walletAddress]);
+
+    if (tier === null) return null;
+    const style = TIER_BADGE_STYLES[tier] || TIER_BADGE_STYLES[0];
+
+    return (
+        <div className="flex items-center gap-2">
+            <Badge variant="outline" className={`text-[10px] px-2 py-0.5 ${style.color}`}>
+                {tier === 3 ? <Crown className="h-2.5 w-2.5 mr-0.5" /> : <Shield className="h-2.5 w-2.5 mr-0.5" />}
+                {style.label}
+            </Badge>
+            {quota && (
+                <span className="text-[10px] text-muted-foreground">
+                    {quota.max - Math.min(quota.used, quota.max)}/{quota.max} this week
+                </span>
+            )}
+        </div>
+    );
+}
+
+// ═══════════════════════════════════════════════════════════════
 // Market Item Card
 // ═══════════════════════════════════════════════════════════════
 
@@ -670,17 +719,17 @@ export default function MarketPage() {
     }
 
     return (
-        <div className="max-w-6xl mx-auto px-6 py-8">
+        <div className="w-full px-4 sm:px-6 py-6">
             {/* Header */}
-            <div className="flex items-center justify-between mb-8">
+            <div className="flex items-center justify-between mb-6">
                 <div>
-                    <h1 className="text-3xl font-bold tracking-tight flex items-center gap-3">
+                    <h1 className="text-2xl sm:text-3xl font-bold tracking-tight flex items-center gap-3">
                         <div className="p-2 rounded-xl bg-amber-500/10 border border-amber-500/20">
                             <Store className="h-6 w-6 text-amber-500" />
                         </div>
                         Market
                     </h1>
-                    <p className="text-sm text-muted-foreground mt-2">
+                    <p className="text-sm text-muted-foreground mt-1.5">
                         Browse agents, mods, plugins, and skills for your swarm
                     </p>
                 </div>
@@ -690,12 +739,12 @@ export default function MarketPage() {
             </div>
 
             {/* Tabs */}
-            <div className="flex items-center gap-1 mb-6 border-b border-border pb-px">
+            <div className="flex items-center gap-1 mb-6 border-b border-border pb-px overflow-x-auto scrollbar-none">
                 {TABS.map(({ key, label, icon: Icon }) => (
                     <button
                         key={key}
                         onClick={() => setTab(key)}
-                        className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 transition-all -mb-px ${tab === key
+                        className={`flex items-center gap-1.5 px-3 sm:px-4 py-2.5 text-sm font-medium border-b-2 transition-all -mb-px whitespace-nowrap ${tab === key
                                 ? "border-amber-500 text-amber-500"
                                 : "border-transparent text-muted-foreground hover:text-foreground"
                             }`}
@@ -712,8 +761,8 @@ export default function MarketPage() {
             {/* Search + Filters (hidden on agents, bundles & submit tabs) */}
             {tab !== "agents" && tab !== "bundles" && tab !== "submit" && (
                 <>
-                    <div className="flex items-center gap-3 mb-4">
-                        <div className="relative flex-1">
+                    <div className="flex flex-wrap items-center gap-3 mb-4">
+                        <div className="relative flex-1 min-w-[200px]">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                             <Input
                                 placeholder={`Search ${activeTabConfig?.label.toLowerCase() || "items"}...`}
@@ -767,8 +816,8 @@ export default function MarketPage() {
 
                     {/* Items Grid */}
                     {loading ? (
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                            {Array.from({ length: 6 }, (_, i) => (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-3">
+                            {Array.from({ length: 8 }, (_, i) => (
                                 <Card key={i} className="p-4 bg-card/80 border-border">
                                     <div className="flex items-start gap-3">
                                         <div className="w-10 h-10 rounded-lg bg-muted/50 animate-pulse shrink-0" />
@@ -785,7 +834,7 @@ export default function MarketPage() {
                             ))}
                         </div>
                     ) : filteredItems.length > 0 ? (
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-3">
                             {filteredItems.map((item) => {
                                 // For community items, subscription key is the Firestore doc ID (strip "community-" prefix)
                                 const subKey = item.id.startsWith("community-") ? item.id.slice(10) : item.id;
@@ -830,8 +879,8 @@ export default function MarketPage() {
                 <div className="space-y-8">
                     {/* Search + Filters for personas */}
                     <div className="space-y-4">
-                        <div className="flex items-center gap-3">
-                            <div className="relative flex-1">
+                        <div className="flex flex-wrap items-center gap-3">
+                            <div className="relative flex-1 min-w-[200px]">
                                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                                 <Input
                                     placeholder="Search personas..."
@@ -875,7 +924,7 @@ export default function MarketPage() {
 
                     {/* Persona Grid */}
                     {filteredPersonas.length > 0 ? (
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
                             {filteredPersonas.map((persona) => (
                                 <PersonaCard
                                     key={persona.id}
@@ -898,7 +947,7 @@ export default function MarketPage() {
                                 <h2 className="text-lg font-semibold">Your Agents</h2>
                                 <Badge variant="outline" className="text-xs">{orgAgents.length}</Badge>
                             </div>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-3">
                                 {orgAgents.map((agent) => (
                                     <AgentMarketCard
                                         key={agent.id}
@@ -923,17 +972,21 @@ export default function MarketPage() {
                                 Submit mods, plugins, and skills for the community marketplace
                             </p>
                         </div>
-                        <Button
-                            onClick={() => setSubmitOpen(true)}
-                            className="bg-amber-600 hover:bg-amber-700 text-black gap-1.5"
-                        >
-                            <Plus className="h-4 w-4" />
-                            Submit to Market
-                        </Button>
+                        <div className="flex items-center gap-3">
+                            {/* Publisher Tier Badge */}
+                            <PublisherTierBadge walletAddress={account?.address} />
+                            <Button
+                                onClick={() => setSubmitOpen(true)}
+                                className="bg-amber-600 hover:bg-amber-700 text-black gap-1.5"
+                            >
+                                <Plus className="h-4 w-4" />
+                                Submit to Market
+                            </Button>
+                        </div>
                     </div>
 
                     {userSubmissions.length > 0 ? (
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-3">
                             {userSubmissions.map((sub) => (
                                 <Card key={sub.id} className="p-4 bg-card border-border">
                                     <div className="flex items-start gap-3">
@@ -969,6 +1022,16 @@ export default function MarketPage() {
                                                 {sub.status === "rejected" && (
                                                     <Badge variant="outline" className="text-[10px] border-red-500/20 text-red-400">
                                                         <XCircle className="h-2.5 w-2.5 mr-0.5" />Rejected
+                                                    </Badge>
+                                                )}
+                                                {sub.status === "changes_requested" && (
+                                                    <Badge variant="outline" className="text-[10px] border-orange-500/20 text-orange-400">
+                                                        <Clock className="h-2.5 w-2.5 mr-0.5" />Changes Requested
+                                                    </Badge>
+                                                )}
+                                                {sub.status === "suspended" && (
+                                                    <Badge variant="outline" className="text-[10px] border-red-500/20 text-red-500">
+                                                        <StopCircle className="h-2.5 w-2.5 mr-0.5" />Suspended
                                                     </Badge>
                                                 )}
                                             </div>
