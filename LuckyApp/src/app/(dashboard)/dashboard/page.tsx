@@ -1549,31 +1549,34 @@ export default function DashboardPage() {
       label: "Error Rate",
       colSpan: "",
       render: () => {
-        const errorRate = 1.7; // Mock data
-        const trend = -0.3;
+        const doneTasks = allTasks.filter(t => t.status === "done").length;
+        const inProgressTasks = allTasks.filter(t => t.status === "in_progress").length;
+        const todoTasks = allTasks.filter(t => t.status === "todo").length;
+        const totalTasks = allTasks.length;
+        const doneRate = totalTasks > 0 ? ((doneTasks / totalTasks) * 100) : 0;
         return (
           <SpotlightCard className="p-0 glass-card-enhanced h-full overflow-hidden">
             <CardHeader className="px-2 pt-2 pb-1">
-              <CardTitle className="text-sm">⚠️ Error Rate</CardTitle>
+              <CardTitle className="text-sm">⚠️ Task Progress</CardTitle>
             </CardHeader>
             <CardContent className="px-2 pb-2">
               <div className="space-y-2">
                 <div className="text-center">
-                  <div className="text-3xl font-bold text-orange-400">{errorRate}%</div>
-                  <div className="text-xs text-muted-foreground">Last 24 hours</div>
-                </div>
-                <div className="flex items-center justify-center gap-1 text-xs">
-                  <span className="text-emerald-400">↓ {Math.abs(trend)}%</span>
-                  <span className="text-muted-foreground">vs yesterday</span>
+                  <div className="text-3xl font-bold text-emerald-400">{doneRate.toFixed(0)}%</div>
+                  <div className="text-xs text-muted-foreground">{totalTasks} total tasks</div>
                 </div>
                 <div className="pt-2 border-t text-xs text-muted-foreground">
                   <div className="flex justify-between py-1">
-                    <span>Failed tasks:</span>
-                    <span className="font-medium">12</span>
+                    <span>Done:</span>
+                    <span className="font-medium">{doneTasks}</span>
                   </div>
                   <div className="flex justify-between py-1">
-                    <span>Retries:</span>
-                    <span className="font-medium">8</span>
+                    <span>In progress:</span>
+                    <span className="font-medium">{inProgressTasks}</span>
+                  </div>
+                  <div className="flex justify-between py-1">
+                    <span>To do:</span>
+                    <span className="font-medium">{todoTasks}</span>
                   </div>
                 </div>
               </div>
@@ -1586,26 +1589,28 @@ export default function DashboardPage() {
       label: "Completion Time",
       colSpan: "",
       render: () => {
-        const avgTime = "2.4h"; // Mock data
+        const doneTasks = allTasks.filter(t => t.status === "done");
+        const todoTasks = allTasks.filter(t => t.status === "todo");
+        const inProgress = allTasks.filter(t => t.status === "in_progress");
         return (
           <SpotlightCard className="p-0 glass-card-enhanced h-full overflow-hidden">
             <CardHeader className="px-2 pt-2 pb-1">
-              <CardTitle className="text-sm">⏱️ Avg Completion</CardTitle>
+              <CardTitle className="text-sm">⏱️ Task Status</CardTitle>
             </CardHeader>
             <CardContent className="px-2 pb-2">
               <div className="space-y-2">
                 <div className="text-center">
-                  <div className="text-3xl font-bold text-blue-400">{avgTime}</div>
-                  <div className="text-xs text-muted-foreground">Per task</div>
+                  <div className="text-3xl font-bold text-blue-400">{doneTasks.length}</div>
+                  <div className="text-xs text-muted-foreground">Done</div>
                 </div>
                 <div className="pt-2 border-t text-xs text-muted-foreground space-y-1">
                   <div className="flex justify-between">
-                    <span>Fastest:</span>
-                    <span className="font-medium text-emerald-400">12m</span>
+                    <span>In progress:</span>
+                    <span className="font-medium text-amber-400">{inProgress.length}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span>Slowest:</span>
-                    <span className="font-medium text-orange-400">8.2h</span>
+                    <span>To do:</span>
+                    <span className="font-medium text-muted-foreground">{todoTasks.length}</span>
                   </div>
                 </div>
               </div>
@@ -1620,10 +1625,13 @@ export default function DashboardPage() {
       label: "Alert Center",
       colSpan: "lg:col-span-2",
       render: () => {
-        const alerts = [
-          { id: 1, severity: "warning", message: "Agent capacity at 85%", time: "5m ago" },
-          { id: 2, severity: "info", message: "System update scheduled for 2AM", time: "1h ago" },
-        ];
+        const alerts: { id: number; severity: string; message: string }[] = [];
+        const offlineAgents = agents.filter(a => a.status === "offline");
+        const pausedAgents = agents.filter(a => a.status === "paused");
+        const inProgressCount = allTasks.filter(t => t.status === "in_progress").length;
+        if (offlineAgents.length > 0) alerts.push({ id: 1, severity: "warning", message: `${offlineAgents.length} agent${offlineAgents.length > 1 ? "s" : ""} offline` });
+        if (pausedAgents.length > 0) alerts.push({ id: 2, severity: "info", message: `${pausedAgents.length} agent${pausedAgents.length > 1 ? "s" : ""} paused` });
+        if (inProgressCount > agents.filter(a => a.status === "online" || a.status === "busy").length) alerts.push({ id: 3, severity: "info", message: `${inProgressCount} task${inProgressCount > 1 ? "s" : ""} in progress` });
 
         return (
           <SpotlightCard className="p-0 glass-card-enhanced h-full overflow-hidden">
@@ -1640,7 +1648,6 @@ export default function DashboardPage() {
                       <span className="text-base mt-0.5">{alert.severity === "warning" ? "⚠️" : "ℹ️"}</span>
                       <div className="flex-1 min-w-0">
                         <p className="text-xs font-medium">{alert.message}</p>
-                        <p className="text-[10px] text-muted-foreground">{alert.time}</p>
                       </div>
                     </div>
                   ))}
@@ -1654,70 +1661,78 @@ export default function DashboardPage() {
     "widget-capacity": {
       label: "Capacity Planning",
       colSpan: "lg:col-span-2",
-      render: () => (
-        <SpotlightCard className="p-0 glass-card-enhanced h-full overflow-hidden">
-          <CardHeader className="px-2 pt-2 pb-1">
-            <CardTitle className="text-sm">📈 Capacity Planning</CardTitle>
-          </CardHeader>
-          <CardContent className="px-2 pb-2">
-            <div className="space-y-3">
-              <div>
-                <div className="flex justify-between text-xs mb-1">
-                  <span className="text-muted-foreground">Agent Utilization</span>
-                  <span className="font-medium">68%</span>
+      render: () => {
+        const totalAgents = agents.length || 1;
+        const busyAgents = agents.filter(a => a.status === "busy" || a.status === "online").length;
+        const utilization = Math.round((busyAgents / totalAgents) * 100);
+        const todoTasks = allTasks.filter(t => t.status === "todo").length;
+        const totalTasks = allTasks.length || 1;
+        const queuePct = Math.round((todoTasks / totalTasks) * 100);
+        const onlineAgents = agents.filter(a => a.status === "online" || a.status === "busy").length;
+        const onlinePct = Math.round((onlineAgents / totalAgents) * 100);
+        return (
+          <SpotlightCard className="p-0 glass-card-enhanced h-full overflow-hidden">
+            <CardHeader className="px-2 pt-2 pb-1">
+              <CardTitle className="text-sm">📈 Capacity Planning</CardTitle>
+            </CardHeader>
+            <CardContent className="px-2 pb-2">
+              <div className="space-y-3">
+                <div>
+                  <div className="flex justify-between text-xs mb-1">
+                    <span className="text-muted-foreground">Agent Utilization</span>
+                    <span className="font-medium">{utilization}%</span>
+                  </div>
+                  <div className="h-2 bg-muted rounded-full overflow-hidden">
+                    <div className="h-full bg-gradient-to-r from-emerald-500 to-emerald-400" style={{ width: `${utilization}%` }} />
+                  </div>
                 </div>
-                <div className="h-2 bg-muted rounded-full overflow-hidden">
-                  <div className="h-full bg-gradient-to-r from-emerald-500 to-emerald-400" style={{ width: '68%' }} />
+                <div>
+                  <div className="flex justify-between text-xs mb-1">
+                    <span className="text-muted-foreground">To-Do Tasks</span>
+                    <span className="font-medium">{queuePct}% ({todoTasks})</span>
+                  </div>
+                  <div className="h-2 bg-muted rounded-full overflow-hidden">
+                    <div className="h-full bg-gradient-to-r from-blue-500 to-blue-400" style={{ width: `${queuePct}%` }} />
+                  </div>
+                </div>
+                <div>
+                  <div className="flex justify-between text-xs mb-1">
+                    <span className="text-muted-foreground">Agents Online</span>
+                    <span className="font-medium">{onlinePct}% ({onlineAgents}/{totalAgents})</span>
+                  </div>
+                  <div className="h-2 bg-muted rounded-full overflow-hidden">
+                    <div className="h-full bg-gradient-to-r from-amber-500 to-amber-400" style={{ width: `${onlinePct}%` }} />
+                  </div>
                 </div>
               </div>
-              <div>
-                <div className="flex justify-between text-xs mb-1">
-                  <span className="text-muted-foreground">Task Queue</span>
-                  <span className="font-medium">42%</span>
-                </div>
-                <div className="h-2 bg-muted rounded-full overflow-hidden">
-                  <div className="h-full bg-gradient-to-r from-blue-500 to-blue-400" style={{ width: '42%' }} />
-                </div>
-              </div>
-              <div>
-                <div className="flex justify-between text-xs mb-1">
-                  <span className="text-muted-foreground">API Rate Limit</span>
-                  <span className="font-medium">15%</span>
-                </div>
-                <div className="h-2 bg-muted rounded-full overflow-hidden">
-                  <div className="h-full bg-gradient-to-r from-amber-500 to-amber-400" style={{ width: '15%' }} />
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </SpotlightCard>
-      ),
+            </CardContent>
+          </SpotlightCard>
+        );
+      },
     },
     "widget-deployments": {
       label: "Recent Deployments",
       colSpan: "",
       render: () => {
-        const deployments = agents.slice(0, 3).map(agent => ({
-          name: agent.name,
-          time: "Just now",
-          status: "success",
-        }));
+        const recentAgents = agents.slice(0, 3);
 
         return (
           <SpotlightCard className="p-0 glass-card-enhanced h-full overflow-hidden">
             <CardHeader className="px-2 pt-2 pb-1">
-              <CardTitle className="text-sm">🚀 Deployments</CardTitle>
+              <CardTitle className="text-sm">🚀 Active Agents</CardTitle>
             </CardHeader>
             <CardContent className="px-2 pb-2">
-              {deployments.length === 0 ? (
-                <div className="text-center py-4 text-muted-foreground text-xs">No recent deployments</div>
+              {recentAgents.length === 0 ? (
+                <div className="text-center py-4 text-muted-foreground text-xs">No agents deployed</div>
               ) : (
                 <div className="space-y-2">
-                  {deployments.map((deploy, i) => (
+                  {recentAgents.map((agent, i) => (
                     <div key={i} className="flex items-center gap-2 text-xs">
-                      <span className="text-emerald-400">✓</span>
-                      <span className="truncate flex-1">{deploy.name}</span>
-                      <span className="text-muted-foreground text-[10px]">{deploy.time}</span>
+                      <span className={agent.status === "online" || agent.status === "busy" ? "text-emerald-400" : "text-gray-500"}>
+                        {agent.status === "online" || agent.status === "busy" ? "●" : "○"}
+                      </span>
+                      <span className="truncate flex-1">{agent.name}</span>
+                      <span className="text-muted-foreground text-[10px]">{agent.status}</span>
                     </div>
                   ))}
                 </div>
@@ -1731,27 +1746,33 @@ export default function DashboardPage() {
       label: "Health Checks",
       colSpan: "",
       render: () => {
-        const services = [
-          { name: "WebSocket Hub", status: "healthy", uptime: "99.9%" },
-          { name: "Database", status: "healthy", uptime: "100%" },
-          { name: "Redis Cache", status: "healthy", uptime: "99.8%" },
-          { name: "Pub/Sub", status: "degraded", uptime: "98.1%" },
+        const statusCounts = {
+          online: agents.filter(a => a.status === "online").length,
+          busy: agents.filter(a => a.status === "busy").length,
+          offline: agents.filter(a => a.status === "offline").length,
+          paused: agents.filter(a => a.status === "paused").length,
+        };
+        const healthItems = [
+          { name: "Online Agents", status: statusCounts.online > 0 ? "healthy" : "degraded", count: statusCounts.online },
+          { name: "Busy Agents", status: "healthy", count: statusCounts.busy },
+          { name: "Offline Agents", status: statusCounts.offline > 0 ? "degraded" : "healthy", count: statusCounts.offline },
+          { name: "Paused Agents", status: statusCounts.paused > 0 ? "degraded" : "healthy", count: statusCounts.paused },
         ];
 
         return (
           <SpotlightCard className="p-0 glass-card-enhanced h-full overflow-hidden">
             <CardHeader className="px-2 pt-2 pb-1">
-              <CardTitle className="text-sm">❤️ System Health</CardTitle>
+              <CardTitle className="text-sm">❤️ Agent Health</CardTitle>
             </CardHeader>
             <CardContent className="px-2 pb-2">
               <div className="space-y-2">
-                {services.map((service, i) => (
+                {healthItems.map((item, i) => (
                   <div key={i} className="flex items-center justify-between text-xs">
                     <div className="flex items-center gap-2">
-                      <span className={`w-2 h-2 rounded-full ${service.status === 'healthy' ? 'bg-emerald-400' : 'bg-amber-400'}`} />
-                      <span className="truncate">{service.name}</span>
+                      <span className={`w-2 h-2 rounded-full ${item.status === 'healthy' ? 'bg-emerald-400' : 'bg-amber-400'}`} />
+                      <span className="truncate">{item.name}</span>
                     </div>
-                    <span className="text-muted-foreground text-[10px]">{service.uptime}</span>
+                    <span className="font-medium">{item.count}</span>
                   </div>
                 ))}
               </div>
@@ -1761,46 +1782,52 @@ export default function DashboardPage() {
       },
     },
     "widget-rate-limits": {
-      label: "Rate Limits",
+      label: "Resource Usage",
       colSpan: "",
-      render: () => (
-        <SpotlightCard className="p-0 glass-card-enhanced h-full overflow-hidden">
-          <CardHeader className="px-2 pt-2 pb-1">
-            <CardTitle className="text-sm">🔒 Rate Limits</CardTitle>
-          </CardHeader>
-          <CardContent className="px-2 pb-2">
-            <div className="space-y-3">
-              <div>
-                <div className="flex justify-between text-xs mb-1">
-                  <span>OpenAI API</span>
-                  <span className="font-medium">2.4k / 10k</span>
+      render: () => {
+        const totalAgents = agents.length;
+        const totalTasks = allTasks.length;
+        const doneTasks = allTasks.filter(t => t.status === "done").length;
+        const completionRate = totalTasks > 0 ? Math.round((doneTasks / totalTasks) * 100) : 0;
+        return (
+          <SpotlightCard className="p-0 glass-card-enhanced h-full overflow-hidden">
+            <CardHeader className="px-2 pt-2 pb-1">
+              <CardTitle className="text-sm">📊 Resource Usage</CardTitle>
+            </CardHeader>
+            <CardContent className="px-2 pb-2">
+              <div className="space-y-3">
+                <div>
+                  <div className="flex justify-between text-xs mb-1">
+                    <span>Task Completion</span>
+                    <span className="font-medium">{doneTasks} / {totalTasks}</span>
+                  </div>
+                  <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                    <div className="h-full bg-emerald-500" style={{ width: `${completionRate}%` }} />
+                  </div>
                 </div>
-                <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-                  <div className="h-full bg-emerald-500" style={{ width: '24%' }} />
+                <div>
+                  <div className="flex justify-between text-xs mb-1">
+                    <span>Active Agents</span>
+                    <span className="font-medium">{agents.filter(a => a.status === "online" || a.status === "busy").length} / {totalAgents}</span>
+                  </div>
+                  <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                    <div className="h-full bg-blue-500" style={{ width: `${totalAgents > 0 ? Math.round((agents.filter(a => a.status === "online" || a.status === "busy").length / totalAgents) * 100) : 0}%` }} />
+                  </div>
+                </div>
+                <div>
+                  <div className="flex justify-between text-xs mb-1">
+                    <span>Projects</span>
+                    <span className="font-medium">{stats?.projectCount || 0}</span>
+                  </div>
+                  <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                    <div className="h-full bg-amber-500" style={{ width: `${Math.min((stats?.projectCount || 0) * 10, 100)}%` }} />
+                  </div>
                 </div>
               </div>
-              <div>
-                <div className="flex justify-between text-xs mb-1">
-                  <span>Anthropic API</span>
-                  <span className="font-medium">8.2k / 10k</span>
-                </div>
-                <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-                  <div className="h-full bg-amber-500" style={{ width: '82%' }} />
-                </div>
-              </div>
-              <div>
-                <div className="flex justify-between text-xs mb-1">
-                  <span>Webhook Calls</span>
-                  <span className="font-medium">142 / 1k</span>
-                </div>
-                <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-                  <div className="h-full bg-blue-500" style={{ width: '14%' }} />
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </SpotlightCard>
-      ),
+            </CardContent>
+          </SpotlightCard>
+        );
+      },
     },
     "widget-audit-log": {
       label: "Audit Log",

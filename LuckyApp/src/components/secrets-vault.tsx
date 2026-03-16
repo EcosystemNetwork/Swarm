@@ -22,6 +22,34 @@ export function SecretsVault({
   const [saving, setSaving] = useState(false);
   const [revealedSecrets, setRevealedSecrets] = useState<Record<string, string>>({});
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<string | null>(null);
+
+  const handleDelete = async (secretId: string) => {
+    setDeleting(secretId);
+    try {
+      const res = await fetch(`/api/secrets/${secretId}`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orgId }),
+      });
+
+      const data = await res.json();
+      if (data.ok) {
+        // Clear revealed value if it was shown
+        const updated = { ...revealedSecrets };
+        delete updated[secretId];
+        setRevealedSecrets(updated);
+        onSecretsChange();
+      } else {
+        alert(data.error || "Failed to delete secret");
+      }
+    } catch (err) {
+      console.error("Failed to delete secret:", err);
+      alert("Failed to delete secret");
+    } finally {
+      setDeleting(null);
+    }
+  };
 
   const handleAddSecret = async () => {
     if (!newSecret.key || !newSecret.value) {
@@ -39,7 +67,7 @@ export function SecretsVault({
           key: newSecret.key,
           value: newSecret.value,
           description: newSecret.description,
-          createdBy: "user", // TODO: Get from auth context
+          createdBy: orgId,
           masterSecret,
         }),
       });
@@ -243,13 +271,14 @@ export function SecretsVault({
                   <button
                     onClick={() => {
                       if (confirm(`Delete secret "${secret.key}"?`)) {
-                        // TODO: Implement delete
+                        handleDelete(secret.id);
                       }
                     }}
-                    className="p-2 hover:bg-gray-700 rounded transition text-gray-400 hover:text-red-400"
+                    disabled={deleting === secret.id}
+                    className="p-2 hover:bg-gray-700 rounded transition text-gray-400 hover:text-red-400 disabled:opacity-50"
                     title="Delete"
                   >
-                    <Trash2 className="w-4 h-4" />
+                    <Trash2 className={`w-4 h-4 ${deleting === secret.id ? "animate-pulse" : ""}`} />
                   </button>
                 </div>
               </div>

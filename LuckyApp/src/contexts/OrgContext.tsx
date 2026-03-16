@@ -69,10 +69,8 @@ export function OrgProvider({ children }: { children: ReactNode }) {
 
   const fetchOrgs = useCallback(async (walletAddress: string) => {
     try {
-      console.log('[OrgContext] 🔍 Fetching orgs for address:', walletAddress);
       setError(null);
       const orgs = await getOrganizationsByWallet(walletAddress);
-      console.log('[OrgContext] Found', orgs.length, 'organizations:', orgs.map(o => o.name));
       setOrganizations(orgs);
 
       // Restore previously selected org

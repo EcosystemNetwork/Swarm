@@ -13,6 +13,8 @@ import {
   getDoc,
   getDocs,
   setDoc,
+  updateDoc,
+  deleteField,
   query,
   where,
   serverTimestamp,
@@ -179,6 +181,34 @@ export async function getAllPlatformConnections(
   });
 }
 
+/**
+ * List connections without decrypting credentials (safe for client-facing API).
+ * Returns metadata only.
+ */
+export async function listPlatformConnections(
+  orgId: string
+): Promise<Omit<PlatformConnection, "credentials" | "credentialsIV">[]> {
+  const q = query(
+    collection(db, "platformConnections"),
+    where("orgId", "==", orgId),
+    where("active", "==", true)
+  );
+
+  const snap = await getDocs(q);
+  return snap.docs.map((d) => {
+    const data = d.data();
+    return {
+      id: d.id,
+      orgId: data.orgId,
+      platform: data.platform,
+      webhookUrl: data.webhookUrl,
+      connectedAt: data.connectedAt?.toDate() || null,
+      active: data.active,
+      metadata: data.metadata,
+    };
+  });
+}
+
 export async function deactivatePlatformConnection(connectionId: string): Promise<void> {
   await setDoc(
     doc(db, "platformConnections", connectionId),
@@ -272,12 +302,25 @@ export async function getBridgedChannelByPlatform(
 }
 
 export async function unbridgeChannel(bridgeId: string): Promise<void> {
-  // TODO: Also update the Swarm channel to remove platform fields
+  // Get the bridge record to find the Swarm channel ID
+  const bridgeDoc = await getDoc(doc(db, "bridgedChannels", bridgeId));
+  const bridgeData = bridgeDoc.exists() ? bridgeDoc.data() : null;
+
+  // Deactivate the bridge
   await setDoc(
     doc(db, "bridgedChannels", bridgeId),
     { active: false },
     { merge: true }
   );
+
+  // Clear platform fields from the Swarm channel
+  if (bridgeData?.swarmChannelId) {
+    await updateDoc(doc(db, "channels", bridgeData.swarmChannelId), {
+      platformType: deleteField(),
+      platformChannelId: deleteField(),
+      platformMetadata: deleteField(),
+    });
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════

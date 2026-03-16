@@ -90,7 +90,6 @@ export async function POST(req: Request) {
 
     // Extract address from verified payload
     const address = verifiedPayload.payload?.address;
-    console.log("[auth/verify] ✅ Signature verified for:", address);
 
     if (!address) {
       console.error("[auth/verify] No address found in verified payload");
@@ -153,13 +152,11 @@ export async function POST(req: Request) {
     // 3. Set httpOnly cookie
     try {
       await setSessionCookie(token);
-      console.log("[auth/verify] ✅ Session cookie set successfully");
     } catch (err) {
       console.error("[auth/verify] setSessionCookie error:", err);
       // Don't fail - cookie might still work
     }
 
-    console.log("[auth/verify] ✅ Session created successfully for:", address);
     return Response.json({
       success: true,
       session: {

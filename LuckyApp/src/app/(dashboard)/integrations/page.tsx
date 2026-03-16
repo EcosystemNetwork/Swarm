@@ -5,7 +5,6 @@ import { useOrg } from "@/contexts/OrgContext";
 import { Send, MessageSquare, Briefcase, Plus, Trash2, Link as LinkIcon } from "lucide-react";
 import {
   type PlatformConnection,
-  getAllPlatformConnections,
   getPlatformIcon,
   getPlatformColor,
 } from "@/lib/platform-bridge";
@@ -27,9 +26,16 @@ export default function IntegrationsPage() {
     if (!currentOrg?.id) return;
     setLoading(true);
     try {
-      // TODO: masterSecret should be fetched securely or this should use an API endpoint
-      const conns = await getAllPlatformConnections(currentOrg.id, "");
-      setConnections(conns);
+      const res = await fetch(`/api/platforms/connections?orgId=${encodeURIComponent(currentOrg.id)}`);
+      const data = await res.json();
+      if (data.ok) {
+        // Parse dates from JSON
+        const conns = (data.connections || []).map((c: Record<string, unknown>) => ({
+          ...c,
+          connectedAt: c.connectedAt ? new Date(c.connectedAt as string) : null,
+        })) as PlatformConnection[];
+        setConnections(conns);
+      }
     } catch (err) {
       console.error("Failed to fetch connections:", err);
     } finally {
