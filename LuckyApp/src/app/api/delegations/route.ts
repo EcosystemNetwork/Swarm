@@ -3,11 +3,14 @@
  *
  * Get delegation history for an organization or specific agent.
  * Query: ?orgId=xxx&agentId=xxx&status=pending|in_progress|completed|failed
+ *
+ * Auth: org membership or platform admin.
  */
 
 import { NextRequest } from "next/server";
 import { getDelegations } from "@/lib/agent-hierarchy";
 import type { DelegationRecord } from "@/lib/agent-hierarchy";
+import { requirePlatformAdminOrOrgMember, forbidden } from "@/lib/auth-guard";
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -19,6 +22,11 @@ export async function GET(request: NextRequest) {
 
   if (!orgId) {
     return Response.json({ error: "orgId is required" }, { status: 400 });
+  }
+
+  const auth = await requirePlatformAdminOrOrgMember(request, orgId);
+  if (!auth.ok) {
+    return forbidden(auth.error);
   }
 
   try {

@@ -11,10 +11,10 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { ethers } from "ethers";
 import {
-  CONTRACTS,
-  TASK_BOARD_ABI,
-  AGENT_REGISTRY_ABI,
-  TREASURY_ABI,
+  HEDERA_CONTRACTS,
+  HEDERA_TASK_BOARD_ABI,
+  HEDERA_AGENT_REGISTRY_ABI,
+  HEDERA_TREASURY_ABI,
   toHbar,
   type TaskListing,
   type AgentProfile,
@@ -63,9 +63,9 @@ export function useSwarmData(): SwarmData {
 
     try {
       const provider = getProvider();
-      const board = new ethers.Contract(CONTRACTS.TASK_BOARD, TASK_BOARD_ABI, provider);
-      const registry = new ethers.Contract(CONTRACTS.AGENT_REGISTRY, AGENT_REGISTRY_ABI, provider);
-      const treasuryContract = new ethers.Contract(CONTRACTS.AGENT_TREASURY, TREASURY_ABI, provider);
+      const board = new ethers.Contract(HEDERA_CONTRACTS.TASK_BOARD, HEDERA_TASK_BOARD_ABI, provider);
+      const registry = new ethers.Contract(HEDERA_CONTRACTS.AGENT_REGISTRY, HEDERA_AGENT_REGISTRY_ABI, provider);
+      const treasuryContract = new ethers.Contract(HEDERA_CONTRACTS.AGENT_TREASURY, HEDERA_TREASURY_ABI, provider);
 
       // Fetch counts + bulk calls in parallel; bulk calls may revert if too large
       const [rawTasksBulk, rawAgents, taskCount, agentCount, rawPnL] = await Promise.all([

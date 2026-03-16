@@ -3,10 +3,13 @@
  *
  * Pause an agent (prevents message processing).
  * Body: { orgId, pausedBy, reason? }
+ *
+ * Auth: org membership or platform admin.
  */
 
 import { NextRequest } from "next/server";
 import { pauseAgent } from "@/lib/heartbeat";
+import { requirePlatformAdminOrOrgMember, forbidden } from "@/lib/auth-guard";
 
 export async function POST(
   request: NextRequest,
@@ -27,6 +30,11 @@ export async function POST(
       { error: "orgId and pausedBy are required" },
       { status: 400 }
     );
+  }
+
+  const auth = await requirePlatformAdminOrOrgMember(request, orgId as string);
+  if (!auth.ok) {
+    return forbidden(auth.error);
   }
 
   try {

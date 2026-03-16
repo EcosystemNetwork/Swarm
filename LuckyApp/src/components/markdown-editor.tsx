@@ -124,9 +124,20 @@ export function MarkdownEditor({
   );
 }
 
+/** Escape HTML entities to prevent XSS before markdown processing */
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
 // Simple markdown renderer (basic support)
 function renderMarkdown(markdown: string): string {
-  let html = markdown;
+  // Escape HTML first to prevent XSS via dangerouslySetInnerHTML
+  let html = escapeHtml(markdown);
 
   // Headers
   html = html.replace(/^#### (.*$)/gim, '<h4 class="text-lg font-semibold mt-4 mb-2">$1</h4>');

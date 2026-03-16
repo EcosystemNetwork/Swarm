@@ -12,8 +12,10 @@ export const dynamic = 'force-dynamic';
 export async function GET(req: Request) {
     try {
         const url = new URL(req.url);
-        const limit = parseInt(url.searchParams.get('limit') || '50', 10);
-        const since = parseInt(url.searchParams.get('since') || '0', 10);
+        const rawLimit = parseInt(url.searchParams.get('limit') || '50', 10);
+        const rawSince = parseInt(url.searchParams.get('since') || '0', 10);
+        const limit = isNaN(rawLimit) ? 50 : Math.max(1, Math.min(rawLimit, 500));
+        const since = isNaN(rawSince) || rawSince < 0 ? 0 : rawSince;
 
         if (!fs.existsSync(sessDir)) {
             return NextResponse.json({ events: [] });

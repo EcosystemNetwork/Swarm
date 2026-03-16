@@ -16,8 +16,17 @@ const SESSION_COOKIE = "swarm_session";
 function getSecret(): Uint8Array {
   const raw = process.env.SESSION_SECRET;
   if (!raw || raw.length < 32) {
-    // In development without SESSION_SECRET, allow pass-through
-    // but log a warning. In production this should never happen.
+    if (process.env.NODE_ENV === "production") {
+      throw new Error(
+        "SESSION_SECRET env var must be set in production (min 32 chars). " +
+        "Generate one with: openssl rand -hex 32"
+      );
+    }
+    // Development-only fallback — throws in production.
+    console.warn(
+      "[middleware] SESSION_SECRET missing or too short — using dev fallback. " +
+      "Set SESSION_SECRET in .env.local (min 32 chars)."
+    );
     return new TextEncoder().encode(
       "development-fallback-key-not-for-production-use!"
     );

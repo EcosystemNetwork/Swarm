@@ -3,10 +3,13 @@
  *
  * Reveal (decrypt) a secret value.
  * Body: { orgId, masterSecret }
+ *
+ * Auth: org membership or platform admin.
  */
 
 import { NextRequest } from "next/server";
 import { revealSecret } from "@/lib/secrets";
+import { requirePlatformAdminOrOrgMember, forbidden } from "@/lib/auth-guard";
 
 export async function POST(
   request: NextRequest,
@@ -28,6 +31,11 @@ export async function POST(
       { error: "orgId and masterSecret are required" },
       { status: 400 }
     );
+  }
+
+  const auth = await requirePlatformAdminOrOrgMember(request, orgId as string);
+  if (!auth.ok) {
+    return forbidden(auth.error);
   }
 
   try {

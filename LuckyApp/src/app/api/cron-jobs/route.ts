@@ -18,8 +18,9 @@ function verifyServiceAuth(req: NextRequest): boolean {
 }
 
 export async function GET(req: NextRequest) {
-    // Auth: internal service or local dashboard (check origin)
-    const isLocal = req.headers.get('host')?.startsWith('localhost') || req.headers.get('host')?.startsWith('127.0.0.1');
+    // Auth: internal service or local dashboard (dev only)
+    const isDev = process.env.NODE_ENV === 'development';
+    const isLocal = isDev && (req.headers.get('host')?.startsWith('localhost') || req.headers.get('host')?.startsWith('127.0.0.1'));
     if (!isLocal && !verifyServiceAuth(req)) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -37,9 +38,13 @@ export async function GET(req: NextRequest) {
     }
 }
 
+const MAX_PROMPT_LENGTH = 10_000; // 10KB max prompt
+const MAX_INBOX_ITEMS = 100;
+
 export async function POST(req: NextRequest) {
-    // Auth: internal service or local dashboard
-    const isLocal = req.headers.get('host')?.startsWith('localhost') || req.headers.get('host')?.startsWith('127.0.0.1');
+    // Auth: internal service or local dashboard (dev only)
+    const isDev = process.env.NODE_ENV === 'development';
+    const isLocal = isDev && (req.headers.get('host')?.startsWith('localhost') || req.headers.get('host')?.startsWith('127.0.0.1'));
     if (!isLocal && !verifyServiceAuth(req)) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -74,8 +79,14 @@ export async function POST(req: NextRequest) {
 
         if (action === 'trigger') {
             const { prompt, taskId } = body;
-            if (!prompt) {
+            if (!prompt || typeof prompt !== 'string') {
                 return NextResponse.json({ error: 'prompt is required' }, { status: 400 });
+            }
+            if (prompt.length > MAX_PROMPT_LENGTH) {
+                return NextResponse.json({ error: `prompt exceeds max length (${MAX_PROMPT_LENGTH} chars)` }, { status: 400 });
+            }
+            if (taskId && (typeof taskId !== 'string' || taskId.length > 200)) {
+                return NextResponse.json({ error: 'invalid taskId' }, { status: 400 });
             }
 
             // Write to the agent's INBOX.json — OpenClaw agents poll this file for pending actions
@@ -88,6 +99,11 @@ export async function POST(req: NextRequest) {
                 } catch {
                     inbox = [];
                 }
+            }
+
+            // Prevent unbounded inbox growth
+            if (inbox.length >= MAX_INBOX_ITEMS) {
+                inbox = inbox.slice(-Math.floor(MAX_INBOX_ITEMS / 2));
             }
 
             inbox.push({

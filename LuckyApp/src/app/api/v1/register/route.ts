@@ -16,7 +16,7 @@ import { PLATFORM_BRIEFING } from "../briefing";
 import { getAgentAvatarUrl } from "@/lib/agent-avatar";
 import { agentCheckIn, getOrganization, type Agent } from "@/lib/firestore";
 import { generateASN } from "@/lib/chainlink";
-import { CONTRACTS, AGENT_REGISTRY_ABI, HEDERA_GAS_LIMIT } from "@/lib/swarm-contracts";
+import { HEDERA_CONTRACTS, HEDERA_AGENT_REGISTRY_ABI, HEDERA_GAS_LIMIT } from "@/lib/swarm-contracts";
 import {
     LINK_CONTRACTS,
     LINK_AGENT_REGISTRY_ABI,
@@ -68,7 +68,7 @@ async function registerOnChain(
     try {
         const provider = new ethers.JsonRpcProvider(HEDERA_TESTNET_RPC);
         const wallet = new ethers.Wallet(privateKey, provider);
-        const registry = new ethers.Contract(CONTRACTS.AGENT_REGISTRY, AGENT_REGISTRY_ABI, wallet);
+        const registry = new ethers.Contract(HEDERA_CONTRACTS.AGENT_REGISTRY, HEDERA_AGENT_REGISTRY_ABI, wallet);
 
         // Derive unique agent address from public key
         const agentAddress = deriveAgentAddress(publicKey);

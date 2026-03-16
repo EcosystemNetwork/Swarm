@@ -6,7 +6,7 @@
  */
 import type { ModManifest, ModTool, ModWorkflow, ModExample, ModAgentSkill } from "./skills";
 import { ethers } from "ethers";
-import { CONTRACTS, AGENT_REGISTRY_ABI, HEDERA_GAS_LIMIT } from "./swarm-contracts";
+import { HEDERA_CONTRACTS, HEDERA_AGENT_REGISTRY_ABI, HEDERA_GAS_LIMIT } from "./swarm-contracts";
 import { shortAddress, toNative } from "./chains";
 
 // ═══════════════════════════════════════════════════════════════
@@ -1347,7 +1347,7 @@ export async function executeRegisterIdentity(): Promise<PlaygroundExecutionResu
     const name = `Agent-${shortAddress(address)}`;
     const skills = "chainlink.fetch_price,chainlink.compute_agent_score";
 
-    const registry = new ethers.Contract(CONTRACTS.AGENT_REGISTRY, AGENT_REGISTRY_ABI, signer);
+    const registry = new ethers.Contract(HEDERA_CONTRACTS.AGENT_REGISTRY, HEDERA_AGENT_REGISTRY_ABI, signer);
     const tx = await registry.registerAgent(name, skills, 500, { gasLimit: HEDERA_GAS_LIMIT, type: 0 });
     const receipt = await tx.wait();
     const elapsed = Math.round(performance.now() - start);
@@ -1387,7 +1387,7 @@ export async function executeLookupAsn(queryAddress?: string): Promise<Playgroun
     const lookupAddr = queryAddress || walletAddr;
     if (!lookupAddr) throw new Error("No address to look up. Connect wallet or provide an address.");
 
-    const registry = new ethers.Contract(CONTRACTS.AGENT_REGISTRY, AGENT_REGISTRY_ABI, provider);
+    const registry = new ethers.Contract(HEDERA_CONTRACTS.AGENT_REGISTRY, HEDERA_AGENT_REGISTRY_ABI, provider);
     const [isReg, agentData] = await Promise.all([
         registry.isRegistered(lookupAddr).catch(() => false),
         registry.getAgent(lookupAddr).catch(() => null),
@@ -1421,7 +1421,7 @@ export async function executeLookupAsn(queryAddress?: string): Promise<Playgroun
             trustScore: Math.min(50 + ageDays, 95),
             fraudRiskScore: Math.max(25 - Math.floor(ageDays / 10), 5),
             policy: getDefaultPolicy(baseScore),
-            contractAddress: CONTRACTS.AGENT_REGISTRY,
+            contractAddress: HEDERA_CONTRACTS.AGENT_REGISTRY,
             network: "Hedera Testnet",
         }, null, 2),
         latency: `${elapsed}ms`, isLive: true, walletUsed: walletAddr ?? undefined,
@@ -1434,12 +1434,12 @@ export async function executeFreezeIdentity(): Promise<PlaygroundExecutionResult
     const address = await signer.getAddress();
 
     const provider = getHederaTestnetProvider();
-    const registryRead = new ethers.Contract(CONTRACTS.AGENT_REGISTRY, AGENT_REGISTRY_ABI, provider);
+    const registryRead = new ethers.Contract(HEDERA_CONTRACTS.AGENT_REGISTRY, HEDERA_AGENT_REGISTRY_ABI, provider);
     const isReg = await registryRead.isRegistered(address);
     if (!isReg) throw new Error("Your wallet has no registered agent to deactivate. Register first.");
     const agentBefore = await registryRead.getAgent(address);
 
-    const registryWrite = new ethers.Contract(CONTRACTS.AGENT_REGISTRY, AGENT_REGISTRY_ABI, signer);
+    const registryWrite = new ethers.Contract(HEDERA_CONTRACTS.AGENT_REGISTRY, HEDERA_AGENT_REGISTRY_ABI, signer);
     const tx = await registryWrite.deactivateAgent({ gasLimit: HEDERA_GAS_LIMIT, type: 0 });
     const receipt = await tx.wait();
     const elapsed = Math.round(performance.now() - start);
@@ -1468,7 +1468,7 @@ export async function executeCollectMultichain(): Promise<PlaygroundExecutionRes
     if (!walletAddr) throw new Error("Connect wallet to query multichain data.");
 
     const provider = getHederaTestnetProvider();
-    const registry = new ethers.Contract(CONTRACTS.AGENT_REGISTRY, AGENT_REGISTRY_ABI, provider);
+    const registry = new ethers.Contract(HEDERA_CONTRACTS.AGENT_REGISTRY, HEDERA_AGENT_REGISTRY_ABI, provider);
     const [balance, isReg, agentCount] = await Promise.all([
         getHbarBalance(walletAddr),
         registry.isRegistered(walletAddr).catch(() => false),
@@ -1500,7 +1500,7 @@ export async function executeComputeScore(): Promise<PlaygroundExecutionResult> 
     if (!walletAddr) throw new Error("Connect wallet to compute agent score.");
 
     const provider = getHederaTestnetProvider();
-    const registry = new ethers.Contract(CONTRACTS.AGENT_REGISTRY, AGENT_REGISTRY_ABI, provider);
+    const registry = new ethers.Contract(HEDERA_CONTRACTS.AGENT_REGISTRY, HEDERA_AGENT_REGISTRY_ABI, provider);
     const [balance, isReg, agentData] = await Promise.all([
         getHbarBalance(walletAddr),
         registry.isRegistered(walletAddr).catch(() => false),
@@ -1603,7 +1603,7 @@ export async function executeTriggerRiskPolicy(): Promise<PlaygroundExecutionRes
     if (walletAddr) {
         try {
             const provider = getHederaTestnetProvider();
-            const registry = new ethers.Contract(CONTRACTS.AGENT_REGISTRY, AGENT_REGISTRY_ABI, provider);
+            const registry = new ethers.Contract(HEDERA_CONTRACTS.AGENT_REGISTRY, HEDERA_AGENT_REGISTRY_ABI, provider);
             isReg = await registry.isRegistered(walletAddr);
             if (isReg) {
                 const data = await registry.getAgent(walletAddr);

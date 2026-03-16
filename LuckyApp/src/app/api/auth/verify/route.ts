@@ -61,11 +61,11 @@ export async function POST(req: Request) {
     }
 
     // Verify the SIWE signature
-    console.log("[auth/verify] Verifying SIWE signature...");
-    console.log("[auth/verify] Payload:", JSON.stringify(payload, null, 2));
-    console.log("[auth/verify] Signature:", signature);
+    if (process.env.NODE_ENV === "development") {
+      console.log("[auth/verify] Payload:", JSON.stringify(payload, null, 2));
+      console.log("[auth/verify] Signature:", signature);
+    }
     const domain = getDomainFromRequest(req);
-    console.log("[auth/verify] Domain:", domain);
     const auth = getThirdwebAuth(domain);
 
     let verifiedPayload;
@@ -83,7 +83,7 @@ export async function POST(req: Request) {
     if (!verifiedPayload.valid) {
       console.error("[auth/verify] Payload validation failed:", verifiedPayload.error);
       return Response.json(
-        { error: verifiedPayload.error || "Invalid signature" },
+        { error: "Invalid signature" },
         { status: 401 }
       );
     }
@@ -168,10 +168,9 @@ export async function POST(req: Request) {
       },
     });
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    console.error("[auth/verify] Unhandled error:", msg, err);
+    console.error("[auth/verify] Unhandled error:", err);
     return Response.json(
-      { error: `Authentication failed: ${msg}` },
+      { error: "Authentication failed" },
       { status: 500 }
     );
   }

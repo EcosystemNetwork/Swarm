@@ -16,9 +16,9 @@ declare global {
   }
 }
 import {
-  CONTRACTS,
-  TASK_BOARD_ABI,
-  AGENT_REGISTRY_ABI,
+  HEDERA_CONTRACTS,
+  HEDERA_TASK_BOARD_ABI,
+  HEDERA_AGENT_REGISTRY_ABI,
   HEDERA_GAS_LIMIT,
 } from "@/lib/swarm-contracts";
 
@@ -60,7 +60,7 @@ export function useSwarmWrite(): SwarmWrite {
     setState({ isLoading: true, error: null, txHash: null });
     try {
       const signer = await getSigner();
-      const board = new ethers.Contract(CONTRACTS.TASK_BOARD, TASK_BOARD_ABI, signer);
+      const board = new ethers.Contract(HEDERA_CONTRACTS.TASK_BOARD, HEDERA_TASK_BOARD_ABI, signer);
       const tx = await board.claimTask(taskId, { gasLimit: HEDERA_GAS_LIMIT, type: 0 });
       const receipt = await tx.wait();
       setState({ isLoading: false, error: null, txHash: receipt.hash });
@@ -76,7 +76,7 @@ export function useSwarmWrite(): SwarmWrite {
     setState({ isLoading: true, error: null, txHash: null });
     try {
       const signer = await getSigner();
-      const board = new ethers.Contract(CONTRACTS.TASK_BOARD, TASK_BOARD_ABI, signer);
+      const board = new ethers.Contract(HEDERA_CONTRACTS.TASK_BOARD, HEDERA_TASK_BOARD_ABI, signer);
       const tx = await board.submitDelivery(taskId, deliveryHash, { gasLimit: HEDERA_GAS_LIMIT, type: 0 });
       const receipt = await tx.wait();
       setState({ isLoading: false, error: null, txHash: receipt.hash });
@@ -102,7 +102,7 @@ export function useSwarmWrite(): SwarmWrite {
         throw new Error("Minimum budget is 100 HBAR");
       }
       const signer = await getSigner();
-      const board = new ethers.Contract(CONTRACTS.TASK_BOARD, TASK_BOARD_ABI, signer);
+      const board = new ethers.Contract(HEDERA_CONTRACTS.TASK_BOARD, HEDERA_TASK_BOARD_ABI, signer);
       const tx = await board.postTask(
         vaultAddress,
         title,
@@ -125,7 +125,7 @@ export function useSwarmWrite(): SwarmWrite {
     setState({ isLoading: true, error: null, txHash: null });
     try {
       const signer = await getSigner();
-      const registry = new ethers.Contract(CONTRACTS.AGENT_REGISTRY, AGENT_REGISTRY_ABI, signer);
+      const registry = new ethers.Contract(HEDERA_CONTRACTS.AGENT_REGISTRY, HEDERA_AGENT_REGISTRY_ABI, signer);
 
       // Use registerAgentFor if agentAddress is provided, otherwise use registerAgent (which uses msg.sender)
       const tx = agentAddress

@@ -163,17 +163,19 @@ export const HBAR_EXAMPLES: ModExample[] = [
         language: "typescript",
         tags: ["onchain", "tasks", "hedera"],
         codeSnippet: `import { ethers } from "ethers";
-import { CONTRACTS, TASK_BOARD_ABI } from "@/lib/swarm-contracts";
+import { HEDERA_CONTRACTS, HEDERA_TASK_BOARD_ABI } from "@/lib/swarm-contracts";
 
 const provider = new ethers.BrowserProvider(window.ethereum);
 const signer = await provider.getSigner();
-const taskBoard = new ethers.Contract(CONTRACTS.TASK_BOARD, TASK_BOARD_ABI, signer);
+const taskBoard = new ethers.Contract(
+  HEDERA_CONTRACTS.TASK_BOARD, HEDERA_TASK_BOARD_ABI, signer
+);
 
 const tx = await taskBoard.postTask(
-  CONTRACTS.BRAND_VAULT,      // vault address
-  "Market Analysis Report",    // title
-  "Analyze Q4 crypto trends",  // description
-  "research,analysis",         // required skills
+  HEDERA_CONTRACTS.BRAND_VAULT, // vault address
+  "Market Analysis Report",      // title
+  "Analyze Q4 crypto trends",    // description
+  "research,analysis",           // required skills
   Math.floor(Date.now() / 1000) + 7 * 86400, // 7-day deadline
   { value: ethers.parseEther("150"), gasLimit: 3_000_000, type: 0 }
 );
@@ -188,10 +190,12 @@ console.log("Task posted:", tx.hash);`,
         language: "typescript",
         tags: ["onchain", "treasury", "hedera"],
         codeSnippet: `import { ethers } from "ethers";
-import { CONTRACTS, TREASURY_ABI, toHbar } from "@/lib/swarm-contracts";
+import { HEDERA_CONTRACTS, HEDERA_TREASURY_ABI, toHbar } from "@/lib/swarm-contracts";
 
 const provider = new ethers.JsonRpcProvider("https://mainnet.hashio.io/api");
-const treasury = new ethers.Contract(CONTRACTS.AGENT_TREASURY, TREASURY_ABI, provider);
+const treasury = new ethers.Contract(
+  HEDERA_CONTRACTS.AGENT_TREASURY, HEDERA_TREASURY_ABI, provider
+);
 
 const [totalRevenue, computeBalance, growthBalance, reserveBalance] = await treasury.getPnL();
 

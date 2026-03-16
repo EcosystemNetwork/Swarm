@@ -76,7 +76,8 @@ export function OrgProvider({ children }: { children: ReactNode }) {
       setOrganizations(orgs);
 
       // Restore previously selected org
-      const savedOrgId = localStorage.getItem(ORG_STORAGE_KEY);
+      let savedOrgId: string | null = null;
+      try { savedOrgId = localStorage.getItem(ORG_STORAGE_KEY); } catch { /* private browsing */ }
       const savedOrg = orgs.find(o => o.id === savedOrgId);
 
       if (savedOrg) {
@@ -84,15 +85,15 @@ export function OrgProvider({ children }: { children: ReactNode }) {
       } else if (orgs.length === 1) {
         // Auto-select if only one org
         setCurrentOrg(orgs[0]);
-        localStorage.setItem(ORG_STORAGE_KEY, orgs[0].id);
+        try { localStorage.setItem(ORG_STORAGE_KEY, orgs[0].id); } catch { /* private browsing */ }
       } else if (orgs.length > 1) {
         // Multiple orgs - select first one as default
         setCurrentOrg(orgs[0]);
-        localStorage.setItem(ORG_STORAGE_KEY, orgs[0].id);
+        try { localStorage.setItem(ORG_STORAGE_KEY, orgs[0].id); } catch { /* private browsing */ }
       } else {
         // No orgs found
         setCurrentOrg(null);
-        localStorage.removeItem(ORG_STORAGE_KEY);
+        try { localStorage.removeItem(ORG_STORAGE_KEY); } catch { /* private browsing */ }
       }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Failed to load organizations';
@@ -116,7 +117,7 @@ export function OrgProvider({ children }: { children: ReactNode }) {
     const org = organizations.find(o => o.id === orgId);
     if (org) {
       setCurrentOrg(org);
-      localStorage.setItem(ORG_STORAGE_KEY, orgId);
+      try { localStorage.setItem(ORG_STORAGE_KEY, orgId); } catch { /* private browsing */ }
     }
   }, [organizations]);
 
@@ -145,7 +146,7 @@ export function OrgProvider({ children }: { children: ReactNode }) {
 
       if (newOrg) {
         setCurrentOrg(newOrg);
-        localStorage.setItem(ORG_STORAGE_KEY, orgId);
+        try { localStorage.setItem(ORG_STORAGE_KEY, orgId); } catch { /* private browsing */ }
       }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Failed to create organization';
