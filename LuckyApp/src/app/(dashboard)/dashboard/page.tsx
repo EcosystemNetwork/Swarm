@@ -18,7 +18,7 @@ import DecryptedText from "@/components/reactbits/DecryptedText";
 import { VitalsWidget } from "@/components/vitals-widget";
 import { useActiveAccount } from "thirdweb/react";
 import { useSession } from "@/contexts/SessionContext";
-import { GripVertical, RotateCcw, Plus, X, Check, FolderKanban, Bot, Target, CheckCircle2, Briefcase, ListTodo, BarChart3, Handshake, Users, Loader2, Pencil } from "lucide-react";
+import { GripVertical, RotateCcw, Plus, X, Check, FolderKanban, Bot, Target, CheckCircle2, Briefcase, ListTodo, BarChart3, Handshake, Users, Loader2, Pencil, Wifi, WifiOff, Zap, TrendingUp, Clock } from "lucide-react";
 import {
   getOrgStats,
   getTasksByOrg,
@@ -116,9 +116,9 @@ const jobStatusLabels: Record<string, string> = {
 /*  Persistence                                                        */
 /* ------------------------------------------------------------------ */
 
-const WIDGET_ORDER_KEY = "swarm-dashboard-widget-order-v4";
-const ACTIVE_WIDGETS_KEY = "swarm-dashboard-active-widgets-v4";
-const WIDGET_WIDTHS_KEY = "swarm-dashboard-widget-widths-v5";
+const WIDGET_ORDER_KEY = "swarm-dashboard-widget-order-v6";
+const ACTIVE_WIDGETS_KEY = "swarm-dashboard-active-widgets-v6";
+const WIDGET_WIDTHS_KEY = "swarm-dashboard-widget-widths-v7";
 
 function loadJSON<T>(key: string): T | null {
   if (typeof window === "undefined") return null;
@@ -173,6 +173,12 @@ const ALL_WIDGET_CATALOG: WidgetCatalogEntry[] = [
   { id: "stat-total-tasks", icon: "📊", label: "Total Tasks", description: "All tasks", colSpan: "", category: "stats" },
   { id: "stat-claimed-jobs", icon: "🤝", label: "Claimed Jobs", description: "Currently claimed jobs", colSpan: "", category: "stats" },
   { id: "stat-members", icon: "👥", label: "Members", description: "Registered org members", colSpan: "", category: "stats" },
+  { id: "stat-online-agents", icon: "📶", label: "Online Agents", description: "Currently online agents", colSpan: "", category: "stats" },
+  { id: "stat-busy-agents", icon: "⚡", label: "Busy Agents", description: "Agents currently working", colSpan: "", category: "stats" },
+  { id: "stat-offline-agents", icon: "📴", label: "Offline Agents", description: "Agents not connected", colSpan: "", category: "stats" },
+  { id: "stat-completion-rate", icon: "📈", label: "Done %", description: "Task completion percentage", colSpan: "", category: "stats" },
+  { id: "stat-closed-jobs", icon: "✅", label: "Closed Jobs", description: "Jobs completed and closed", colSpan: "", category: "stats" },
+  { id: "stat-total-jobs", icon: "💼", label: "Total Jobs", description: "All jobs ever posted", colSpan: "", category: "stats" },
   // Analytics
   { id: "widget-task-velocity", icon: "📊", label: "Task Velocity", description: "Task completion rate over time", colSpan: "lg:col-span-2", category: "analytics" },
   { id: "widget-cost-trend", icon: "💸", label: "Cost Trends", description: "Daily and weekly API cost analysis", colSpan: "lg:col-span-2", category: "analytics" },
@@ -199,38 +205,61 @@ const ALL_WIDGET_CATALOG: WidgetCatalogEntry[] = [
 ];
 
 const DEFAULT_ACTIVE_WIDGETS = [
-  // Core dashboard
+  // Row: briefing(3) + tasks(2) + stat(1) = 6
   "widget-daily-briefing",
   "widget-recent-tasks",
+  "stat-online-agents",
+
+  // Row: actions(2) + jobs(2) + org(2) = 6
   "widget-quick-actions",
   "widget-recent-jobs",
   "widget-org-info",
 
-  // Status & monitoring
+  // Stat rows: 12 x 1-col = 2 full rows of 6
+  "stat-projects",
+  "stat-agents",
+  "stat-active-tasks",
+  "stat-completed-tasks",
+  "stat-open-jobs",
+  "stat-todo-tasks",
+  "stat-total-tasks",
+  "stat-members",
+  "stat-busy-agents",
+  "stat-offline-agents",
+  "stat-completion-rate",
+  "stat-total-jobs",
+
+  // Status: 2+2+2 = 6
   "widget-agent-status",
   "widget-task-breakdown",
-  "widget-health-checks",
   "widget-system-vitals",
 
-  // Analytics
+  // Analytics: 2+2+2 = 6
   "widget-task-velocity",
   "widget-cost-trend",
   "widget-agent-workload",
-  "widget-activity-heatmap",
-  "widget-top-performers",
-  "widget-performance-metrics",
 
-  // Operations
+  // heatmap(3) + metrics(2) + stat(1) = 6
+  "widget-activity-heatmap",
+  "widget-performance-metrics",
+  "stat-claimed-jobs",
+
+  // Ops: 2+2+2 = 6
+  "widget-top-performers",
   "widget-alerts",
   "widget-capacity",
+
+  // Ops 2: 2+2+2 = 6
   "widget-deployments",
+  "widget-health-checks",
   "widget-rate-limits",
 
-  // Activity & logs
+  // feed(3) + audit(2) + stat(1) = 6
   "widget-activity-feed",
   "widget-audit-log",
+  "stat-closed-jobs",
 
-  // Integrations
+  // Integrations: 2+2+2 = 6
   "widget-llm-usage",
   "widget-agent-messages",
   "widget-agent-sessions",
@@ -740,8 +769,8 @@ export default function DashboardPage() {
       label: "Recent Tasks",
       colSpan: "lg:col-span-2",
       render: () => (
-        <SpotlightCard className="p-0 glass-card-enhanced h-full overflow-hidden">
-          <CardHeader className="flex flex-row items-center justify-between px-2 pt-2 pb-1">
+        <SpotlightCard className="p-0 glass-card-enhanced h-full overflow-hidden rounded-xl">
+          <CardHeader className="flex flex-row items-center gap-2 px-4 pt-3 pb-1.5">
             <CardTitle className="text-sm">
               📋 <DecryptedText text="Recent Tasks" speed={30} maxIterations={6} animateOn="view" sequential className="text-sm font-semibold" encryptedClassName="text-sm font-semibold text-amber-500/40" />
             </CardTitle>
@@ -749,7 +778,7 @@ export default function DashboardPage() {
               <ShinyText text="View all →" speed={3} color="#b5954a" shineColor="#FFD700" className="text-xs" />
             </Link>
           </CardHeader>
-          <CardContent className="space-y-0.5 px-2 pb-2">
+          <CardContent className="space-y-0.5 px-4 pb-3">
             {recentTasks.length === 0 ? (
               <div className="text-center py-4 text-muted-foreground">
                 <p>No tasks yet</p>
@@ -784,8 +813,8 @@ export default function DashboardPage() {
       label: "Recent Jobs",
       colSpan: "lg:col-span-2",
       render: () => (
-        <SpotlightCard className="p-0 glass-card-enhanced h-full overflow-hidden">
-          <CardHeader className="flex flex-row items-center justify-between px-2 pt-2 pb-1">
+        <SpotlightCard className="p-0 glass-card-enhanced h-full overflow-hidden rounded-xl">
+          <CardHeader className="flex flex-row items-center gap-2 px-4 pt-3 pb-1.5">
             <CardTitle className="text-sm">
               💼 <DecryptedText text="Recent Jobs" speed={30} maxIterations={6} animateOn="view" sequential className="text-sm font-semibold" encryptedClassName="text-sm font-semibold text-amber-500/40" />
             </CardTitle>
@@ -793,7 +822,7 @@ export default function DashboardPage() {
               <ShinyText text="View all →" speed={3} color="#b5954a" shineColor="#FFD700" className="text-xs" />
             </Link>
           </CardHeader>
-          <CardContent className="space-y-0.5 px-2 pb-2">
+          <CardContent className="space-y-0.5 px-4 pb-3">
             {recentJobs.length === 0 ? (
               <div className="text-center py-4 text-muted-foreground">
                 <p>No jobs posted yet</p>
@@ -829,28 +858,25 @@ export default function DashboardPage() {
       label: "Quick Actions",
       colSpan: "",
       render: () => (
-        <SpotlightCard className="p-0 glass-card-enhanced h-full overflow-hidden">
-          <CardHeader className="px-2 pt-2 pb-1">
+        <SpotlightCard className="p-0 glass-card-enhanced h-full overflow-hidden rounded-xl">
+          <CardHeader className="px-4 pt-3 pb-1.5">
             <CardTitle className="text-sm">
               ⚡ <DecryptedText text="Quick Actions" speed={30} maxIterations={6} animateOn="view" sequential className="text-sm font-semibold" encryptedClassName="text-sm font-semibold text-amber-500/40" />
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-1 px-2 pb-2">
-            <Button asChild className="w-full btn-glow" variant="outline">
-              <Link href="/swarms">📁 Create Project</Link>
-            </Button>
-            <Button asChild className="w-full btn-glow" variant="outline">
-              <Link href="/agents">🤖 Register Agent</Link>
-            </Button>
-            <Button asChild className="w-full btn-glow" variant="outline">
-              <Link href="/missions">📋 Create Task</Link>
-            </Button>
-            <Button asChild className="w-full btn-glow" variant="outline">
-              <Link href="/jobs">💼 Post Job</Link>
-            </Button>
-            <Button asChild className="w-full btn-glow" variant="outline">
-              <Link href="/chat">💬 Open Chat</Link>
-            </Button>
+          <CardContent className="space-y-1.5 px-4 pb-3">
+            {[
+              { href: "/swarms", icon: "📁", label: "Create Project", color: "hover:border-blue-500/30 hover:bg-blue-500/5" },
+              { href: "/agents", icon: "🤖", label: "Register Agent", color: "hover:border-emerald-500/30 hover:bg-emerald-500/5" },
+              { href: "/missions", icon: "📋", label: "Create Task", color: "hover:border-amber-500/30 hover:bg-amber-500/5" },
+              { href: "/jobs", icon: "💼", label: "Post Job", color: "hover:border-purple-500/30 hover:bg-purple-500/5" },
+              { href: "/chat", icon: "💬", label: "Open Chat", color: "hover:border-cyan-500/30 hover:bg-cyan-500/5" },
+            ].map(action => (
+              <Link key={action.href} href={action.href} className={`flex items-center gap-3 px-3 py-2 rounded-lg border border-border/50 text-sm transition-all duration-200 ${action.color}`}>
+                <span className="text-base">{action.icon}</span>
+                <span className="font-medium">{action.label}</span>
+              </Link>
+            ))}
           </CardContent>
         </SpotlightCard>
       ),
@@ -859,13 +885,13 @@ export default function DashboardPage() {
       label: "Organization",
       colSpan: "",
       render: () => (
-        <SpotlightCard className="p-0 glass-card-enhanced h-full overflow-hidden">
-          <CardHeader className="px-2 pt-2 pb-1">
+        <SpotlightCard className="p-0 glass-card-enhanced h-full overflow-hidden rounded-xl">
+          <CardHeader className="px-4 pt-3 pb-1.5">
             <CardTitle className="text-sm">
               🏢 <DecryptedText text="Organization" speed={30} maxIterations={6} animateOn="view" sequential className="text-sm font-semibold" encryptedClassName="text-sm font-semibold text-amber-500/40" />
             </CardTitle>
           </CardHeader>
-          <CardContent className="px-2 pb-2">
+          <CardContent className="px-4 pb-3">
             <div className="space-y-2">
               <div className="flex items-center gap-2">
                 {currentOrg?.logoUrl ? (
@@ -891,8 +917,8 @@ export default function DashboardPage() {
       label: "Activity Feed",
       colSpan: "lg:col-span-3",
       render: () => (
-        <SpotlightCard className="p-0 glass-card-enhanced h-full overflow-hidden">
-          <CardHeader className="flex flex-row items-center justify-between px-2 pt-2 pb-1">
+        <SpotlightCard className="p-0 glass-card-enhanced h-full overflow-hidden rounded-xl">
+          <CardHeader className="flex flex-row items-center gap-2 px-4 pt-3 pb-1.5">
             <CardTitle className="text-sm">
               📜 <DecryptedText text="Activity Feed" speed={30} maxIterations={6} animateOn="view" sequential className="text-sm font-semibold" encryptedClassName="text-sm font-semibold text-amber-500/40" />
             </CardTitle>
@@ -900,7 +926,7 @@ export default function DashboardPage() {
               <ShinyText text="View all →" speed={3} color="#b5954a" shineColor="#FFD700" className="text-xs" />
             </Link>
           </CardHeader>
-          <CardContent className="space-y-1 px-2 pb-2">
+          <CardContent className="space-y-1 px-4 pb-3">
             {activityFeed.length === 0 ? (
               <div className="text-center py-4 text-muted-foreground">
                 <p>No activity yet</p>
@@ -947,13 +973,13 @@ export default function DashboardPage() {
       render: () => {
         const total = agents.length;
         return (
-          <SpotlightCard className="p-0 glass-card-enhanced h-full overflow-hidden">
-            <CardHeader className="px-2 pt-2 pb-1">
+          <SpotlightCard className="p-0 glass-card-enhanced h-full overflow-hidden rounded-xl">
+            <CardHeader className="px-4 pt-3 pb-1.5">
               <CardTitle className="text-sm">
                 🟢 <DecryptedText text="Agent Status" speed={30} maxIterations={6} animateOn="view" sequential className="text-sm font-semibold" encryptedClassName="text-sm font-semibold text-amber-500/40" />
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-2 px-2 pb-2">
+            <CardContent className="space-y-2 px-4 pb-3">
               {total === 0 ? (
                 <div className="text-center py-4 text-muted-foreground">
                   <p>No agents registered</p>
@@ -1003,13 +1029,13 @@ export default function DashboardPage() {
         const total = todo + inProgress + done;
 
         return (
-          <SpotlightCard className="p-0 glass-card-enhanced h-full overflow-hidden">
-            <CardHeader className="px-2 pt-2 pb-1">
+          <SpotlightCard className="p-0 glass-card-enhanced h-full overflow-hidden rounded-xl">
+            <CardHeader className="px-4 pt-3 pb-1.5">
               <CardTitle className="text-sm">
                 📈 <DecryptedText text="Task Breakdown" speed={30} maxIterations={6} animateOn="view" sequential className="text-sm font-semibold" encryptedClassName="text-sm font-semibold text-amber-500/40" />
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-2 px-2 pb-2">
+            <CardContent className="space-y-2 px-4 pb-3">
               {total === 0 ? (
                 <div className="text-center py-4 text-muted-foreground">
                   <p>No tasks yet</p>
@@ -1097,11 +1123,11 @@ export default function DashboardPage() {
         const userAgent = agents.find(a => a.walletAddress === userAddress);
         if (!userAgent || !currentOrg) {
           return (
-            <SpotlightCard className="p-0 glass-card-enhanced h-full overflow-hidden">
-              <CardHeader className="px-2 pt-2 pb-1">
+            <SpotlightCard className="p-0 glass-card-enhanced h-full overflow-hidden rounded-xl">
+              <CardHeader className="px-4 pt-3 pb-1.5">
                 <CardTitle className="text-sm">💬 Agent Messages</CardTitle>
               </CardHeader>
-              <CardContent className="px-2 pb-2">
+              <CardContent className="px-4 pb-3">
                 <div className="text-center py-4 text-muted-foreground">
                   <p className="text-sm">Register as an agent to view messages</p>
                   <Button asChild variant="outline" size="sm" className="mt-2">
@@ -1122,11 +1148,11 @@ export default function DashboardPage() {
         const userAgent = agents.find(a => a.walletAddress === userAddress);
         if (!userAgent || !currentOrg) {
           return (
-            <SpotlightCard className="p-0 glass-card-enhanced h-full overflow-hidden">
-              <CardHeader className="px-2 pt-2 pb-1">
+            <SpotlightCard className="p-0 glass-card-enhanced h-full overflow-hidden rounded-xl">
+              <CardHeader className="px-4 pt-3 pb-1.5">
                 <CardTitle className="text-sm">🔄 Agent Sessions</CardTitle>
               </CardHeader>
-              <CardContent className="px-2 pb-2">
+              <CardContent className="px-4 pb-3">
                 <div className="text-center py-4 text-muted-foreground">
                   <p className="text-sm">Register as an agent to view sessions</p>
                   <Button asChild variant="outline" size="sm" className="mt-2">
@@ -1165,13 +1191,13 @@ export default function DashboardPage() {
           );
           const isEditing = !!briefingCronJob;
           return (
-            <SpotlightCard className="p-0 glass-card-enhanced h-full overflow-hidden">
-              <CardHeader className="px-2 pt-2 pb-1">
+            <SpotlightCard className="p-0 glass-card-enhanced h-full overflow-hidden rounded-xl">
+              <CardHeader className="px-4 pt-3 pb-1.5">
                 <CardTitle className="text-sm">
                   📋 <DecryptedText text={isEditing ? "Edit Briefing" : "Set Up Daily Briefing"} speed={30} maxIterations={6} animateOn="view" sequential className="text-sm font-semibold" encryptedClassName="text-sm font-semibold text-amber-500/40" />
                 </CardTitle>
               </CardHeader>
-              <CardContent className="px-2 pb-2 space-y-3">
+              <CardContent className="px-4 pb-3 space-y-3">
                 {/* Schedule picker */}
                 <div>
                   <p className="text-xs text-muted-foreground mb-1.5">Schedule</p>
@@ -1274,13 +1300,13 @@ export default function DashboardPage() {
         // ─── Unconfigured: no cron job exists ───
         if (!briefingCronJob) {
           return (
-            <SpotlightCard className="p-0 glass-card-enhanced h-full overflow-hidden">
-              <CardHeader className="px-2 pt-2 pb-1">
+            <SpotlightCard className="p-0 glass-card-enhanced h-full overflow-hidden rounded-xl">
+              <CardHeader className="px-4 pt-3 pb-1.5">
                 <CardTitle className="text-sm">
                   📋 <DecryptedText text="Daily Briefing" speed={30} maxIterations={6} animateOn="view" sequential className="text-sm font-semibold" encryptedClassName="text-sm font-semibold text-amber-500/40" />
                 </CardTitle>
               </CardHeader>
-              <CardContent className="px-2 pb-2">
+              <CardContent className="px-4 pb-3">
                 <div className="text-center py-4 space-y-2">
                   <div className="text-4xl opacity-30">📋</div>
                   <p className="text-sm text-muted-foreground">Daily briefings are not configured</p>
@@ -1322,28 +1348,26 @@ export default function DashboardPage() {
         }
 
         return (
-          <SpotlightCard className="p-0 glass-card-enhanced h-full overflow-hidden">
-            <CardHeader className="flex flex-row items-center justify-between px-2 pt-2 pb-1">
+          <SpotlightCard className="p-0 glass-card-enhanced h-full overflow-hidden rounded-xl">
+            <CardHeader className="flex flex-row items-center gap-2 px-4 pt-3 pb-1.5">
               <CardTitle className="text-sm">
                 📋 <DecryptedText text="Daily Briefing" speed={30} maxIterations={6} animateOn="view" sequential className="text-sm font-semibold" encryptedClassName="text-sm font-semibold text-amber-500/40" />
               </CardTitle>
-              <div className="flex items-center gap-2">
-                <Badge variant="outline" className="text-[9px] px-1.5 py-0 bg-amber-500/10 border-amber-500/20 text-amber-400">
-                  {scheduleLabel}
-                </Badge>
-                <button
-                  onClick={openBriefingEditor}
-                  className="p-1 rounded hover:bg-muted/50 text-muted-foreground hover:text-foreground transition-colors"
-                  title="Edit briefing settings"
-                >
-                  <Pencil className="h-3 w-3" />
-                </button>
-                <Link href="/summaries" className="text-xs">
-                  <ShinyText text="View All →" speed={3} color="#b5954a" shineColor="#FFD700" className="text-xs" />
-                </Link>
-              </div>
+              <Link href="/summaries" className="text-xs">
+                <ShinyText text="View All →" speed={3} color="#b5954a" shineColor="#FFD700" className="text-xs" />
+              </Link>
+              <Badge variant="outline" className="text-[9px] px-1.5 py-0 bg-amber-500/10 border-amber-500/20 text-amber-400">
+                {scheduleLabel}
+              </Badge>
+              <button
+                onClick={openBriefingEditor}
+                className="p-1 rounded hover:bg-muted/50 text-muted-foreground hover:text-foreground transition-colors"
+                title="Edit briefing settings"
+              >
+                <Pencil className="h-3 w-3" />
+              </button>
             </CardHeader>
-            <CardContent className="px-2 pb-2 space-y-2">
+            <CardContent className="px-4 pb-3 space-y-2">
               {/* Agent badge */}
               {briefingAgent ? (
                 <div className="flex items-center gap-3 p-3 rounded-lg bg-amber-500/5 border border-amber-500/10">
@@ -1459,6 +1483,12 @@ export default function DashboardPage() {
     "stat-total-tasks": { label: "Total Tasks", colSpan: "", render: () => <StatCard title="Total Tasks" value={String(stats?.taskCount || 0)} icon={BarChart3} changeLabel="all tasks" change={0} /> },
     "stat-claimed-jobs": { label: "Claimed Jobs", colSpan: "", render: () => <StatCard title="Claimed Jobs" value={String(stats?.claimedJobs || 0)} icon={Handshake} changeLabel="jobs in progress" change={0} /> },
     "stat-members": { label: "Members", colSpan: "", render: () => <StatCard title="Members" value={String(currentOrg?.members.length || 0)} icon={Users} changeLabel="org members" change={0} /> },
+    "stat-online-agents": { label: "Online", colSpan: "", render: () => <StatCard title="Online" value={String(onlineAgents.length)} icon={Wifi} changeLabel="agents online" change={0} /> },
+    "stat-busy-agents": { label: "Busy", colSpan: "", render: () => <StatCard title="Busy" value={String(busyAgents.length)} icon={Zap} changeLabel="agents working" change={0} /> },
+    "stat-offline-agents": { label: "Offline", colSpan: "", render: () => <StatCard title="Offline" value={String(offlineAgents.length)} icon={WifiOff} changeLabel="agents idle" change={0} /> },
+    "stat-completion-rate": { label: "Done %", colSpan: "", render: () => <StatCard title="Done %" value={`${stats?.taskCount ? Math.round(((stats.completedTasks || 0) / stats.taskCount) * 100) : 0}%`} icon={TrendingUp} changeLabel="completion rate" change={0} /> },
+    "stat-closed-jobs": { label: "Closed Jobs", colSpan: "", render: () => <StatCard title="Closed Jobs" value={String(stats?.closedJobs || 0)} icon={CheckCircle2} changeLabel="jobs done" change={0} /> },
+    "stat-total-jobs": { label: "Total Jobs", colSpan: "", render: () => <StatCard title="Total Jobs" value={String(stats?.jobCount || 0)} icon={Briefcase} changeLabel="all jobs" change={0} /> },
 
     // Analytics Widgets
     "widget-task-velocity": {
@@ -1485,11 +1515,11 @@ export default function DashboardPage() {
       label: "Performance Metrics",
       colSpan: "lg:col-span-2",
       render: () => (
-        <SpotlightCard className="p-0 glass-card-enhanced h-full overflow-hidden">
-          <CardHeader className="px-2 pt-2 pb-1">
+        <SpotlightCard className="p-0 glass-card-enhanced h-full overflow-hidden rounded-xl">
+          <CardHeader className="px-4 pt-3 pb-1.5">
             <CardTitle className="text-sm">⚡ Performance Metrics</CardTitle>
           </CardHeader>
-          <CardContent className="px-2 pb-2">
+          <CardContent className="px-4 pb-3">
             <div className="space-y-3">
               <div className="flex items-center justify-between p-2 rounded bg-muted/30">
                 <span className="text-xs text-muted-foreground">Avg Response Time</span>
@@ -1522,11 +1552,11 @@ export default function DashboardPage() {
           .slice(0, 5);
 
         return (
-          <SpotlightCard className="p-0 glass-card-enhanced h-full overflow-hidden">
-            <CardHeader className="px-2 pt-2 pb-1">
+          <SpotlightCard className="p-0 glass-card-enhanced h-full overflow-hidden rounded-xl">
+            <CardHeader className="px-4 pt-3 pb-1.5">
               <CardTitle className="text-sm">🏆 Top Performers</CardTitle>
             </CardHeader>
-            <CardContent className="px-2 pb-2">
+            <CardContent className="px-4 pb-3">
               {sortedAgents.length === 0 ? (
                 <div className="text-center py-4 text-muted-foreground text-xs">No completed tasks yet</div>
               ) : (
@@ -1555,11 +1585,11 @@ export default function DashboardPage() {
         const totalTasks = allTasks.length;
         const doneRate = totalTasks > 0 ? ((doneTasks / totalTasks) * 100) : 0;
         return (
-          <SpotlightCard className="p-0 glass-card-enhanced h-full overflow-hidden">
-            <CardHeader className="px-2 pt-2 pb-1">
+          <SpotlightCard className="p-0 glass-card-enhanced h-full overflow-hidden rounded-xl">
+            <CardHeader className="px-4 pt-3 pb-1.5">
               <CardTitle className="text-sm">⚠️ Task Progress</CardTitle>
             </CardHeader>
-            <CardContent className="px-2 pb-2">
+            <CardContent className="px-4 pb-3">
               <div className="space-y-2">
                 <div className="text-center">
                   <div className="text-3xl font-bold text-emerald-400">{doneRate.toFixed(0)}%</div>
@@ -1593,11 +1623,11 @@ export default function DashboardPage() {
         const todoTasks = allTasks.filter(t => t.status === "todo");
         const inProgress = allTasks.filter(t => t.status === "in_progress");
         return (
-          <SpotlightCard className="p-0 glass-card-enhanced h-full overflow-hidden">
-            <CardHeader className="px-2 pt-2 pb-1">
+          <SpotlightCard className="p-0 glass-card-enhanced h-full overflow-hidden rounded-xl">
+            <CardHeader className="px-4 pt-3 pb-1.5">
               <CardTitle className="text-sm">⏱️ Task Status</CardTitle>
             </CardHeader>
-            <CardContent className="px-2 pb-2">
+            <CardContent className="px-4 pb-3">
               <div className="space-y-2">
                 <div className="text-center">
                   <div className="text-3xl font-bold text-blue-400">{doneTasks.length}</div>
@@ -1634,11 +1664,11 @@ export default function DashboardPage() {
         if (inProgressCount > agents.filter(a => a.status === "online" || a.status === "busy").length) alerts.push({ id: 3, severity: "info", message: `${inProgressCount} task${inProgressCount > 1 ? "s" : ""} in progress` });
 
         return (
-          <SpotlightCard className="p-0 glass-card-enhanced h-full overflow-hidden">
-            <CardHeader className="px-2 pt-2 pb-1">
+          <SpotlightCard className="p-0 glass-card-enhanced h-full overflow-hidden rounded-xl">
+            <CardHeader className="px-4 pt-3 pb-1.5">
               <CardTitle className="text-sm">🚨 Alert Center</CardTitle>
             </CardHeader>
-            <CardContent className="px-2 pb-2">
+            <CardContent className="px-4 pb-3">
               {alerts.length === 0 ? (
                 <div className="text-center py-4 text-muted-foreground text-xs">No active alerts</div>
               ) : (
@@ -1671,11 +1701,11 @@ export default function DashboardPage() {
         const onlineAgents = agents.filter(a => a.status === "online" || a.status === "busy").length;
         const onlinePct = Math.round((onlineAgents / totalAgents) * 100);
         return (
-          <SpotlightCard className="p-0 glass-card-enhanced h-full overflow-hidden">
-            <CardHeader className="px-2 pt-2 pb-1">
+          <SpotlightCard className="p-0 glass-card-enhanced h-full overflow-hidden rounded-xl">
+            <CardHeader className="px-4 pt-3 pb-1.5">
               <CardTitle className="text-sm">📈 Capacity Planning</CardTitle>
             </CardHeader>
-            <CardContent className="px-2 pb-2">
+            <CardContent className="px-4 pb-3">
               <div className="space-y-3">
                 <div>
                   <div className="flex justify-between text-xs mb-1">
@@ -1717,11 +1747,11 @@ export default function DashboardPage() {
         const recentAgents = agents.slice(0, 3);
 
         return (
-          <SpotlightCard className="p-0 glass-card-enhanced h-full overflow-hidden">
-            <CardHeader className="px-2 pt-2 pb-1">
+          <SpotlightCard className="p-0 glass-card-enhanced h-full overflow-hidden rounded-xl">
+            <CardHeader className="px-4 pt-3 pb-1.5">
               <CardTitle className="text-sm">🚀 Active Agents</CardTitle>
             </CardHeader>
-            <CardContent className="px-2 pb-2">
+            <CardContent className="px-4 pb-3">
               {recentAgents.length === 0 ? (
                 <div className="text-center py-4 text-muted-foreground text-xs">No agents deployed</div>
               ) : (
@@ -1760,11 +1790,11 @@ export default function DashboardPage() {
         ];
 
         return (
-          <SpotlightCard className="p-0 glass-card-enhanced h-full overflow-hidden">
-            <CardHeader className="px-2 pt-2 pb-1">
+          <SpotlightCard className="p-0 glass-card-enhanced h-full overflow-hidden rounded-xl">
+            <CardHeader className="px-4 pt-3 pb-1.5">
               <CardTitle className="text-sm">❤️ Agent Health</CardTitle>
             </CardHeader>
-            <CardContent className="px-2 pb-2">
+            <CardContent className="px-4 pb-3">
               <div className="space-y-2">
                 {healthItems.map((item, i) => (
                   <div key={i} className="flex items-center justify-between text-xs">
@@ -1790,11 +1820,11 @@ export default function DashboardPage() {
         const doneTasks = allTasks.filter(t => t.status === "done").length;
         const completionRate = totalTasks > 0 ? Math.round((doneTasks / totalTasks) * 100) : 0;
         return (
-          <SpotlightCard className="p-0 glass-card-enhanced h-full overflow-hidden">
-            <CardHeader className="px-2 pt-2 pb-1">
+          <SpotlightCard className="p-0 glass-card-enhanced h-full overflow-hidden rounded-xl">
+            <CardHeader className="px-4 pt-3 pb-1.5">
               <CardTitle className="text-sm">📊 Resource Usage</CardTitle>
             </CardHeader>
-            <CardContent className="px-2 pb-2">
+            <CardContent className="px-4 pb-3">
               <div className="space-y-3">
                 <div>
                   <div className="flex justify-between text-xs mb-1">
@@ -1836,14 +1866,14 @@ export default function DashboardPage() {
         const auditEvents = activityFeed.slice(0, 5);
 
         return (
-          <SpotlightCard className="p-0 glass-card-enhanced h-full overflow-hidden">
-            <CardHeader className="flex flex-row items-center justify-between px-2 pt-2 pb-1">
+          <SpotlightCard className="p-0 glass-card-enhanced h-full overflow-hidden rounded-xl">
+            <CardHeader className="flex flex-row items-center gap-2 px-4 pt-3 pb-1.5">
               <CardTitle className="text-sm">📝 Audit Log</CardTitle>
               <Link href="/activity" className="text-xs">
                 <ShinyText text="View all →" speed={3} color="#b5954a" shineColor="#FFD700" className="text-xs" />
               </Link>
             </CardHeader>
-            <CardContent className="px-2 pb-2">
+            <CardContent className="px-4 pb-3">
               {auditEvents.length === 0 ? (
                 <div className="text-center py-4 text-muted-foreground text-xs">No audit events</div>
               ) : (
@@ -1881,10 +1911,10 @@ export default function DashboardPage() {
 
   if (!currentOrg) {
     return (
-      <div className="space-y-1">
-        <div>
-          <h1 className="text-xl font-bold tracking-tight leading-tight">Dashboard</h1>
-          <p className="text-muted-foreground text-xs">No organization selected</p>
+      <div className="space-y-4">
+        <div className="relative overflow-hidden rounded-xl border border-border/50 bg-gradient-to-br from-muted/30 via-transparent to-muted/20 px-6 py-5">
+          <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">No organization selected</p>
         </div>
       </div>
     );
@@ -1892,24 +1922,25 @@ export default function DashboardPage() {
 
   if (loading) {
     return (
-      <div className="space-y-1">
-        <div>
-          <h1 className="text-xl font-bold tracking-tight leading-tight">{greeting}</h1>
-          <p className="text-muted-foreground text-xs">{currentOrg.name}</p>
+      <div className="space-y-4">
+        {/* Hero skeleton */}
+        <div className="relative overflow-hidden rounded-xl border border-amber-500/10 bg-gradient-to-br from-amber-500/5 via-transparent to-orange-500/5 px-6 py-5">
+          <div className="space-y-2">
+            <div className="h-7 w-48 rounded-lg skeleton-shimmer" />
+            <div className="h-4 w-32 rounded-md skeleton-shimmer" />
+          </div>
         </div>
-        {/* Skeleton grid matching widget layout */}
-        <div className="grid gap-0.5 grid-cols-2 md:grid-cols-4 lg:grid-cols-6 grid-flow-row-dense auto-rows-auto">
-          {/* Briefing skeleton — 3 cols */}
-          <div className="col-span-2 md:col-span-3 lg:col-span-3 h-40 rounded-lg bg-muted/30 animate-pulse" />
-          {/* 6 stat card skeletons */}
+        {/* Widget grid skeleton */}
+        <div className="grid gap-2 grid-cols-2 md:grid-cols-4 lg:grid-cols-6 grid-flow-row-dense auto-rows-auto">
+          <div className="col-span-2 md:col-span-3 lg:col-span-3 h-40 rounded-xl skeleton-shimmer" />
+          <div className="col-span-2 md:col-span-2 lg:col-span-2 h-40 rounded-xl skeleton-shimmer" style={{ animationDelay: '0.1s' }} />
+          <div className="col-span-1 md:col-span-1 lg:col-span-1 h-40 rounded-xl skeleton-shimmer" style={{ animationDelay: '0.15s' }} />
           {Array.from({ length: 6 }, (_, i) => (
-            <div key={`sk-stat-${i}`} className="col-span-1 md:col-span-2 lg:col-span-1 h-24 rounded-lg bg-muted/30 animate-pulse" />
+            <div key={`sk-stat-${i}`} className="col-span-1 md:col-span-1 lg:col-span-1 h-20 rounded-xl skeleton-shimmer" style={{ animationDelay: `${0.2 + i * 0.06}s` }} />
           ))}
-          {/* 2 panel skeletons — 2 cols each */}
-          <div className="col-span-2 md:col-span-2 lg:col-span-2 h-52 rounded-lg bg-muted/30 animate-pulse" />
-          <div className="col-span-2 md:col-span-2 lg:col-span-1 h-52 rounded-lg bg-muted/30 animate-pulse" />
-          <div className="col-span-2 md:col-span-2 lg:col-span-2 h-52 rounded-lg bg-muted/30 animate-pulse" />
-          <div className="col-span-2 md:col-span-2 lg:col-span-1 h-52 rounded-lg bg-muted/30 animate-pulse" />
+          <div className="col-span-2 md:col-span-2 lg:col-span-2 h-44 rounded-xl skeleton-shimmer" style={{ animationDelay: '0.6s' }} />
+          <div className="col-span-2 md:col-span-2 lg:col-span-2 h-44 rounded-xl skeleton-shimmer" style={{ animationDelay: '0.7s' }} />
+          <div className="col-span-2 md:col-span-2 lg:col-span-2 h-44 rounded-xl skeleton-shimmer" style={{ animationDelay: '0.8s' }} />
         </div>
       </div>
     );
@@ -1917,22 +1948,22 @@ export default function DashboardPage() {
 
   if (error) {
     return (
-      <div className="space-y-1">
-        <div>
-          <h1 className="text-xl font-bold tracking-tight leading-tight">{greeting}</h1>
-          <p className="text-muted-foreground text-xs">{currentOrg.name}</p>
+      <div className="space-y-4">
+        <div className="relative overflow-hidden rounded-xl border border-red-500/10 bg-gradient-to-br from-red-500/5 via-transparent to-orange-500/5 px-6 py-5">
+          <h1 className="text-2xl font-bold tracking-tight">{greeting}</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">{currentOrg.name}</p>
         </div>
-        <div className="flex items-center justify-center py-8">
+        <div className="flex items-center justify-center py-16">
           <div className="text-center max-w-sm">
-            <div className="p-3 rounded-full bg-red-500/10 inline-flex mb-4">
+            <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-red-500/10 border border-red-500/20 mb-4">
               <X className="h-6 w-6 text-red-400" />
             </div>
             <h2 className="text-lg font-semibold mb-1">Failed to load dashboard</h2>
-            <p className="text-sm text-muted-foreground mb-4">{error}</p>
+            <p className="text-sm text-muted-foreground mb-6">{error}</p>
             <Button
               onClick={() => loadDashboardData(true)}
               variant="outline"
-              className="gap-2"
+              className="gap-2 border-amber-500/20 hover:border-amber-500/40"
             >
               <RotateCcw className="h-3.5 w-3.5" />
               Try again
@@ -1952,31 +1983,40 @@ export default function DashboardPage() {
   /* ── Render ── */
 
   return (
-    <div className="space-y-0.5">
-      {/* Dashboard header */}
-      <div className="flex items-center justify-between mb-1">
-        <div>
-          <h1 className="text-lg font-bold tracking-tight leading-tight">{greeting}</h1>
-          <p className="text-muted-foreground text-[10px]">{currentOrg.name}</p>
-        </div>
-        <div className="flex items-center gap-3">
-          {lastUpdated && (
-            <span className="text-[10px] text-muted-foreground/60 tabular-nums">
-              Updated {formatRelativeTime(lastUpdated)}
-            </span>
-          )}
-          {dashTab === "overview" && (
-            <div className="flex items-center gap-2">
-              {isCustomized && (
-                <Button variant="ghost" size="sm" onClick={resetLayout} className="text-muted-foreground hover:text-foreground gap-1.5">
-                  <RotateCcw className="w-3.5 h-3.5" /> Reset
-                </Button>
+    <div className="space-y-2">
+      {/* Dashboard hero header */}
+      <div className="relative overflow-hidden rounded-xl border border-amber-500/10 bg-gradient-to-br from-amber-500/5 via-transparent to-orange-500/5 dark:from-amber-500/[0.07] dark:to-orange-500/[0.04] px-5 py-3.5">
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_rgba(255,215,0,0.08),transparent_60%)] pointer-events-none" />
+        <div className="relative flex items-center justify-between">
+          <div>
+            <h1 className="text-xl font-bold tracking-tight text-glow-gold">{greeting}</h1>
+            <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-2">
+              {currentOrg.name}
+              {lastUpdated && (
+                <>
+                  <span className="text-muted-foreground/30">·</span>
+                  <span className="text-xs text-muted-foreground/50 tabular-nums flex items-center gap-1.5">
+                    <span className="relative flex h-1.5 w-1.5"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" /><span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500" /></span>
+                    Updated {formatRelativeTime(lastUpdated)}
+                  </span>
+                </>
               )}
-              <Button variant="outline" size="sm" onClick={() => setShowCatalog(true)} className="gap-1.5">
-                <Plus className="w-3.5 h-3.5" /> Widgets
-              </Button>
-            </div>
-          )}
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            {dashTab === "overview" && (
+              <>
+                {isCustomized && (
+                  <Button variant="ghost" size="sm" onClick={resetLayout} className="text-muted-foreground hover:text-foreground gap-1.5 h-8">
+                    <RotateCcw className="w-3.5 h-3.5" /> Reset
+                  </Button>
+                )}
+                <Button variant="outline" size="sm" onClick={() => setShowCatalog(true)} className="gap-1.5 h-8 border-amber-500/20 hover:border-amber-500/40 hover:bg-amber-500/5">
+                  <Plus className="w-3.5 h-3.5" /> Widgets
+                </Button>
+              </>
+            )}
+          </div>
         </div>
       </div>
 
@@ -1986,12 +2026,12 @@ export default function DashboardPage() {
           <TabsTrigger value="swarm">Agent Map</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="overview" className="mt-0">
+        <TabsContent value="overview" className="mt-1.5">
           <div>
 
             {/* ═══ Draggable Main Widgets ═══ */}
             {widgetOrder.length > 0 && (
-              <div className="grid gap-0.5 grid-cols-2 md:grid-cols-4 lg:grid-cols-6 grid-flow-row-dense auto-rows-auto">
+              <div className="grid gap-2 grid-cols-2 md:grid-cols-4 lg:grid-cols-6 grid-flow-row-dense auto-rows-auto">
                 {widgetOrder.map((id, index) => {
                   const widget = widgetRenderers[id];
                   if (!widget) return null;
@@ -2000,12 +2040,12 @@ export default function DashboardPage() {
 
                   const isStatCard = id.startsWith("stat-");
 
-                  // Determine columns in a 6-col grid
+                  // Determine columns in a 6-col grid (1:1 with catalog colSpan)
                   let defaultCols = isStatCard ? 1 : 2;
                   const maxCols = isStatCard ? 2 : 6;
 
-                  if (widget.colSpan.includes("col-span-2")) { defaultCols = 3; }
-                  if (widget.colSpan.includes("col-span-3")) { defaultCols = 6; }
+                  if (widget.colSpan.includes("col-span-2")) { defaultCols = 2; }
+                  if (widget.colSpan.includes("col-span-3")) { defaultCols = 3; }
 
                   const effectiveCols = widgetWidths[id] || defaultCols;
                   const spanClass = getColSpanClass(effectiveCols, isStatCard);
@@ -2013,34 +2053,34 @@ export default function DashboardPage() {
                   return (
                     <motion.div
                       key={id}
-                      initial={{ opacity: 0, y: 30 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.6, delay: 0.2 + index * 0.1, ease: "easeOut" }}
+                      initial={{ opacity: 0, y: 20, scale: 0.97 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      transition={{ duration: 0.4, delay: Math.min(index * 0.04, 0.6), ease: [0.25, 0.46, 0.45, 0.94] }}
                       draggable
                       onDragStart={(e) => onWidgetDragStart(e as unknown as DragEvent, id)}
                       onDragOver={(e) => onWidgetDragOver(e as unknown as DragEvent, id)}
                       onDrop={(e) => onWidgetDrop(e as unknown as DragEvent, id)}
                       onDragEnd={onWidgetDragEnd}
                       onDragLeave={() => setDropTargetWidget(null)}
-                      className={`relative group cursor-grab active:cursor-grabbing transition-all duration-200 overflow-hidden rounded-lg ${spanClass} ${isDragging ? "opacity-40 scale-[0.98] z-50" : ""
-                        } ${isDropTarget ? "ring-2 ring-amber-500 ring-offset-0" : ""}`}
+                      className={`relative group cursor-grab active:cursor-grabbing transition-all duration-200 overflow-hidden rounded-xl ${spanClass} ${isDragging ? "opacity-40 scale-[0.96] z-50 rotate-1" : ""
+                        } ${isDropTarget ? "ring-2 ring-amber-500/60 ring-offset-2 ring-offset-background" : ""}`}
                     >
-                      <div className="absolute top-3 right-3 z-10 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className="absolute top-2.5 right-2.5 z-10 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200 bg-background/80 backdrop-blur-sm rounded-md px-1 py-0.5">
                         <button
                           onClick={(e) => { e.stopPropagation(); cycleWidgetWidth(id, defaultCols, maxCols); }}
-                          className="p-0.5 rounded hover:bg-amber-500/20 text-muted-foreground hover:text-amber-400 transition-colors"
+                          className="p-1 rounded hover:bg-amber-500/20 text-muted-foreground hover:text-amber-400 transition-colors"
                           title={`Resize Widget (1-${maxCols} Columns)`}
                         >
-                          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" /></svg>
+                          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" /></svg>
                         </button>
                         <button
                           onClick={(e) => { e.stopPropagation(); removeWidget(id); }}
-                          className="p-0.5 rounded hover:bg-red-500/20 text-muted-foreground hover:text-red-400 transition-colors"
+                          className="p-1 rounded hover:bg-red-500/20 text-muted-foreground hover:text-red-400 transition-colors"
                           title="Remove widget"
                         >
-                          <X className="w-3.5 h-3.5" />
+                          <X className="w-3 h-3" />
                         </button>
-                        <GripVertical className="w-4 h-4 text-muted-foreground/60" />
+                        <GripVertical className="w-3.5 h-3.5 text-muted-foreground/40" />
                       </div>
                       {widget.render()}
                     </motion.div>
@@ -2051,11 +2091,13 @@ export default function DashboardPage() {
 
             {/* Empty state */}
             {widgetOrder.length === 0 && (
-              <div className="text-center py-8 text-muted-foreground">
-                <div className="text-5xl mb-4">📊</div>
-                <p className="text-lg font-medium mb-2">No widgets on your dashboard</p>
-                <p className="text-sm mb-4">Add some widgets to customize your view</p>
-                <Button onClick={() => setShowCatalog(true)} className="bg-amber-600 hover:bg-amber-700 text-black gap-1.5">
+              <div className="text-center py-16 text-muted-foreground">
+                <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-amber-500/10 border border-amber-500/20 mb-4">
+                  <BarChart3 className="w-8 h-8 text-amber-500/60" />
+                </div>
+                <p className="text-lg font-medium mb-1">No widgets on your dashboard</p>
+                <p className="text-sm text-muted-foreground/60 mb-6">Add some widgets to customize your command center</p>
+                <Button onClick={() => setShowCatalog(true)} className="bg-amber-600 hover:bg-amber-700 text-black gap-2 px-6">
                   <Plus className="w-4 h-4" />
                   Add Widgets
                 </Button>
@@ -2095,16 +2137,30 @@ export default function DashboardPage() {
       <Dialog open={showCatalog} onOpenChange={setShowCatalog}>
         <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Widget Catalog</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <Plus className="w-4 h-4 text-amber-500" />
+              Widget Catalog
+            </DialogTitle>
+            <p className="text-xs text-muted-foreground">Toggle widgets to customize your dashboard</p>
           </DialogHeader>
 
           <div className="space-y-6 pt-2">
             {(["widgets", "stats", "analytics", "operations", "integrations"] as const).map((cat) => {
-              const label = { widgets: "Widgets", stats: "Stat Cards", analytics: "Analytics", operations: "Operations", integrations: "Integrations" }[cat];
+              const config = {
+                widgets: { label: "Widgets", accent: "border-l-amber-500" },
+                stats: { label: "Stat Cards", accent: "border-l-blue-500" },
+                analytics: { label: "Analytics", accent: "border-l-emerald-500" },
+                operations: { label: "Operations", accent: "border-l-red-500" },
+                integrations: { label: "Integrations", accent: "border-l-purple-500" },
+              }[cat];
               const items = ALL_WIDGET_CATALOG.filter(e => e.category === cat);
+              const activeCount = items.filter(e => activeWidgetIds.includes(e.id)).length;
               return (
                 <div key={cat}>
-                  <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">{label}</h3>
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{config.label}</h3>
+                    <span className="text-[10px] text-muted-foreground/50 tabular-nums">{activeCount}/{items.length} active</span>
+                  </div>
                   <div className="space-y-1">
                     {items.map((entry) => {
                       const isActive = activeWidgetIds.includes(entry.id);
@@ -2112,19 +2168,19 @@ export default function DashboardPage() {
                         <button
                           key={entry.id}
                           onClick={() => toggleWidget(entry.id)}
-                          className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors ${isActive
-                            ? "bg-amber-500/10 text-foreground"
-                            : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                          className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all duration-200 border-l-2 ${isActive
+                            ? `bg-amber-500/10 text-foreground ${config.accent}`
+                            : "border-l-transparent text-muted-foreground hover:bg-muted/50 hover:text-foreground"
                             }`}
                         >
                           <span className="text-base shrink-0">{entry.icon}</span>
                           <div className="flex-1 text-left">
                             <p className="font-medium">{entry.label}</p>
-                            <p className="text-xs text-muted-foreground">{entry.description}</p>
+                            <p className="text-xs text-muted-foreground/70">{entry.description}</p>
                           </div>
-                          {isActive && (
-                            <Check className="w-4 h-4 text-amber-500 shrink-0" />
-                          )}
+                          <div className={`w-5 h-5 rounded-md border flex items-center justify-center transition-colors ${isActive ? "bg-amber-500 border-amber-500" : "border-border"}`}>
+                            {isActive && <Check className="w-3 h-3 text-black" />}
+                          </div>
                         </button>
                       );
                     })}

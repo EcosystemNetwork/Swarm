@@ -499,6 +499,7 @@ body {
   background: rgba(255, 255, 255, 0.8);
   border-color: rgba(255, 215, 0, 0.3);
   box-shadow: 0 8px 32px rgba(255, 215, 0, 0.06), 0 0 20px rgba(255, 215, 0, 0.03);
+  transform: translateY(-1px);
 }
 
 .dark .glass-card-enhanced {
@@ -508,8 +509,39 @@ body {
 
 .dark .glass-card-enhanced:hover {
   background: rgba(255, 255, 255, 0.04);
-  border-color: rgba(255, 215, 0, 0.2);
-  box-shadow: 0 8px 32px rgba(255, 215, 0, 0.08), 0 0 20px rgba(255, 215, 0, 0.05);
+  border-color: rgba(255, 215, 0, 0.25);
+  box-shadow: 0 8px 32px rgba(255, 215, 0, 0.1), 0 0 0 1px rgba(255, 215, 0, 0.05);
+  transform: translateY(-1px);
+}
+
+/* Skeleton shimmer loading effect */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.skeleton-shimmer {
+  background: linear-gradient(
+    90deg,
+    hsl(var(--muted) / 0.3) 0%,
+    hsl(var(--muted) / 0.5) 20%,
+    hsl(var(--muted) / 0.3) 40%,
+    hsl(var(--muted) / 0.3) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.8s ease-in-out infinite;
+}
+
+.dark .skeleton-shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 215, 0, 0.03) 0%,
+    rgba(255, 215, 0, 0.08) 20%,
+    rgba(255, 215, 0, 0.03) 40%,
+    rgba(255, 215, 0, 0.03) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.8s ease-in-out infinite;
 }
 
 /* Ambient floating orbs */

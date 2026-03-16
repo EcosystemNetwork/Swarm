@@ -23,8 +23,8 @@ export function StatCard({ title, value, icon: IconOrEmoji, change, changeLabel,
   const isNumeric = !isNaN(numericValue) && isFinite(numericValue);
 
   return (
-    <div className="gradient-border-spin overflow-hidden rounded-lg">
-      <SpotlightCard className="p-2.5">
+    <div className="gradient-border-spin overflow-hidden rounded-xl h-full">
+      <SpotlightCard className="p-3 h-full">
         <div className="flex items-center justify-between mb-0.5">
           <DecryptedText
             text={title}
