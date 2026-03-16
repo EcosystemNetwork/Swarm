@@ -14,9 +14,19 @@ const CONTROLLER_ICONS: Record<string, React.ReactNode> = {
 };
 
 export function SessionTimeline({ sessions }: SessionTimelineProps) {
+  // Firestore timestamps arrive as Timestamp objects with .toDate(); coerce to native Date
+  const toDate = (v: Date | { toDate(): Date } | null | undefined): Date | null => {
+    if (!v) return null;
+    if (typeof (v as { toDate?: unknown }).toDate === "function") return (v as { toDate(): Date }).toDate();
+    if (v instanceof Date) return v;
+    return new Date(v as unknown as string | number);
+  };
+
   const formatDuration = (start: Date | null, end: Date | null) => {
-    if (!start) return "—";
-    const ms = (end?.getTime() || Date.now()) - start.getTime();
+    const s = toDate(start);
+    if (!s) return "—";
+    const e = toDate(end);
+    const ms = (e?.getTime() || Date.now()) - s.getTime();
     const mins = Math.floor(ms / 60000);
     if (mins < 60) return `${mins}m`;
     const hrs = Math.floor(mins / 60);
@@ -24,8 +34,9 @@ export function SessionTimeline({ sessions }: SessionTimelineProps) {
   };
 
   const formatDate = (d: Date | null) => {
-    if (!d) return "—";
-    return d.toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+    const nd = toDate(d);
+    if (!nd) return "—";
+    return nd.toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
   };
 
   if (sessions.length === 0) {

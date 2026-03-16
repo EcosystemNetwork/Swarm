@@ -68,8 +68,18 @@ const COLLECTIONS = {
 // ═══════════════════════════════════════════════════════════════
 
 function toDate(val: unknown): Date | null {
+  if (!val) return null;
   if (val instanceof Timestamp) return val.toDate();
   if (val instanceof Date) return val;
+  // Duck-type Firestore Timestamp (instanceof can fail across bundle boundaries)
+  if (typeof val === "object" && typeof (val as { toDate?: unknown }).toDate === "function") {
+    return (val as { toDate(): Date }).toDate();
+  }
+  // Handle numeric timestamps or ISO strings
+  if (typeof val === "number" || typeof val === "string") {
+    const d = new Date(val);
+    if (!isNaN(d.getTime())) return d;
+  }
   return null;
 }
 
