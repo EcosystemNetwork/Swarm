@@ -13,6 +13,7 @@
     "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
+    "@aws-sdk/client-bedrock-runtime": "^3.1010.0",
     "@aws-sdk/client-ec2": "^3.1010.0",
     "@aws-sdk/client-ssm": "^3.1010.0",
     "@azure/arm-compute": "^23.3.0",
@@ -20,6 +21,7 @@
     "@azure/identity": "^4.13.0",
     "@e2b/desktop": "^2.2.2",
     "@google-cloud/compute": "^6.8.0",
+    "@google/genai": "^1.45.0",
     "@gsap/react": "^2.1.2",
     "@metaplex-foundation/mpl-token-metadata": "^3.4.0",
     "@metaplex-foundation/umi": "^1.5.1",

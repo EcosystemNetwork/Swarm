@@ -15,7 +15,7 @@ import {
   Map, FileText, ChevronLeft, ChevronRight, ChevronDown, GripVertical,
   Command, Coins, Stethoscope, Brain, UserCog, Network, HardDrive, BookOpen, Store, Building2,
   Link as LinkIcon, Zap, Palette, Megaphone, Wrench, Plug, Puzzle, Sparkles,
-  Monitor, Globe, Code as CodeIcon,
+  Monitor, Globe, Code as CodeIcon, Bot,
 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
@@ -31,6 +31,7 @@ const ICON_MAP: Record<string, typeof LayoutDashboard> = {
   Plug: Plug,
   Puzzle: Puzzle,
   Sparkles: Sparkles,
+  Bot: Bot,
 };
 
 /** Default icon per item type for mods without explicit sidebarConfig */
