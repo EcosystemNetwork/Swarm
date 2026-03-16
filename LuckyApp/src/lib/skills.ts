@@ -472,7 +472,7 @@ export const SKILL_REGISTRY: Skill[] = [
     {
         id: "solana-web3",
         name: "Solana",
-        description: "Solana dashboard — wallet connectivity, SPL token operations, staking, and program interactions. UI manifest with tool definitions; on-chain programs not yet deployed.",
+        description: "Solana dashboard — deterministic agent wallets, SOL balance queries, and Devnet RPC integration. Mod manifest with tool definitions for the Solana dashboard page.",
         type: "mod",
         source: "verified",
         category: "Web3",
@@ -492,7 +492,7 @@ export const SKILL_REGISTRY: Skill[] = [
     {
         id: "metaplex-nft",
         name: "Metaplex",
-        description: "Metaplex NFT dashboard — minting, collections, and metadata management on Solana. UI manifest with tool definitions; Candy Machine programs not yet deployed.",
+        description: "Metaplex NFT dashboard — agent identity NFT minting, org collections, and metadata updates on Solana Devnet via mpl-token-metadata. Mod manifest with tool definitions for the Metaplex dashboard tab.",
         type: "mod",
         source: "verified",
         category: "Web3",

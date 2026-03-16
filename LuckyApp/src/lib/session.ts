@@ -158,15 +158,6 @@ export async function setSessionCookie(token: string): Promise<void> {
   const jar = await cookies();
   const isProduction = isProd();
 
-  console.log("[session] Setting cookie:", {
-    name: SESSION_COOKIE,
-    httpOnly: true,
-    secure: isProduction,
-    sameSite: "lax",
-    maxAge: SESSION_MAX_AGE,
-    tokenLength: token.length
-  });
-
   jar.set(SESSION_COOKIE, token, {
     httpOnly: true,
     secure: isProduction,
@@ -174,8 +165,6 @@ export async function setSessionCookie(token: string): Promise<void> {
     path: "/",
     maxAge: SESSION_MAX_AGE,
   });
-
-  console.log("[session] ✅ Cookie set successfully");
 }
 
 export async function clearSessionCookie(): Promise<void> {
@@ -187,21 +176,11 @@ export async function getSessionFromCookie(): Promise<SessionPayload | null> {
   const jar = await cookies();
   const cookie = jar.get(SESSION_COOKIE);
 
-  console.log("[session] Reading cookie:", {
-    name: SESSION_COOKIE,
-    found: !!cookie?.value,
-    valueLength: cookie?.value?.length || 0
-  });
-
   if (!cookie?.value) {
-    console.log("[session] ❌ No cookie found");
     return null;
   }
 
-  const payload = await verifySessionJWT(cookie.value);
-  console.log("[session] JWT verification:", payload ? "✅ Valid" : "❌ Invalid");
-
-  return payload;
+  return verifySessionJWT(cookie.value);
 }
 
 // ─── Convenience: full session validation ───────────────

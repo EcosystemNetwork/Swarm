@@ -4,7 +4,7 @@
 
 [![Live Demo](https://img.shields.io/badge/demo-swarmprotocol.ai-amber)](https://swarmprotocol.ai)
 [![Hub](https://img.shields.io/badge/hub-hub.swarmprotocol.ai-green)](https://hub.swarmprotocol.ai/health)
-[![Security](https://img.shields.io/badge/security-100%25%20hardened-brightgreen)](HARDENING.md)
+[![Security](https://img.shields.io/badge/security-hardened-brightgreen)](HARDENING.md)
 
 ## 🆕 What's New (March 2026)
 
@@ -44,7 +44,7 @@
 - ✅ **Real-Time Notifications** — Multi-channel delivery via WebSocket + Agent Hub + persistent inbox
 - ✅ **Cross-Org Protection** — Prevents privilege escalation attacks with org-level isolation
 
-**Security Hardening Complete (100%)**
+**Security Hardening**
 - ✅ **AES-256-GCM Secrets Vault** — Encrypt API keys, tokens, and credentials with PBKDF2 key derivation (100,000 iterations)
 - ✅ **Multi-Platform Messaging** — Bridge Telegram, Discord, and Slack with encrypted bot credentials and webhook verification
 - ✅ **Webhook Signature Verification** — Ed25519 for Discord, HMAC-SHA256 for Slack/GitHub/Stripe, timing-safe for Telegram
@@ -65,7 +65,7 @@ Built for solo founders, startups, and teams who need to command multiple AI age
 
 ## Current Status
 
-> Active development. **Production-ready security (100% hardened)** with AES-256-GCM encryption, Ed25519 signatures, and comprehensive webhook verification.
+> Active development. Security hardening applied across auth, webhook verification, and encryption layers. Some components (nonce tracking, REST rate limiting) remain in-memory/prototype-grade — see [HARDENING.md](HARDENING.md) for details.
 
 | Feature | Status | Notes |
 |---------|--------|-------|
@@ -91,21 +91,21 @@ Built for solo founders, startups, and teams who need to command multiple AI age
 | **Chainlink Price Feeds** | Shipped | Real on-chain oracle reads (ETH/USD, BTC/USD, etc.) |
 | **On-chain Agent Identity (ASN)** | Shipped | Unique Agent Social Numbers on Sepolia |
 | **On-chain Credit/Trust Scores** | Shipped | Written to Sepolia contracts via real transactions |
-| **Solana Agent Wallets** | Shipped | Deterministic per-agent Solana keypairs (SHA-256 derived), idempotent generation |
-| **Metaplex NFT Identity** | Shipped | Mint agent identity NFTs on Solana Devnet with dynamic metadata, collection membership, and on-chain updates |
-| **Metaplex Collections** | Shipped | Org-level NFT collections, verified collection membership for agent NFTs |
-| **Solana Treasury Dashboard** | Shipped | Live SOL balance, token accounts, staked SOL from Devnet RPC |
+| **Solana Agent Wallets** | Shipped (Devnet) | Deterministic per-agent Solana keypairs (SHA-256 derived), idempotent generation |
+| **Metaplex NFT Identity** | Shipped (Devnet) | Mint agent identity NFTs on Solana Devnet via mpl-token-metadata with dynamic metadata and on-chain updates |
+| **Metaplex Collections** | Shipped (Devnet) | Org-level NFT collections, verified collection membership for agent NFTs |
+| **Solana Treasury Dashboard** | Shipped (Devnet) | Live SOL balance, token accounts, staked SOL from Devnet RPC |
 | **NFT Gallery & Bulk Ops** | Shipped | Visual NFT grid, bulk wallet generation, bulk minting with progress tracking |
 | **SwarmCare Bittensor Subnet** | Shipped | Decentralized AI training for elderly care coordination. Miners train models, validators score quality, best models deploy to Swarm. |
 | **Wallet Auth (SIWE)** | Shipped | Sign-In With Ethereum via Thirdweb v5 with cryptographic signature verification; supports MetaMask, Coinbase, Rainbow, Rabby, Phantom, in-app wallets |
 | **Swarm Workflow Builder** | Beta | Visual drag-and-drop editor with React Flow; cost estimation UI ready, execution engine not yet wired |
 | **Multi-Platform Messaging** | Shipped | Telegram, Discord, Slack bridges with encrypted credentials and webhook verification |
 | **Secrets Vault** | Shipped | AES-256-GCM encryption for API keys and tokens with rate limiting |
-| **Security Hardening** | Shipped | 100% security audit completion with timing-safe comparisons and PBKDF2 key derivation |
+| **Security Hardening** | Shipped | Timing-safe comparisons, PBKDF2 key derivation, auth guards on all routes. Nonce/rate-limit stores are in-memory (see [HARDENING.md](HARDENING.md)). |
 | **Task Assignment System** | Shipped | Formal task delegation with accept/reject workflow, deadline tracking, capacity management, and work mode status |
 | **Swarm Protocol Slots** | Beta | Visual role assignment with hub notifications; no automated execution |
 | **Gateway Management** | Beta | CRUD + status tracking in Firestore; no remote agent deployment runtime |
-| **Marketplace Framework** | Partial | Full type system, install/uninstall API, ModManifest spec; registry is currently empty |
+| **Marketplace Framework** | Partial | Full type system, install/uninstall API, ModManifest spec. In-app catalog ships 6 official mods (Chainlink, HBAR, Solana, Metaplex, Bittensor, BrandMover) via static SKILL_REGISTRY. External community marketplace is empty. |
 | **Capability Resolver** | Partial | Code complete; waiting on marketplace content |
 | **Community Submissions** | Partial | Submission UI + approval queue exist; no review pipeline active |
 | **Chainlink CRE Workflow** | Partial | Workflow defined; simulation-ready, not deployed to production |
@@ -166,7 +166,7 @@ A runtime capability registration system for extending agent capabilities. The f
 - **Mod Detail Pages** — Click any marketplace item to see full feature breakdowns: tools, workflows, agent skills, code examples, and registered capabilities with permission scope badges
 - **Sidebar Modifications Section** — Installed mods appear in a dedicated sidebar section with accent-colored theming
 
-> **Current state:** The type system, API endpoints (install/uninstall/list/capabilities), and UI are complete. The `MOD_REGISTRY` and `CAPABILITY_REGISTRY` are empty — no mods are shipped yet. The Chainlink integration is defined as a mod manifest but not registered. This is infrastructure waiting for content.
+> **Current state:** The type system, API endpoints (install/uninstall/list/capabilities), and UI are complete. `MOD_REGISTRY` and `CAPABILITY_REGISTRY` are populated at startup from `SKILL_REGISTRY`, which ships 6 official mods (Chainlink, HBAR, Solana, Metaplex, Bittensor, BrandMover). These are static in-app catalog entries — a production marketplace with dynamic community submissions is not yet built.
 
 #### The Modification Specification
 
@@ -197,7 +197,7 @@ See [docs/creating-mods.md](docs/creating-mods.md) for the complete specificatio
 - **CORS Protection** — Origin whitelisting prevents unauthorized cross-origin requests
 - **Request Size Limits** — 1MB body size limit protects against DoS attacks
 - **Rate Limiting** — 60 messages/min per agent (configurable), max 5 connections/agent
-- **Nonce-based Replay Protection** — All signed requests include timestamped nonces
+- **Nonce-based Replay Protection** — All signed requests include timestamped nonces (in-memory store — not shared across instances)
 - **Firestore Fallback** — Automatic failover if Hub is unreachable
 - **Audit Logging** — All connections, auth attempts, and message routing logged
 
@@ -910,9 +910,9 @@ Swarm/
 
 ## Security
 
-🔒 **Production-Ready Security (100% Hardened)**
+🔒 **Security Hardening**
 
-Swarm has undergone comprehensive security hardening with enterprise-grade cryptography and defense-in-depth practices.
+Swarm has undergone security hardening across auth, encryption, and webhook verification. Cryptographic foundations are production-grade. Some operational components (nonce tracking, rate limiting) use in-memory stores suitable for single-instance deployment — see [HARDENING.md](HARDENING.md) for the full breakdown.
 
 ### Cryptography
 
@@ -944,7 +944,7 @@ Swarm has undergone comprehensive security hardening with enterprise-grade crypt
 | Protection | Implementation |
 |------------|---------------|
 | **Rate Limiting** | 60 messages/min/agent, 10 secret reveals/min/org |
-| **Replay Protection** | Timestamp-based nonces (5 min window) |
+| **Replay Protection** | Timestamp-based nonces (5 min window). In-memory only — single-instance. |
 | **Input Validation** | All API inputs validated with type checking and bounds |
 | **Error Handling** | Generic error messages prevent information leakage |
 | **Audit Logging** | All connections, auth failures, and message routing logged |
@@ -969,7 +969,7 @@ See [HARDENING.md](HARDENING.md) for the complete security audit and recommendat
 - **No built-in LLM** — Swarm is coordination infrastructure, not an AI runtime. Agents bring their own reasoning capabilities via OpenClaw or any LLM framework. The platform does not make LLM API calls.
 - **Agent coordination is human-managed** — Agents do not autonomously delegate tasks to each other or self-organize. Humans assign agents to projects, channels, and tasks. There is no automatic skill-based task routing.
 - **Swarm Protocol slots are notification-only** — Assigning an agent to a slot sends a message to the Agent Hub but does not trigger automated execution. The agent must independently act on its role.
-- **Marketplace is empty** — The mod/capability framework is complete but no mods are registered yet. The `MOD_REGISTRY` and `CAPABILITY_REGISTRY` are empty arrays.
+- **Marketplace is static** — The mod/capability framework is complete and ships 6 official mods via a static `SKILL_REGISTRY`. There is no dynamic community marketplace or external mod submission pipeline yet.
 - **No payment processing** — Pricing models are defined in the type system but no payment processor (Stripe, PayPal) is integrated. On-chain LINK/HBAR payments work via smart contracts for task bounties only.
 - **Gateway feature is registry-only** — You can register and track gateways, but there is no runtime for executing agents on remote gateways.
 - **Workflow builder is visual-only** — The drag-and-drop canvas works and validates node connections, but there is no execution engine to run workflows.

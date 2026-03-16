@@ -292,10 +292,10 @@ Firestore availability separately.
 **Mitigation:** All addresses normalized to lowercase before storage/comparison
 **Code:** `address.toLowerCase()` used consistently
 
-#### 6. ~~Debug Logging in Production~~ ✅ MITIGATED
-**Status:** `src/lib/debug.ts` utility created. Client-side hooks and session context
-use `debug.log()` (dev-only). Server-side auth routes still use `console.log` for
-operational visibility — acceptable for Next.js server logs.
+#### 6. ~~Debug Logging in Production~~ ✅ RESOLVED
+**Status:** Client-side hooks use `debug.log()` (dev-only). Server-side auth route
+(`auth/verify`) wraps payload/signature logging in `NODE_ENV === "development"`.
+`session.ts` cookie/JWT debug logging removed entirely.
 
 ---
 
@@ -383,13 +383,13 @@ npm run dev
 ## 🚀 Recommendations
 
 ### Immediate
-1. ✅ Keep debug logging in dev, remove in production
-2. ⏳ Add rate limiting to `/api/auth/verify`
+1. ✅ Debug logging gated to dev-only (auth/verify, session.ts)
+2. ✅ Rate limiting added to `/api/auth/verify` (10 req/min/IP, Firestore-backed)
 3. ⏳ Add metrics/monitoring for login success rate
 
 ### Short-term
-1. ⏳ Cache organization lookups to reduce Firestore queries
-2. ⏳ Add signature verification as optional security layer
+1. ✅ Organization lookups cached via `org-cache.ts` (5-minute in-memory TTL)
+2. ✅ SIWE signature verification enforced — `thirdwebAuth.verifyPayload()` is mandatory, not optional
 3. ⏳ Implement session refresh before 24h expiry
 
 ### Long-term

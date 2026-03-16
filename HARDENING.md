@@ -209,10 +209,35 @@ INTERNAL_SERVICE_SECRET=<strong-random-secret>   # For /api/cron-jobs and /api/w
 
 1. **No server-side wallet signature verification** — `x-wallet-address` header can be spoofed by direct API callers. Full fix requires ThirdWeb server-side sig verification or session tokens.
 2. **API keys stored in plaintext** — Agent API keys in Firestore not hashed. Firestore breach exposes all credentials.
-3. **In-memory nonce tracking** — `/api/v1/send` nonce Set doesn't persist across cold starts or instances.
-4. **`/api/usage` and `/api/live-feed`** — Read-only local filesystem access, no auth. Low risk but should be gated on public deployments.
-5. **`/api/v1/register` open to public orgs** — Intentional for swarm model, but anyone can add agents to public orgs.
-6. **GitHub callback state param** — orgId not HMAC-signed. Attacker with GitHub App flow knowledge could target different org.
+3. **In-memory nonce tracking** — `/api/v1/send` nonce Map doesn't persist across cold starts or instances.
+4. **`/api/v1/register` open to public orgs** — Intentional for swarm model, but anyone can add agents to public orgs.
+5. **GitHub callback state param** — orgId not HMAC-signed. Attacker with GitHub App flow knowledge could target different org.
+6. **IP spoofing via `x-forwarded-for`** — Rate limiter trusts proxy headers without a trusted proxy allowlist.
+
+---
+
+## Pass 3: Code Audit Fixes
+
+### Routes Fixed
+
+| Route | Fix | Severity |
+|---|---|---|
+| `POST /api/delegations` | Added `requirePlatformAdminOrOrgMember` auth guard | CRITICAL |
+| `POST /api/agents/[id]/pause` | Added `requirePlatformAdminOrOrgMember` auth guard | CRITICAL |
+| `POST /api/secrets/[id]/reveal` | Added `requirePlatformAdminOrOrgMember` auth guard | CRITICAL |
+| `POST /api/auth/verify` | Payload/signature logging now dev-only; generic error messages | HIGH |
+| `GET/POST /api/cron-jobs` | Localhost bypass now dev-only; prompt length/type validation; inbox size cap | MEDIUM |
+| `GET /api/live-feed` | Input validation: limit clamped 1-500, since validated non-negative | MEDIUM |
+
+### Other Fixes
+
+| File | Fix | Severity |
+|---|---|---|
+| `src/components/markdown-editor.tsx` | HTML entity escaping before `dangerouslySetInnerHTML` rendering (XSS) | HIGH |
+| `src/contexts/OrgContext.tsx` | try-catch on all localStorage calls for private browsing | LOW |
+| `src/lib/session.ts` | Removed debug-grade cookie/JWT logging | MEDIUM |
+| `src/middleware.ts` | Removed dev fallback SESSION_SECRET — now required in all environments | HIGH |
+| `src/lib/brandmover.ts` | Fixed truncated address in comment (39 → 40 hex chars) | INFO |
 
 ### Public vs Private Endpoint Policy
 

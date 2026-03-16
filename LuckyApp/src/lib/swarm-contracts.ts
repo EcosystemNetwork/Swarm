@@ -10,7 +10,6 @@
 
 import {
   getContracts,
-  toNative,
   getExplorerTxUrl,
   getExplorerContractUrl,
   shortAddress,
@@ -171,9 +170,9 @@ export const STATUS_CONFIG: Record<TaskStatus, { label: string; color: string; b
 // Helpers (backwards compat — wrap chain-aware functions from chains.ts)
 // ============================================================
 
-/** Convert tinybars to HBAR (backwards compat — use toNative from chains.ts for multi-chain) */
+/** Convert tinybars to HBAR (1 HBAR = 100,000,000 tinybars) */
 export function toHbar(tinybars: bigint | number): number {
-  return toNative(tinybars, 296); // Hedera testnet
+  return Number(tinybars) / 1e8;
 }
 
 /** Shorten an address (backwards compat) */
