@@ -59,6 +59,22 @@ export function SubmitMarketItemDialog({
     const [rentalUsage, setRentalUsage] = useState("");
     const [performanceShare, setPerformanceShare] = useState("");
     const [hirePerTask, setHirePerTask] = useState("");
+    // SOUL template fields (agent)
+    const [commStyle, setCommStyle] = useState("");
+    const [decisionMaking, setDecisionMaking] = useState("");
+    const [riskTolerance, setRiskTolerance] = useState("");
+    const [humor, setHumor] = useState("");
+    const [greeting, setGreeting] = useState("");
+    const [systemPrompt, setSystemPrompt] = useState("");
+    // Skin-specific fields
+    const [skinPrimary, setSkinPrimary] = useState("");
+    const [skinAccent, setSkinAccent] = useState("");
+    const [skinBg, setSkinBg] = useState("");
+    const [skinFeatures, setSkinFeatures] = useState("");
+    // Mod manifest fields
+    const [modTools, setModTools] = useState("");
+    const [modWorkflows, setModWorkflows] = useState("");
+    const [modAgentSkills, setModAgentSkills] = useState("");
 
     const resetForm = () => {
         setName("");
@@ -84,6 +100,19 @@ export function SubmitMarketItemDialog({
         setRentalUsage("");
         setPerformanceShare("");
         setHirePerTask("");
+        setCommStyle("");
+        setDecisionMaking("");
+        setRiskTolerance("");
+        setHumor("");
+        setGreeting("");
+        setSystemPrompt("");
+        setSkinPrimary("");
+        setSkinAccent("");
+        setSkinBg("");
+        setSkinFeatures("");
+        setModTools("");
+        setModWorkflows("");
+        setModAgentSkills("");
     };
 
     const handleSubmit = async () => {
@@ -110,6 +139,45 @@ export function SubmitMarketItemDialog({
                 if (hirePerTask) distributions.push("hire");
                 if (distributions.length === 0) distributions.push("config");
 
+                // Build soulTemplate from SOUL fields if any are set
+                const hasSoulFields = commStyle || decisionMaking || riskTolerance || humor || greeting || systemPrompt;
+                const personalityTraits = personality ? personality.split(",").map(p => p.trim()).filter(Boolean) : ["helpful"];
+                const soulTemplate: import("@/lib/soul").SOULConfig | undefined = hasSoulFields ? {
+                    version: "1.0",
+                    identity: {
+                        name: name.trim(),
+                        role: agentType || "General",
+                        purpose: persona || description.trim(),
+                    },
+                    personality: {
+                        traits: personalityTraits,
+                        communicationStyle: (commStyle || "casual") as "casual",
+                        emotionalRange: "balanced",
+                        humor: (humor || "subtle") as "subtle",
+                    },
+                    behavior: {
+                        decisionMaking: (decisionMaking || "collaborative") as "collaborative",
+                        riskTolerance: (riskTolerance || "moderate") as "moderate",
+                        learningStyle: "interactive",
+                        responseSpeed: "considered",
+                    },
+                    capabilities: {
+                        skills: personalityTraits,
+                    },
+                    ethics: {
+                        principles: ["Act in the user's best interest"],
+                        boundaries: ["Stay within defined scope"],
+                        priorities: ["Accuracy", "Helpfulness"],
+                    },
+                    interactions: {
+                        greetingStyle: greeting || `Hello! I'm ${name.trim()}.`,
+                        farewellStyle: "Goodbye! Feel free to reach out anytime.",
+                        errorHandling: "solution-focused",
+                        feedbackPreference: "adaptive",
+                    },
+                    ...(systemPrompt ? { customFields: { systemPrompt } } : {}),
+                } : undefined;
+
                 await publishAgentPackage({
                     slug: name.trim().toLowerCase().replace(/\s+/g, "-"),
                     name: name.trim(),
@@ -134,9 +202,11 @@ export function SubmitMarketItemDialog({
                         persona: persona || description.trim(),
                         personality: personality ? personality.split(",").map(p => p.trim()).filter(Boolean) : undefined,
                         rules: rules ? rules.split("\n").map(r => r.trim()).filter(Boolean) : undefined,
+                        systemPrompt: systemPrompt || undefined,
                     },
                     requiredSkills: [],
                     requiredKeys: requiredKeys.length > 0 ? requiredKeys : undefined,
+                    soulTemplate,
                     source: "community",
                     creatorRevShare: 0.85,
                 });
@@ -150,6 +220,23 @@ export function SubmitMarketItemDialog({
                     if (lifetimePrice) pricing.tiers.push({ plan: "lifetime", price: parseFloat(lifetimePrice), currency: "USD" });
                 }
 
+                // Build optional skin config
+                const skinConfig = type === "skin" && (skinPrimary || skinAccent || skinBg || skinFeatures) ? {
+                    colors: {
+                        ...(skinPrimary ? { primary: skinPrimary.trim() } : {}),
+                        ...(skinAccent ? { accent: skinAccent.trim() } : {}),
+                        ...(skinBg ? { background: skinBg.trim() } : {}),
+                    },
+                    features: skinFeatures ? skinFeatures.split("\n").map(f => f.trim()).filter(Boolean) : [],
+                } : undefined;
+
+                // Build optional mod manifest
+                const modManifest = type === "mod" && (modTools || modWorkflows || modAgentSkills) ? {
+                    tools: modTools ? modTools.split("\n").map(t => t.trim()).filter(Boolean) : [],
+                    workflows: modWorkflows ? modWorkflows.split("\n").map(w => w.trim()).filter(Boolean) : [],
+                    agentSkills: modAgentSkills ? modAgentSkills.split("\n").map(s => s.trim()).filter(Boolean) : [],
+                } : undefined;
+
                 await submitMarketItem({
                     name: name.trim(),
                     type: type as MarketItemType,
@@ -161,6 +248,8 @@ export function SubmitMarketItemDialog({
                     requiredKeys: requiredKeys.length > 0 ? requiredKeys : undefined,
                     pricing,
                     submittedBy: submitterAddress,
+                    skinConfig,
+                    modManifest,
                 });
             }
 
@@ -216,6 +305,7 @@ export function SubmitMarketItemDialog({
                                     <SelectItem value="mod">Mod</SelectItem>
                                     <SelectItem value="plugin">Plugin</SelectItem>
                                     <SelectItem value="skill">Skill</SelectItem>
+                                    <SelectItem value="skin">Skin</SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>
@@ -356,7 +446,167 @@ export function SubmitMarketItemDialog({
                                     className="h-8 text-sm w-24"
                                 />
                             </div>
-                            <p className="text-[10px] text-muted-foreground">Leave blank for fields you don't want to offer. Revenue split: Creator 85% / Platform 15% for sales, Creator 70% / Host 15% / Platform 15% for rentals.</p>
+                            <p className="text-[10px] text-muted-foreground">Leave blank for fields you don&apos;t want to offer. Revenue split: Creator 85% / Platform 15% for sales, Creator 70% / Host 15% / Platform 15% for rentals.</p>
+
+                            {/* SOUL Template */}
+                            <p className="text-xs font-medium text-purple-400 mt-2">SOUL Template</p>
+                            <div className="grid grid-cols-2 gap-2">
+                                <div>
+                                    <label className="text-[11px] font-medium mb-0.5 block text-muted-foreground">Communication Style</label>
+                                    <Select value={commStyle} onValueChange={setCommStyle}>
+                                        <SelectTrigger className="h-8 text-sm">
+                                            <SelectValue placeholder="Select style" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {["formal", "casual", "technical", "friendly", "direct"].map(s => (
+                                                <SelectItem key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <div>
+                                    <label className="text-[11px] font-medium mb-0.5 block text-muted-foreground">Decision Making</label>
+                                    <Select value={decisionMaking} onValueChange={setDecisionMaking}>
+                                        <SelectTrigger className="h-8 text-sm">
+                                            <SelectValue placeholder="Select approach" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {["data-driven", "intuitive", "collaborative", "autonomous"].map(s => (
+                                                <SelectItem key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <div>
+                                    <label className="text-[11px] font-medium mb-0.5 block text-muted-foreground">Risk Tolerance</label>
+                                    <Select value={riskTolerance} onValueChange={setRiskTolerance}>
+                                        <SelectTrigger className="h-8 text-sm">
+                                            <SelectValue placeholder="Select level" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {["conservative", "moderate", "aggressive"].map(s => (
+                                                <SelectItem key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <div>
+                                    <label className="text-[11px] font-medium mb-0.5 block text-muted-foreground">Humor</label>
+                                    <Select value={humor} onValueChange={setHumor}>
+                                        <SelectTrigger className="h-8 text-sm">
+                                            <SelectValue placeholder="Select level" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {["none", "subtle", "moderate", "witty"].map(s => (
+                                                <SelectItem key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                            </div>
+                            <div>
+                                <label className="text-[11px] font-medium mb-0.5 block text-muted-foreground">Greeting</label>
+                                <Input
+                                    placeholder="Hello! I'm ready to help you..."
+                                    value={greeting}
+                                    onChange={(e) => setGreeting(e.target.value)}
+                                    className="h-8 text-sm"
+                                />
+                            </div>
+                            <div>
+                                <label className="text-[11px] font-medium mb-0.5 block text-muted-foreground">System Prompt (optional)</label>
+                                <Textarea
+                                    placeholder="Custom system prompt for this persona..."
+                                    value={systemPrompt}
+                                    onChange={(e) => setSystemPrompt(e.target.value)}
+                                    rows={2}
+                                    className="text-sm"
+                                />
+                            </div>
+                            <p className="text-[10px] text-muted-foreground">These fields build the SOUL config that defines your agent&apos;s personality and behavior.</p>
+                        </div>
+                    )}
+
+                    {/* Skin-specific fields */}
+                    {type === "skin" && (
+                        <div className="space-y-3 p-3 rounded-lg border border-purple-500/20 bg-purple-500/5">
+                            <p className="text-xs font-medium text-purple-400">Skin Configuration</p>
+                            <div className="grid grid-cols-3 gap-2">
+                                <div>
+                                    <label className="text-[11px] font-medium mb-0.5 block text-muted-foreground">Primary Color</label>
+                                    <Input
+                                        placeholder="#6366f1"
+                                        value={skinPrimary}
+                                        onChange={(e) => setSkinPrimary(e.target.value)}
+                                        className="h-8 text-sm"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-[11px] font-medium mb-0.5 block text-muted-foreground">Accent Color</label>
+                                    <Input
+                                        placeholder="#22d3ee"
+                                        value={skinAccent}
+                                        onChange={(e) => setSkinAccent(e.target.value)}
+                                        className="h-8 text-sm"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-[11px] font-medium mb-0.5 block text-muted-foreground">Background</label>
+                                    <Input
+                                        placeholder="#0a0a0a"
+                                        value={skinBg}
+                                        onChange={(e) => setSkinBg(e.target.value)}
+                                        className="h-8 text-sm"
+                                    />
+                                </div>
+                            </div>
+                            <div>
+                                <label className="text-[11px] font-medium mb-0.5 block text-muted-foreground">Features</label>
+                                <Textarea
+                                    placeholder="One per line: gradient backgrounds, rounded corners, ..."
+                                    value={skinFeatures}
+                                    onChange={(e) => setSkinFeatures(e.target.value)}
+                                    rows={2}
+                                    className="text-sm"
+                                />
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Mod manifest fields */}
+                    {type === "mod" && (
+                        <div className="space-y-3 p-3 rounded-lg border border-amber-500/20 bg-amber-500/5">
+                            <p className="text-xs font-medium text-amber-400">Mod Manifest</p>
+                            <div>
+                                <label className="text-[11px] font-medium mb-0.5 block text-muted-foreground">Tools</label>
+                                <Textarea
+                                    placeholder="One per line: tool_name: description"
+                                    value={modTools}
+                                    onChange={(e) => setModTools(e.target.value)}
+                                    rows={2}
+                                    className="text-sm"
+                                />
+                            </div>
+                            <div>
+                                <label className="text-[11px] font-medium mb-0.5 block text-muted-foreground">Workflows</label>
+                                <Textarea
+                                    placeholder="One per line: workflow name"
+                                    value={modWorkflows}
+                                    onChange={(e) => setModWorkflows(e.target.value)}
+                                    rows={2}
+                                    className="text-sm"
+                                />
+                            </div>
+                            <div>
+                                <label className="text-[11px] font-medium mb-0.5 block text-muted-foreground">Agent Skills</label>
+                                <Textarea
+                                    placeholder="One per line: invocation: description"
+                                    value={modAgentSkills}
+                                    onChange={(e) => setModAgentSkills(e.target.value)}
+                                    rows={2}
+                                    className="text-sm"
+                                />
+                            </div>
                         </div>
                     )}
 

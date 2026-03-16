@@ -329,6 +329,8 @@ export interface AgentPackage {
     workflows?: AgentWorkflowDef[];
     policy?: AgentPolicyConfig;
     memory?: AgentMemoryConfig;
+    /** Full SOUL personality template — applied when user installs this persona */
+    soulTemplate?: import("./soul").SOULConfig;
     status: AgentListingStatus;
     source: MarketItemSource;
     publishedAt?: Date | null;
@@ -1084,6 +1086,7 @@ export interface CommunityMarketItem {
     id: string;
     name: string;
     description: string;
+    longDescription?: string;
     type: MarketItemType;
     category: string;
     icon: string;
@@ -1095,6 +1098,17 @@ export interface CommunityMarketItem {
     submittedByName?: string;
     submittedAt: Date | null;
     status: "pending" | "approved" | "rejected";
+    /** Skin theme config (type === "skin") */
+    skinConfig?: {
+        colors?: Record<string, string>;
+        features?: string[];
+    };
+    /** Simplified mod manifest entries (type === "mod") */
+    modManifest?: {
+        tools?: string[];
+        workflows?: string[];
+        agentSkills?: string[];
+    };
 }
 
 // ═══════════════════════════════════════════════════════════════

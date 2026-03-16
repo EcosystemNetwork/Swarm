@@ -37,6 +37,11 @@ import {
     DialogHeader,
     DialogTitle,
 } from "@/components/ui/dialog";
+import { type AgentPackage, getMarketplaceAgents } from "@/lib/skills";
+import { PERSONA_REGISTRY, PERSONA_CATEGORIES } from "@/lib/personas";
+import { PersonaCard } from "@/components/market/persona-card";
+import { PersonaDetailDialog } from "@/components/market/persona-detail-dialog";
+import { ApplyPersonaDialog } from "@/components/market/apply-persona-dialog";
 
 // ═══════════════════════════════════════════════════════════════
 // Tab Config
@@ -362,6 +367,9 @@ export default function MarketPage() {
     const [deletingId, setDeletingId] = useState<string | null>(null);
     const [orgAgents, setOrgAgents] = useState<Agent[]>([]);
     const [agentInstalls, setAgentInstalls] = useState<AgentInstall[]>([]);
+    const [selectedPersona, setSelectedPersona] = useState<AgentPackage | null>(null);
+    const [applyPersona, setApplyPersona] = useState<AgentPackage | null>(null);
+    const [marketplaceAgents, setMarketplaceAgents] = useState<AgentPackage[]>([]);
 
     const loadInventory = useCallback(async () => {
         if (!currentOrg) return;
@@ -425,27 +433,24 @@ export default function MarketPage() {
         }
     }, [currentOrg]);
 
+    const loadMarketplaceAgents = useCallback(async () => {
+        try {
+            const agents = await getMarketplaceAgents();
+            setMarketplaceAgents(agents);
+        } catch (err) {
+            console.error("Failed to load marketplace agents:", err);
+        }
+    }, []);
+
     useEffect(() => { loadInventory(); }, [loadInventory]);
     useEffect(() => { loadCommunityItems(); }, [loadCommunityItems]);
     useEffect(() => { loadUserSubmissions(); }, [loadUserSubmissions]);
     useEffect(() => { loadSubscriptions(); }, [loadSubscriptions]);
     useEffect(() => { loadOrgAgents(); }, [loadOrgAgents]);
     useEffect(() => { loadAgentInstalls(); }, [loadAgentInstalls]);
+    useEffect(() => { loadMarketplaceAgents(); }, [loadMarketplaceAgents]);
 
-    // Map agent type to market category
-    const agentTypeToCategory = (type: string): string => {
-        const map: Record<string, string> = {
-            Research: "Research", Trading: "Trading", Operations: "Operations",
-            Support: "Customer Support", Analytics: "Analytics", Scout: "Research",
-            Security: "Security", Creative: "Creative", Engineering: "Engineering",
-            DevOps: "Engineering", Marketing: "Operations", Finance: "Trading",
-            Data: "Analytics", Coordinator: "Operations", Legal: "Compliance",
-            Communication: "Customer Support",
-        };
-        return map[type] || "General";
-    };
-
-    // Merge community items + real agents with registry
+    // Merge community items with registry
     const allItems: Skill[] = useMemo(() => {
         const communitySkills: Skill[] = communityItems.map((c) => ({
             id: `community-${c.id}`,
@@ -462,25 +467,8 @@ export default function MarketPage() {
             pricing: c.pricing,
         }));
 
-        // Convert real Firestore agents into Skill entries for the Agents tab
-        const agentSkills: Skill[] = orgAgents.map((agent) => ({
-            id: `agent-${agent.id}`,
-            name: agent.name,
-            description: agent.description || `${agent.type} agent`,
-            type: "agent" as const,
-            source: "verified" as const,
-            category: agentTypeToCategory(agent.type),
-            icon: agent.avatarUrl || "🤖",
-            version: "1.0.0",
-            author: "Your Org",
-            tags: [agent.type.toLowerCase(), ...(agent.reportedSkills?.map(s => s.name.toLowerCase()) || [])],
-            pricing: { model: "free" as const },
-            // Stash the full agent for card rendering
-            _agent: agent,
-        } as Skill & { _agent: Agent }));
-
-        return [...SKILL_REGISTRY, ...communitySkills, ...agentSkills];
-    }, [communityItems, orgAgents]);
+        return [...SKILL_REGISTRY, ...communitySkills];
+    }, [communityItems]);
 
     const handleDeleteSubmission = async (docId: string) => {
         setDeletingId(docId);
@@ -632,8 +620,37 @@ export default function MarketPage() {
         return ["All", ...Array.from(merged).filter((c) => c !== "All").sort()];
     }, [activeType, allItems]);
 
+    // Persona marketplace — merge static registry with Firestore marketplace agents
+    const allPersonas = useMemo(() => {
+        return [...PERSONA_REGISTRY, ...marketplaceAgents];
+    }, [marketplaceAgents]);
+
+    // Filtered personas for the agents tab
+    const filteredPersonas = useMemo(() => {
+        let items = allPersonas;
+        if (debouncedSearch) {
+            const q = debouncedSearch.toLowerCase();
+            items = items.filter((p) =>
+                p.name.toLowerCase().includes(q) ||
+                p.description.toLowerCase().includes(q) ||
+                p.tags.some((t) => t.toLowerCase().includes(q)) ||
+                (p.identity.personality || []).some((t) => t.toLowerCase().includes(q))
+            );
+        }
+        if (category !== "All") {
+            items = items.filter((p) => {
+                const catLabel = p.category.charAt(0).toUpperCase() + p.category.slice(1);
+                return catLabel === category;
+            });
+        }
+        if (sourceFilter !== "all") {
+            items = items.filter((p) => p.source === sourceFilter);
+        }
+        return items;
+    }, [allPersonas, debouncedSearch, category, sourceFilter]);
+
     // Counts per tab
-    const agentCount = allItems.filter((s) => s.type === "agent").length;
+    const agentCount = allPersonas.length;
     const modCount = allItems.filter((s) => s.type === "mod").length;
     const pluginCount = allItems.filter((s) => s.type === "plugin").length;
     const skillCount = allItems.filter((s) => s.type === "skill").length;
@@ -692,8 +709,8 @@ export default function MarketPage() {
                 ))}
             </div>
 
-            {/* Search + Filters (hidden on bundles & submit tabs) */}
-            {tab !== "bundles" && tab !== "submit" && (
+            {/* Search + Filters (hidden on agents, bundles & submit tabs) */}
+            {tab !== "agents" && tab !== "bundles" && tab !== "submit" && (
                 <>
                     <div className="flex items-center gap-3 mb-4">
                         <div className="relative flex-1">
@@ -770,21 +787,6 @@ export default function MarketPage() {
                     ) : filteredItems.length > 0 ? (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                             {filteredItems.map((item) => {
-                                // Agent items use special card
-                                if (item.type === "agent" && item.id.startsWith("agent-")) {
-                                    const agent = (item as Skill & { _agent: Agent })._agent;
-                                    if (agent) {
-                                        return (
-                                            <AgentMarketCard
-                                                key={item.id}
-                                                agent={agent}
-                                                onViewAgent={() => {}}
-                                                busy={busyId === item.id}
-                                            />
-                                        );
-                                    }
-                                }
-
                                 // For community items, subscription key is the Firestore doc ID (strip "community-" prefix)
                                 const subKey = item.id.startsWith("community-") ? item.id.slice(10) : item.id;
                                 const sub = subscriptionMap.get(subKey);
@@ -803,19 +805,6 @@ export default function MarketPage() {
                                 );
                             })}
                         </div>
-                    ) : tab === "agents" && agentCount === 0 ? (
-                        <Card className="p-12 text-center bg-card border-border border-dashed">
-                            <Bot className="h-12 w-12 mx-auto text-muted-foreground/30 mb-4" />
-                            <h3 className="text-lg font-semibold mb-2">No agents yet</h3>
-                            <p className="text-sm text-muted-foreground mb-6">
-                                Register agents to your org to see them here. Agents get an ASN and are registered on-chain.
-                            </p>
-                            <Link href="/agents">
-                                <Button className="bg-cyan-600 hover:bg-cyan-700 text-white gap-2">
-                                    <Bot className="h-4 w-4" /> Go to Agents
-                                </Button>
-                            </Link>
-                        </Card>
                     ) : tab === "inventory" && inventory.length === 0 ? (
                         <Card className="p-12 text-center bg-card border-border border-dashed">
                             <Store className="h-12 w-12 mx-auto text-muted-foreground/30 mb-4" />
@@ -834,6 +823,94 @@ export default function MarketPage() {
                         </div>
                     )}
                 </>
+            )}
+
+            {/* Agents / Persona Marketplace Tab */}
+            {tab === "agents" && (
+                <div className="space-y-8">
+                    {/* Search + Filters for personas */}
+                    <div className="space-y-4">
+                        <div className="flex items-center gap-3">
+                            <div className="relative flex-1">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                <Input
+                                    placeholder="Search personas..."
+                                    value={search}
+                                    onChange={(e) => setSearch(e.target.value)}
+                                    className="pl-9"
+                                />
+                            </div>
+                            <div className="flex items-center gap-1 shrink-0">
+                                {(["all", "verified", "community"] as const).map((s) => (
+                                    <button
+                                        key={s}
+                                        onClick={() => setSourceFilter(s)}
+                                        className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all ${sourceFilter === s
+                                                ? "bg-purple-500/20 text-purple-400 border border-purple-500/30"
+                                                : "bg-muted/50 text-muted-foreground hover:bg-muted border border-transparent"
+                                            }`}
+                                    >
+                                        {s === "all" ? "All" : s === "verified" ? "Official" : "Community"}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Category chips */}
+                        <div className="flex items-center gap-1.5 overflow-x-auto">
+                            {PERSONA_CATEGORIES.map((cat) => (
+                                <button
+                                    key={cat}
+                                    onClick={() => setCategory(cat)}
+                                    className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all ${category === cat
+                                            ? "bg-purple-500/20 text-purple-400 border border-purple-500/30"
+                                            : "bg-muted/50 text-muted-foreground hover:bg-muted border border-transparent"
+                                        }`}
+                                >
+                                    {cat}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Persona Grid */}
+                    {filteredPersonas.length > 0 ? (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            {filteredPersonas.map((persona) => (
+                                <PersonaCard
+                                    key={persona.id}
+                                    persona={persona}
+                                    onSelect={setSelectedPersona}
+                                />
+                            ))}
+                        </div>
+                    ) : (
+                        <div className="text-center py-12 text-muted-foreground">
+                            <Search className="h-8 w-8 mx-auto mb-3 opacity-30" />
+                            <p>No personas match your search</p>
+                        </div>
+                    )}
+
+                    {/* Your Agents section */}
+                    {orgAgents.length > 0 && (
+                        <div className="space-y-4 pt-4 border-t border-border">
+                            <div className="flex items-center gap-2">
+                                <h2 className="text-lg font-semibold">Your Agents</h2>
+                                <Badge variant="outline" className="text-xs">{orgAgents.length}</Badge>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                {orgAgents.map((agent) => (
+                                    <AgentMarketCard
+                                        key={agent.id}
+                                        agent={agent}
+                                        onViewAgent={() => {}}
+                                        busy={false}
+                                    />
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                </div>
             )}
 
             {/* Submit Tab */}
@@ -1068,6 +1145,24 @@ export default function MarketPage() {
                     )}
                 </DialogContent>
             </Dialog>
+
+            {/* Persona Detail Dialog */}
+            <PersonaDetailDialog
+                open={!!selectedPersona}
+                onOpenChange={(open) => { if (!open) setSelectedPersona(null); }}
+                persona={selectedPersona}
+                onApply={(p) => { setSelectedPersona(null); setApplyPersona(p); }}
+            />
+
+            {/* Apply Persona to Agent Dialog */}
+            <ApplyPersonaDialog
+                open={!!applyPersona}
+                onOpenChange={(open) => { if (!open) setApplyPersona(null); }}
+                persona={applyPersona}
+                orgId={currentOrg?.id || ""}
+                installerAddress={userAddress}
+                onApplied={() => { setApplyPersona(null); loadOrgAgents(); loadAgentInstalls(); }}
+            />
         </div>
     );
 }

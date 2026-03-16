@@ -1,10 +1,12 @@
 /**
- * POST /api/v1/mods/review
+ * /api/v1/mods/review
  *
- * Admin review endpoint for community mod submissions.
- * Approves or rejects pending community market items.
+ * Admin review endpoint for community submissions and agent packages.
+ * Approves or rejects pending marketplace items.
  *
- * Body: { itemId, action: "approve" | "reject", reviewComment? }
+ * GET  ?status=pending&collection=community|agents
+ * POST { itemId, action: "approve" | "reject", collection?: "community" | "agents", reviewComment? }
+ *
  * Auth: Platform admin only
  */
 import { NextRequest } from "next/server";
@@ -12,8 +14,25 @@ import { doc, getDoc, updateDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { requirePlatformAdmin, unauthorized } from "@/lib/auth-guard";
 
+const COLLECTIONS = {
+    community: "communityMarketItems",
+    agents: "marketplaceAgents",
+} as const;
+
+type CollectionKey = keyof typeof COLLECTIONS;
+
+function resolveCollection(value: string | null): CollectionKey {
+    if (value === "agents") return "agents";
+    return "community";
+}
+
+/** Pending status field differs: community uses "pending", agents use "review" */
+function pendingStatus(col: CollectionKey): string {
+    return col === "agents" ? "review" : "pending";
+}
+
 /**
- * GET /api/v1/mods/review — List all pending community submissions
+ * GET /api/v1/mods/review — List pending submissions
  */
 export async function GET(req: NextRequest) {
     const admin = requirePlatformAdmin(req);
@@ -21,16 +40,17 @@ export async function GET(req: NextRequest) {
 
     const { getDocs, query, collection, where } = await import("firebase/firestore");
 
-    const status = req.nextUrl.searchParams.get("status") || "pending";
+    const col = resolveCollection(req.nextUrl.searchParams.get("collection"));
+    const status = req.nextUrl.searchParams.get("status") || pendingStatus(col);
 
     const q = query(
-        collection(db, "communityMarketItems"),
+        collection(db, COLLECTIONS[col]),
         where("status", "==", status),
     );
     const snap = await getDocs(q);
     const items = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
 
-    return Response.json({ count: items.length, items });
+    return Response.json({ collection: col, count: items.length, items });
 }
 
 /**
@@ -50,6 +70,7 @@ export async function POST(req: NextRequest) {
     const itemId = body.itemId as string | undefined;
     const action = body.action as string | undefined;
     const reviewComment = (body.reviewComment as string) || "";
+    const col = resolveCollection((body.collection as string) || null);
 
     if (!itemId || !action) {
         return Response.json(
@@ -65,7 +86,7 @@ export async function POST(req: NextRequest) {
         );
     }
 
-    const ref = doc(db, "communityMarketItems", itemId);
+    const ref = doc(db, COLLECTIONS[col], itemId);
     const snap = await getDoc(ref);
 
     if (!snap.exists()) {
@@ -73,7 +94,8 @@ export async function POST(req: NextRequest) {
     }
 
     const current = snap.data();
-    if (current.status !== "pending") {
+    const expectedPending = pendingStatus(col);
+    if (current.status !== expectedPending) {
         return Response.json(
             { error: `Submission already ${current.status}` },
             { status: 409 },
@@ -90,6 +112,7 @@ export async function POST(req: NextRequest) {
 
     return Response.json({
         reviewed: true,
+        collection: col,
         itemId,
         status: newStatus,
         reviewComment: reviewComment || undefined,
