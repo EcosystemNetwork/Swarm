@@ -16,6 +16,7 @@ import { useSwarmData } from "@/hooks/useSwarmData";
 import { useSwarmWrite } from "@/hooks/useSwarmWrite";
 import { useChainCurrency } from "@/hooks/useChainCurrency";
 import { useActiveAccount } from "thirdweb/react";
+import { useAuthAddress } from "@/hooks/useAuthAddress";
 import {
   TaskStatus,
   STATUS_CONFIG,
@@ -59,6 +60,7 @@ export default function HbarPage() {
   const initialTab = (searchParams.get("tab") as HbarTab) || "overview";
   const [tab, setTab] = useState<HbarTab>(initialTab);
   const account = useActiveAccount();
+  const authAddress = useAuthAddress();
 
   // Sync tab from URL changes (e.g. sidebar click to ?tab=brandmover)
   useEffect(() => {
@@ -905,7 +907,7 @@ export default function HbarPage() {
                   >
                     {swarmWrite.state.isLoading ? "Claiming..." : `Claim Task #${selectedTask.taskId}`}
                   </Button>
-                  {!account && <p className="text-[10px] text-muted-foreground">Connect your wallet to claim</p>}
+                  {!account && !authAddress && <p className="text-[10px] text-muted-foreground">Connect your wallet to claim</p>}
                   {swarmWrite.state.error && <p className="text-[10px] text-red-500">{swarmWrite.state.error}</p>}
                 </div>
               )}
@@ -1007,7 +1009,7 @@ export default function HbarPage() {
                 {swarmWrite.state.isLoading ? "Posting..." : `Post Task (${ocBudget || "0"} ${currencySymbol})`}
               </Button>
             </div>
-            {!account && <p className="text-[10px] text-muted-foreground text-center">Connect your wallet to post onchain tasks</p>}
+            {!account && !authAddress && <p className="text-[10px] text-muted-foreground text-center">Connect your wallet to post onchain tasks</p>}
           </div>
         </DialogContent>
       </Dialog>
@@ -1077,7 +1079,7 @@ export default function HbarPage() {
                 {swarmWrite.state.isLoading ? "Registering..." : "Register Onchain"}
               </Button>
             </div>
-            {!account && <p className="text-[10px] text-muted-foreground text-center">Connect your wallet to register onchain</p>}
+            {!account && !authAddress && <p className="text-[10px] text-muted-foreground text-center">Connect your wallet to register onchain</p>}
           </div>
         </DialogContent>
       </Dialog>

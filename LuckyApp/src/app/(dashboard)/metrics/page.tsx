@@ -10,7 +10,7 @@ import {
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useOrg } from "@/contexts/OrgContext";
-import { useActiveAccount } from "thirdweb/react";
+import { useAuthAddress } from "@/hooks/useAuthAddress";
 import { getPendingCount } from "@/lib/approvals";
 import {
     getProjectsByOrg, getAgentsByOrg, getTasksByOrg, getJobsByOrg,
@@ -80,7 +80,7 @@ const TABS: { key: MetricsTab; label: string; icon: typeof Building2 }[] = [
 
 export default function MetricsPage() {
     const { currentOrg } = useOrg();
-    const account = useActiveAccount();
+    const authAddress = useAuthAddress();
     const [loading, setLoading] = useState(true);
     const [tab, setTab] = useState<MetricsTab>("organization");
 
@@ -188,7 +188,7 @@ export default function MetricsPage() {
         }).sort((a, b) => b.totalTasks - a.totalTasks);
     }, [projects, tasks, jobs, agents]);
 
-    if (!account) {
+    if (!authAddress) {
         return (
             <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4 text-muted-foreground">
                 <BarChart3 className="h-12 w-12 opacity-30" />

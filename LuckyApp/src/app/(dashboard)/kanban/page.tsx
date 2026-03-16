@@ -14,7 +14,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useOrg } from "@/contexts/OrgContext";
-import { useActiveAccount } from "thirdweb/react";
+import { useAuthAddress } from "@/hooks/useAuthAddress";
 import { getAgentsByOrg, type Agent } from "@/lib/firestore";
 import {
     type KanbanTask, type KanbanBoard, type KanbanStatus, type SubTask,
@@ -295,7 +295,7 @@ function BoardTab({
 
 export default function KanbanPage() {
     const { currentOrg } = useOrg();
-    const account = useActiveAccount();
+    const authAddress = useAuthAddress();
 
     // Boards
     const [boards, setBoards] = useState<KanbanBoard[]>([]);
@@ -481,7 +481,7 @@ export default function KanbanPage() {
 
     // ── Guards ──
 
-    if (!account) {
+    if (!authAddress) {
         return (
             <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4 text-muted-foreground">
                 <LayoutGrid className="h-12 w-12 opacity-30" />

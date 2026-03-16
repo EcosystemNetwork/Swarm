@@ -15,6 +15,7 @@ import {
 } from "@/lib/storage";
 import type { Attachment } from "@/lib/firestore";
 import { useActiveAccount } from "thirdweb/react";
+import { useAuthAddress } from "@/hooks/useAuthAddress";
 import { useOrg } from "@/contexts/OrgContext";
 import {
   getChannelsByOrg,
@@ -138,7 +139,8 @@ function applyOrder(channels: Channel[], savedIds: string[] | undefined): Channe
 
 export default function ChatPage() {
   const account = useActiveAccount();
-  const address = account?.address;
+  const authAddress = useAuthAddress();
+  const address = account?.address || authAddress;
   const { currentOrg } = useOrg();
 
   // Channels / conversations
@@ -634,7 +636,7 @@ export default function ChatPage() {
     );
   }
 
-  if (!address) {
+  if (!address && !authAddress) {
     return (
       <div className="space-y-6">
         <p className="text-muted-foreground mt-1">Connect your wallet to start chatting</p>

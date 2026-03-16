@@ -215,40 +215,69 @@ export async function getCronJob(id: string): Promise<CronJob | null> {
     };
 }
 
+/** Map a Firestore doc to CronJob */
+function docToCronJob(d: { id: string; data: () => Record<string, unknown> }): CronJob {
+    const data = d.data() as Record<string, unknown>;
+    return {
+        id: d.id,
+        orgId: data.orgId,
+        projectId: data.projectId,
+        name: data.name,
+        message: data.message,
+        schedule: data.schedule,
+        scheduleLabel: data.scheduleLabel,
+        targetChannelId: data.targetChannelId,
+        agentIds: data.agentIds,
+        priority: data.priority,
+        enabled: (data.enabled as boolean) ?? true,
+        createdBy: data.createdBy,
+        createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate() : null,
+        updatedAt: data.updatedAt instanceof Timestamp ? data.updatedAt.toDate() : null,
+        lastRun: data.lastRun
+            ? {
+                time: (data.lastRun as { time?: Timestamp }).time instanceof Timestamp
+                    ? ((data.lastRun as { time: Timestamp }).time).toDate()
+                    : new Date((data.lastRun as { time: unknown }).time as string),
+                success: (data.lastRun as { success?: boolean }).success,
+                error: (data.lastRun as { error?: string }).error,
+                durationMs: (data.lastRun as { durationMs?: number }).durationMs,
+            }
+            : undefined,
+        nextRun: data.nextRun instanceof Timestamp ? data.nextRun.toDate() : undefined,
+    } as CronJob;
+}
+
 /** Get all cron jobs for an org */
 export async function getCronJobs(orgId: string): Promise<CronJob[]> {
+    // Try ordered query first; fall back to unordered if composite index is missing
+    try {
+        const q = query(
+            collection(db, CRON_COLLECTION),
+            where("orgId", "==", orgId),
+            orderBy("createdAt", "desc")
+        );
+        const snap = await getDocs(q);
+        return snap.docs.map(docToCronJob);
+    } catch (indexErr) {
+        // Composite index (orgId + createdAt) may not exist — fall back to unordered
+        console.warn("[getCronJobs] Ordered query failed, falling back to unordered:", indexErr);
+        const q = query(
+            collection(db, CRON_COLLECTION),
+            where("orgId", "==", orgId),
+        );
+        const snap = await getDocs(q);
+        return snap.docs.map(docToCronJob);
+    }
+}
+
+/** Get a specific named cron job for an org (e.g. "Daily Briefing") */
+export async function getNamedCronJob(orgId: string, name: string): Promise<CronJob | null> {
     const q = query(
         collection(db, CRON_COLLECTION),
         where("orgId", "==", orgId),
-        orderBy("createdAt", "desc")
+        where("name", "==", name),
     );
     const snap = await getDocs(q);
-    return snap.docs.map((d) => {
-        const data = d.data();
-        return {
-            id: d.id,
-            orgId: data.orgId,
-            projectId: data.projectId,
-            name: data.name,
-            message: data.message,
-            schedule: data.schedule,
-            scheduleLabel: data.scheduleLabel,
-            targetChannelId: data.targetChannelId,
-            agentIds: data.agentIds,
-            priority: data.priority,
-            enabled: data.enabled ?? true,
-            createdBy: data.createdBy,
-            createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate() : null,
-            updatedAt: data.updatedAt instanceof Timestamp ? data.updatedAt.toDate() : null,
-            lastRun: data.lastRun
-                ? {
-                    time: data.lastRun.time instanceof Timestamp ? data.lastRun.time.toDate() : new Date(data.lastRun.time),
-                    success: data.lastRun.success,
-                    error: data.lastRun.error,
-                    durationMs: data.lastRun.durationMs,
-                }
-                : undefined,
-            nextRun: data.nextRun instanceof Timestamp ? data.nextRun.toDate() : undefined,
-        } as CronJob;
-    });
+    if (snap.empty) return null;
+    return docToCronJob(snap.docs[0]);
 }

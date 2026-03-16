@@ -7,7 +7,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { useOrg } from "@/contexts/OrgContext";
-import { useActiveAccount } from "thirdweb/react";
+import { useAuthAddress } from "@/hooks/useAuthAddress";
 import { FileManager } from "@/components/file-manager";
 import {
     type MemoryEntry,
@@ -29,7 +29,7 @@ function timeAgo(d: Date | null): string {
 
 export default function MemoryPage() {
     const { currentOrg } = useOrg();
-    const account = useActiveAccount();
+    const authAddress = useAuthAddress();
     const [entries, setEntries] = useState<MemoryEntry[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState("");
@@ -51,7 +51,7 @@ export default function MemoryPage() {
 
     const filtered = searchQuery ? searchMemory(entries, searchQuery) : entries;
 
-    if (!account) {
+    if (!authAddress) {
         return (
             <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4 text-muted-foreground">
                 <Brain className="h-12 w-12 opacity-30" /><p>Connect your wallet to browse memory</p>

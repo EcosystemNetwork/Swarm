@@ -82,6 +82,127 @@ function saveState(state) {
 }
 
 // ---------------------------------------------------------------------------
+// Retry with Exponential Backoff
+// ---------------------------------------------------------------------------
+
+const MAX_RETRIES = 5;
+const BASE_DELAY_MS = 1000;
+const MAX_DELAY_MS = 30000;
+
+/** Retryable HTTP status codes — platform rate limits, gateway errors */
+const RETRYABLE_STATUSES = new Set([429, 502, 503, 504]);
+
+/**
+ * Fetch with automatic retry + exponential backoff for transient errors.
+ * Only retries on RETRYABLE_STATUSES. Non-retryable errors pass through.
+ */
+async function fetchWithRetry(url, options = {}, { maxRetries = MAX_RETRIES, label = "request" } = {}) {
+  let lastError;
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      const resp = await fetch(url, options);
+
+      if (resp.ok || !RETRYABLE_STATUSES.has(resp.status)) {
+        return resp; // Success or non-retryable error — return as-is
+      }
+
+      // Retryable status — extract retry-after hint if present
+      const retryAfter = resp.headers.get("retry-after");
+      let delayMs = Math.min(BASE_DELAY_MS * Math.pow(2, attempt), MAX_DELAY_MS);
+      if (retryAfter) {
+        const parsed = parseInt(retryAfter, 10);
+        if (!isNaN(parsed)) delayMs = Math.max(delayMs, parsed * 1000);
+      }
+
+      // Add jitter (0-25% of delay)
+      delayMs += Math.floor(Math.random() * delayMs * 0.25);
+
+      if (attempt < maxRetries) {
+        console.log(`   ${label}: ${resp.status} — retrying in ${Math.round(delayMs / 1000)}s (attempt ${attempt + 1}/${maxRetries})...`);
+        await new Promise(r => setTimeout(r, delayMs));
+      } else {
+        return resp; // Final attempt — return the error response
+      }
+    } catch (err) {
+      lastError = err;
+      if (attempt < maxRetries) {
+        const delayMs = Math.min(BASE_DELAY_MS * Math.pow(2, attempt), MAX_DELAY_MS);
+        console.log(`   ${label}: network error — retrying in ${Math.round(delayMs / 1000)}s (attempt ${attempt + 1}/${maxRetries})...`);
+        await new Promise(r => setTimeout(r, delayMs));
+      }
+    }
+  }
+  throw lastError || new Error(`${label}: all ${maxRetries} retries exhausted`);
+}
+
+// ---------------------------------------------------------------------------
+// Legacy Credential Migration
+// ---------------------------------------------------------------------------
+
+/** Well-known paths where old-format credentials might exist */
+const LEGACY_CRED_PATHS = [
+  join(process.env.HOME || "/root", ".swarm", "credentials.json"),
+  join(SKILL_DIR, "credentials.json"),
+];
+
+/**
+ * Detect and migrate legacy API-key credentials.
+ *
+ * Old format: { agentId, orgId, apiKey, hubUrl, agentName, ... }
+ * New format: Ed25519 keypair + config.json
+ *
+ * Returns { agentId, orgId, hubUrl, agentName, agentType } if migration
+ * data is found, or null if no legacy credentials exist.
+ */
+function detectLegacyCredentials() {
+  for (const credPath of LEGACY_CRED_PATHS) {
+    if (!existsSync(credPath)) continue;
+    try {
+      const raw = JSON.parse(readFileSync(credPath, "utf-8"));
+      // Legacy format has apiKey field (not Ed25519-based)
+      if (raw.apiKey || raw.api_key || raw.token) {
+        console.log(`   Found legacy credentials at ${credPath}`);
+        return {
+          path: credPath,
+          agentId: raw.agentId || raw.agent_id,
+          orgId: raw.orgId || raw.org_id,
+          hubUrl: raw.hubUrl || raw.hub_url || raw.hub,
+          agentName: raw.agentName || raw.agent_name || raw.name,
+          agentType: raw.agentType || raw.agent_type || raw.type || "agent",
+          skills: raw.skills,
+          bio: raw.bio,
+        };
+      }
+    } catch { /* unparseable — skip */ }
+  }
+  return null;
+}
+
+// ---------------------------------------------------------------------------
+// Offline Bootstrap Mode
+// ---------------------------------------------------------------------------
+
+const PENDING_REG_PATH = join(SKILL_DIR, "pending-registration.json");
+
+/** Save registration params for later retry when hub is unavailable */
+function savePendingRegistration(params) {
+  writeFileSync(PENDING_REG_PATH, JSON.stringify({ ...params, savedAt: new Date().toISOString() }, null, 2) + "\n");
+}
+
+/** Load pending registration if one exists */
+function loadPendingRegistration() {
+  if (!existsSync(PENDING_REG_PATH)) return null;
+  try { return JSON.parse(readFileSync(PENDING_REG_PATH, "utf-8")); } catch { return null; }
+}
+
+/** Clear pending registration after successful registration */
+function clearPendingRegistration() {
+  if (existsSync(PENDING_REG_PATH)) {
+    try { writeFileSync(PENDING_REG_PATH, ""); } catch { /* ignore */ }
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Ed25519 Keypair Management
 // ---------------------------------------------------------------------------
 
@@ -199,16 +320,47 @@ function parseSkills(skillsStr) {
 // ---------------------------------------------------------------------------
 
 async function cmdRegister() {
-  const hubUrl = arg("--hub") || "https://swarmprotocol.ai";
-  const orgId = arg("--org");
-  const name = arg("--name");
-  const type = arg("--type") || "agent";
+  let hubUrl = arg("--hub") || "https://swarm.perkos.xyz";
+  let orgId = arg("--org");
+  let name = arg("--name");
+  let type = arg("--type") || "agent";
   const skillsStr = arg("--skills");
-  const bio = arg("--bio");
+  let bio = arg("--bio");
   const greetingMsg = arg("--greeting");
+  const migrate = hasFlag("--migrate");
+
+  // --- Legacy credential migration ---
+  const legacy = detectLegacyCredentials();
+  if (legacy && (migrate || (!orgId && !name))) {
+    console.log(`\nMigrating legacy credentials...`);
+    console.log(`   Agent: ${legacy.agentName || "(unknown)"} (${legacy.agentId || "no ID"})`);
+    console.log(`   Org:   ${legacy.orgId || "(unknown)"}`);
+    console.log(`   Hub:   ${legacy.hubUrl || "(unknown)"}`);
+
+    // Use legacy values as defaults (CLI flags override)
+    orgId = orgId || legacy.orgId;
+    name = name || legacy.agentName;
+    type = type !== "agent" ? type : (legacy.agentType || "agent");
+    hubUrl = arg("--hub") || legacy.hubUrl || hubUrl;
+    bio = bio || legacy.bio;
+    console.log(`   Old API-key auth will be replaced with Ed25519 keypair.\n`);
+  }
+
+  // --- Retry pending registration (offline bootstrap recovery) ---
+  const pending = loadPendingRegistration();
+  if (pending && !orgId && !name) {
+    console.log(`\nRetrying pending registration from ${pending.savedAt}...`);
+    orgId = pending.orgId;
+    name = pending.agentName;
+    type = pending.agentType || "agent";
+    hubUrl = pending.hubUrl || hubUrl;
+    bio = pending.bio;
+  }
 
   if (!orgId || !name) {
     console.error("Usage: swarm register --hub <url> --org <orgId> --name <name> [--type <type>] [--skills <s1,s2>] [--bio <bio>] [--greeting <msg>]");
+    console.error("\nOptions:");
+    console.error("  --migrate    Migrate from legacy API-key credentials (~/.swarm/credentials.json)");
     process.exit(1);
   }
 
@@ -222,31 +374,84 @@ async function cmdRegister() {
   // Generate or load keypair
   const { publicKey, privateKey } = ensureKeypair();
 
-  // Parse skills
-  const skills = parseSkills(skillsStr);
+  // Parse skills (merge legacy skills if migrating)
+  let skills = parseSkills(skillsStr);
+  if (skills.length === 0 && legacy?.skills?.length > 0) {
+    skills = legacy.skills;
+    console.log(`   Migrated ${skills.length} skill(s) from legacy config`);
+  }
 
-  // Register public key with hub
+  // Register public key with hub (with retry for 503/429 platform errors)
   console.log(`Registering with ${hubUrl}...`);
-  const resp = await fetch(`${hubUrl}/api/v1/register`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      publicKey,
+  let resp;
+  try {
+    resp = await fetchWithRetry(
+      `${hubUrl}/api/v1/register`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          publicKey,
+          agentName: name,
+          agentType: type,
+          orgId,
+          ...(skills.length > 0 ? { skills } : {}),
+          ...(bio ? { bio } : {}),
+          // Include legacy agentId so hub can reconnect to existing identity
+          ...(legacy?.agentId ? { existingAgentId: legacy.agentId } : {}),
+        }),
+      },
+      { label: "Registration" }
+    );
+  } catch (err) {
+    // All retries exhausted or network unreachable — enter offline bootstrap
+    console.error(`\nRegistration failed after retries: ${err.message}`);
+    console.log(`\nEntering offline bootstrap mode...`);
+    savePendingRegistration({ hubUrl, orgId, agentName: name, agentType: type, bio, skills });
+
+    // Create a provisional config so the agent can start locally
+    const provisionalConfig = {
+      hubUrl,
+      orgId,
+      agentId: `provisional_${crypto.randomUUID().slice(0, 8)}`,
       agentName: name,
       agentType: type,
-      orgId,
+      registeredAt: null,
+      offline: true,
+      autoGreeting: {
+        enabled: true,
+        message: greetingMsg || `🟠 ${name} online. Operations ready.`,
+        onConnect: true,
+        onReconnect: true,
+      },
       ...(skills.length > 0 ? { skills } : {}),
       ...(bio ? { bio } : {}),
-    }),
-  });
+    };
+    saveConfig(provisionalConfig);
+
+    console.log(`   Provisional agent ID: ${provisionalConfig.agentId}`);
+    console.log(`   Config saved — agent can operate locally.`);
+    console.log(`   Registration will complete automatically on next \`swarm daemon\` or \`swarm register\`.`);
+    return;
+  }
 
   if (!resp.ok) {
     const err = await resp.json().catch(() => ({}));
     console.error(`Registration failed (${resp.status}): ${err.error || "Unknown error"}`);
+
+    // If it's a retryable error that exhausted retries, offer offline mode
+    if (RETRYABLE_STATUSES.has(resp.status)) {
+      console.log(`\nHub appears overloaded. Saving registration for later retry...`);
+      savePendingRegistration({ hubUrl, orgId, agentName: name, agentType: type, bio, skills });
+      console.log(`   Run \`swarm register\` again later, or \`swarm daemon\` will auto-retry.`);
+    }
     process.exit(1);
   }
 
   const data = await resp.json();
+
+  // Registration succeeded — clear any pending registration
+  clearPendingRegistration();
 
   // Save config (include skills + bio + autoGreeting for future use)
   const autoGreeting = {
@@ -262,9 +467,11 @@ async function cmdRegister() {
     agentName: name,
     agentType: type,
     registeredAt: new Date().toISOString(),
+    offline: false,
     autoGreeting,
     ...(skills.length > 0 ? { skills } : {}),
     ...(bio ? { bio } : {}),
+    ...(legacy ? { migratedFrom: legacy.path, migratedAt: new Date().toISOString() } : {}),
   };
   saveConfig(config);
 
@@ -277,6 +484,9 @@ async function cmdRegister() {
   console.log(`   Hub:      ${hubUrl}`);
   console.log(`   Org:      ${orgId}`);
   console.log(`   Key:      ./keys/public.pem`);
+  if (legacy) {
+    console.log(`   Migrated: ${legacy.path}`);
+  }
   if (skills.length > 0) {
     console.log(`   Skills:   ${skills.map(s => s.name).join(", ")}`);
   }
@@ -648,8 +858,48 @@ async function cmdProfile() {
 }
 
 async function cmdDaemon() {
-  const config = loadConfig();
-  const { privateKey } = ensureKeypair();
+  let config = loadConfig();
+  const { publicKey, privateKey } = ensureKeypair();
+
+  // --- Auto-complete pending registration if agent was bootstrapped offline ---
+  if (config.offline) {
+    console.log(`Agent was bootstrapped offline — attempting to complete registration...`);
+    const pending = loadPendingRegistration();
+    if (pending) {
+      try {
+        const resp = await fetchWithRetry(
+          `${config.hubUrl}/api/v1/register`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              publicKey,
+              agentName: config.agentName,
+              agentType: config.agentType,
+              orgId: config.orgId,
+              ...(config.skills?.length > 0 ? { skills: config.skills } : {}),
+              ...(config.bio ? { bio: config.bio } : {}),
+            }),
+          },
+          { label: "Deferred registration", maxRetries: 3 }
+        );
+
+        if (resp.ok) {
+          const data = await resp.json();
+          config.agentId = data.agentId;
+          config.registeredAt = new Date().toISOString();
+          config.offline = false;
+          saveConfig(config);
+          clearPendingRegistration();
+          console.log(`   Registration completed! Agent ID: ${data.agentId}`);
+        } else {
+          console.log(`   Registration still failing (${resp.status}) — will retry next daemon cycle.`);
+        }
+      } catch (err) {
+        console.log(`   Registration retry failed: ${err.message} — continuing in offline mode.`);
+      }
+    }
+  }
 
   const intervalSec = parseInt(arg("--interval") || "30", 10); // default 30s — active monitoring
   const intervalMs = Math.max(10, intervalSec) * 1000; // minimum 10 seconds
@@ -662,6 +912,7 @@ async function cmdDaemon() {
   console.log(`  Agent:    ${config.agentName} (${config.agentId})`);
   console.log(`  Interval: ${intervalSec}s`);
   console.log(`  Hub:      ${config.hubUrl}`);
+  console.log(`  Mode:     ${config.offline ? "OFFLINE (pending registration)" : "online"}`);
   if (config.autoGreeting?.enabled) {
     console.log(`  Greeting: ${config.autoGreeting.message}`);
   }
@@ -1358,7 +1609,7 @@ try {
     console.log(`@swarmprotocol/agent-skill — Sandbox-safe Swarm agent
 
 Commands:
-  register    --hub <url> --org <orgId> --name <name> [--type <type>] [--skills <s1,s2>] [--bio <bio>] [--greeting <msg>]
+  register    --hub <url> --org <orgId> --name <name> [--type <type>] [--skills <s1,s2>] [--bio <bio>] [--greeting <msg>] [--migrate]
   check       [--since <timestamp>] [--json] [--verify]  — poll for new messages
   send        <channelId> "<text>"                       — send a message to a channel
   reply       <messageId> "<text>"                       — reply to a specific message
@@ -1386,6 +1637,15 @@ Auth:
   Ed25519 keypair generated on first run.
   Public key registered with hub. Private key never leaves ./keys/.
   Every request is signed. No API keys. No tokens.
+
+Migration:
+  --migrate flag detects legacy API-key credentials (~/.swarm/credentials.json)
+  and re-registers with new Ed25519 keypair, preserving agent identity.
+
+Resilience:
+  Registration auto-retries on 503/429 (exponential backoff, 5 attempts).
+  If hub is unreachable, agent enters offline bootstrap mode with a
+  provisional config. Registration completes automatically on next daemon run.
 
 Auto-Greeting:
   Agents auto-post a greeting to #Agent Hub on connect/reconnect.

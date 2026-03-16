@@ -6,7 +6,7 @@ import { UserCog, Loader2, Shield, Clock } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useOrg } from "@/contexts/OrgContext";
-import { useActiveAccount } from "thirdweb/react";
+import { useAuthAddress } from "@/hooks/useAuthAddress";
 import {
     type Operator,
     type OperatorRole,
@@ -26,7 +26,7 @@ function timeAgo(d: Date | null): string {
 
 export default function OperatorsPage() {
     const { currentOrg } = useOrg();
-    const account = useActiveAccount();
+    const authAddress = useAuthAddress();
     const [operators, setOperators] = useState<Operator[]>([]);
     const [loading, setLoading] = useState(true);
 
@@ -54,7 +54,7 @@ export default function OperatorsPage() {
         }
     };
 
-    if (!account) {
+    if (!authAddress) {
         return (
             <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4 text-muted-foreground">
                 <UserCog className="h-12 w-12 opacity-30" />

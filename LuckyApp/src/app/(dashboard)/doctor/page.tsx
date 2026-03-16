@@ -9,7 +9,7 @@ import {
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { useActiveAccount } from "thirdweb/react";
+import { useAuthAddress } from "@/hooks/useAuthAddress";
 import { useOrg } from "@/contexts/OrgContext";
 import { db } from "@/lib/firebase";
 import { collection, getDocs, query, limit } from "firebase/firestore";
@@ -281,7 +281,7 @@ async function runDiagnostics(orgId: string | null, walletAddress: string | unde
 // ═══════════════════════════════════════════════════════════════
 
 export default function DoctorPage() {
-    const account = useActiveAccount();
+    const authAddress = useAuthAddress();
     const { currentOrg } = useOrg();
     const [checks, setChecks] = useState<HealthCheck[]>([]);
     const [running, setRunning] = useState(false);
@@ -294,7 +294,7 @@ export default function DoctorPage() {
     const runChecks = useCallback(async () => {
         setRunning(true);
         try {
-            const results = await runDiagnostics(currentOrg?.id ?? null, account?.address);
+            const results = await runDiagnostics(currentOrg?.id ?? null, authAddress ?? undefined);
             setChecks(results);
             setLastRun(new Date());
         } catch {
@@ -302,7 +302,7 @@ export default function DoctorPage() {
         } finally {
             setRunning(false);
         }
-    }, [currentOrg?.id, account?.address]);
+    }, [currentOrg?.id, authAddress]);
 
     const runDiagnosticChecks = useCallback(async () => {
         if (!currentOrg?.id) return;
@@ -349,7 +349,7 @@ export default function DoctorPage() {
         categories.set(check.category, arr);
     }
 
-    if (!account) {
+    if (!authAddress) {
         return (
             <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4 text-muted-foreground">
                 <Stethoscope className="h-12 w-12 opacity-30" />

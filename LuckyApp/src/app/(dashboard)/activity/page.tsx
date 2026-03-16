@@ -6,7 +6,7 @@ import { Activity, Loader2, Filter } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useOrg } from "@/contexts/OrgContext";
-import { useActiveAccount } from "thirdweb/react";
+import { useAuthAddress } from "@/hooks/useAuthAddress";
 import {
     type ActivityEvent, type ActivityActor, type ActivityEventType,
     EVENT_TYPE_CONFIG, ACTOR_ICONS,
@@ -24,7 +24,7 @@ function formatTimeAgo(date: Date | null): string {
 
 export default function ActivityPage() {
     const { currentOrg } = useOrg();
-    const account = useActiveAccount();
+    const authAddress = useAuthAddress();
     const [events, setEvents] = useState<ActivityEvent[]>([]);
     const [loading, setLoading] = useState(true);
     const [actorFilter, setActorFilter] = useState<ActivityActor | "all">("all");
@@ -46,7 +46,7 @@ export default function ActivityPage() {
 
     useEffect(() => { loadEvents(); }, [loadEvents]);
 
-    if (!account) {
+    if (!authAddress) {
         return (
             <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4 text-muted-foreground">
                 <Activity className="h-12 w-12 opacity-30" />

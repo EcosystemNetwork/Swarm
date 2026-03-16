@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { useOrg } from "@/contexts/OrgContext";
-import { useActiveAccount } from "thirdweb/react";
+import { useAuthAddress } from "@/hooks/useAuthAddress";
 import {
     type Gateway,
     GATEWAY_STATUS,
@@ -29,7 +29,7 @@ function timeAgo(d: Date | null): string {
 
 export default function GatewaysPage() {
     const { currentOrg } = useOrg();
-    const account = useActiveAccount();
+    const authAddress = useAuthAddress();
     const [gateways, setGateways] = useState<Gateway[]>([]);
     const [loading, setLoading] = useState(true);
     const [showAdd, setShowAdd] = useState(false);
@@ -64,7 +64,7 @@ export default function GatewaysPage() {
         catch (err) { console.error(err); }
     };
 
-    if (!account) {
+    if (!authAddress) {
         return (
             <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4 text-muted-foreground">
                 <Network className="h-12 w-12 opacity-30" /><p>Connect your wallet to manage gateways</p>

@@ -7,7 +7,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useOrg } from "@/contexts/OrgContext";
-import { useActiveAccount } from "thirdweb/react";
+import { useAuthAddress } from "@/hooks/useAuthAddress";
 import {
     type CerebroTopic,
     type TopicStatus,
@@ -28,7 +28,7 @@ function timeAgo(d: Date | null): string {
 
 export default function CerebroPage() {
     const { currentOrg } = useOrg();
-    const account = useActiveAccount();
+    const authAddress = useAuthAddress();
     const [topics, setTopics] = useState<CerebroTopic[]>([]);
     const [loading, setLoading] = useState(true);
     const [filter, setFilter] = useState<TopicStatus | "all">("all");
@@ -75,7 +75,7 @@ export default function CerebroPage() {
         parked: topics.filter(t => t.status === "parked").length,
     };
 
-    if (!account) {
+    if (!authAddress) {
         return (
             <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4 text-muted-foreground">
                 <Brain className="h-12 w-12 opacity-30" />

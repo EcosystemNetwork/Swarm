@@ -6,7 +6,7 @@ import { Coins, TrendingUp, Cpu, Users, Loader2, BarChart3 } from "lucide-react"
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useOrg } from "@/contexts/OrgContext";
-import { useActiveAccount } from "thirdweb/react";
+import { useAuthAddress } from "@/hooks/useAuthAddress";
 import {
     type UsageRecord,
     getUsageRecords,
@@ -84,7 +84,7 @@ function DailyCostChart({ data }: { data: { date: string; costUsd: number }[] })
 
 export default function UsagePage() {
     const { currentOrg } = useOrg();
-    const account = useActiveAccount();
+    const authAddress = useAuthAddress();
     const [records, setRecords] = useState<UsageRecord[]>([]);
     const [loading, setLoading] = useState(true);
     const [range, setRange] = useState<"7d" | "30d">("30d");
@@ -114,7 +114,7 @@ export default function UsagePage() {
     const topModel = byModel[0]?.model || "—";
     const topAgent = byAgent[0]?.agentName || "—";
 
-    if (!account) {
+    if (!authAddress) {
         return (
             <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4 text-muted-foreground">
                 <Coins className="h-12 w-12 opacity-30" />

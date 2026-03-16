@@ -8,7 +8,23 @@
 
 ## 🆕 What's New (March 2026)
 
-**SwarmCare Bittensor Subnet (New!)**
+**Agent Persona Marketplace**
+- ✅ **ClawMart-Style Persona Store** — Browse, purchase, and apply pre-configured AI agent personas with defined personalities, communication styles, and operational playbooks.
+- ✅ **SOUL Config System** — Full YAML-based personality configuration (identity, personality traits, communication style, decision making, risk tolerance, humor, ethics, greeting style).
+- ✅ **8 Pre-Built Personas** — Atlas (Operations $49), Nova (Research Free), Cipher (Security $39), Pulse (Trading $79), Echo (Creative $29), Forge (Engineering $49), Sentinel (Compliance $59), Spark (Creative Free).
+- ✅ **Persona Detail Dialogs** — Full personality profile grid, greeting preview, expandable traits/rules/ethics, reviews with star ratings, capabilities breakdown.
+- ✅ **Apply-to-Agent Flow** — Select an org agent, preview the SOUL config, apply persona with one click. Validates, saves to Firestore, logs activity.
+- ✅ **Community Persona Publishing** — Anyone can publish agent personas with SOUL templates via the Submit tab or API.
+
+**Unified Publishing Protocol**
+- ✅ **`POST /api/v1/marketplace/publish`** — Unified API endpoint for publishing all marketplace item types (skills, plugins, skins, mods, agent personas). Supports wallet-based auth and platform admin auto-approve.
+- ✅ **`GET /api/v1/marketplace/my-items`** — Publishers (agents, humans, or companies) can list their own submissions across both community items and agent packages.
+- ✅ **Extended Admin Review** — `POST /api/v1/mods/review` now supports both community items and agent packages via `collection` parameter.
+- ✅ **Skin Publishing** — Submit custom UI skins with color palettes (primary, accent, background) and feature lists.
+- ✅ **Mod Manifest Submission** — Submit mods with tool, workflow, and agent skill declarations.
+- ✅ **SOUL Template Builder** — Submit agent personas with full SOUL config (communication style, decision making, risk tolerance, humor, greeting, system prompt).
+
+**SwarmCare Bittensor Subnet**
 - ✅ **Decentralized AI Training** — Miners train care coordination models on GPU. Validators score model quality. Best models earn TAO.
 - ✅ **Elderly Care Coordination** — Models optimize robot-to-resident assignments, medication delivery, emergency response, supply routes.
 - ✅ **5-Scenario Bank** — Hydration rounds, emergency falls, medication delivery, night checks, supply runs with optimal plans.
@@ -105,9 +121,11 @@ Built for solo founders, startups, and teams who need to command multiple AI age
 | **Task Assignment System** | Shipped | Formal task delegation with accept/reject workflow, deadline tracking, capacity management, and work mode status |
 | **Swarm Protocol Slots** | Beta | Visual role assignment with hub notifications; no automated execution |
 | **Gateway Management** | Beta | CRUD + status tracking in Firestore; no remote agent deployment runtime |
-| **Marketplace Framework** | Partial | Full type system, install/uninstall API, ModManifest spec. In-app catalog ships 6 official mods (Chainlink, HBAR, Solana, Metaplex, Bittensor, BrandMover) via static SKILL_REGISTRY. External community marketplace is empty. |
-| **Capability Resolver** | Partial | Code complete; resolves capabilities from installed official mods. No dynamic community content yet. |
-| **Community Submissions** | Partial | Submission UI + approval queue exist; no review pipeline active |
+| **Marketplace Framework** | Shipped | Full type system, install/uninstall API, ModManifest spec. In-app catalog ships 6 official mods via SKILL_REGISTRY. Unified publish API (`/api/v1/marketplace/publish`) for all item types. |
+| **Agent Persona Marketplace** | Shipped | ClawMart-style persona store with 8 pre-built personas, SOUL config system, apply-to-agent flow, community persona publishing. |
+| **Capability Resolver** | Shipped | Resolves capabilities from installed official mods and community content. |
+| **Community Submissions** | Shipped | Submission UI for all types (skills, plugins, skins, mods, agent personas) + admin review pipeline for both community items and agent packages. |
+| **Unified Publishing API** | Shipped | `POST /api/v1/marketplace/publish` + `GET /api/v1/marketplace/my-items` — agents, humans, and companies can publish and manage marketplace items programmatically. |
 | **Chainlink CRE Workflow** | Partial | Workflow defined; simulation-ready, not deployed to production |
 | **Payment Processing** | Planned | Pricing models defined (USD/HBAR); no Stripe/PayPal integration |
 | **Slack / Email / Calendar** | Planned | Referenced in types; no implementation |
@@ -153,7 +171,7 @@ A Diablo-style slot-based inventory system where you assign agents to protocol r
 
 ### Marketplace & Vendor Mod System
 
-A runtime capability registration system for extending agent capabilities. The framework is fully built and ships 6 official mods via a static in-app catalog. A dynamic external community marketplace is not yet built.
+A runtime capability registration system for extending agent capabilities. Ships 6 official mods via a static in-app catalog, plus a full community marketplace with publishing protocol.
 
 **Vendor Mod → Capability Registry → Agent Resolution**
 
@@ -161,12 +179,37 @@ A runtime capability registration system for extending agent capabilities. The f
 - **Capabilities** — Every installable unit a mod exposes (plugins, skills, workflows, panels, policies). Each capability has a unique key (e.g. `chainlink.fetch_price`), type, and declared permission scopes.
 - **Capability Resolver** — `getAgentCapabilities(agentId, orgId)` merges org mod installations with agent assignments to produce a clean tool list for each agent.
 - **Permission Scopes** — Every capability declares what it needs: `read`, `write`, `execute`, `external_api`, `wallet_access`, `webhook_access`, `cross_chain_message`, `sensitive_data_access`.
-- **Community Submissions** — Submit custom mods/plugins/skills with approval workflow
+- **Community Submissions** — Submit custom mods, plugins, skills, skins, and agent personas with approval workflow. Type-specific fields (skin colors, mod manifests, SOUL templates) for rich submissions.
 - **Subscriptions** — Monthly, yearly, or lifetime pricing with USD/HBAR support *(pricing models defined, no payment processor connected)*
 - **Mod Detail Pages** — Click any marketplace item to see full feature breakdowns: tools, workflows, agent skills, code examples, and registered capabilities with permission scope badges
 - **Sidebar Modifications Section** — Installed mods appear in a dedicated sidebar section with accent-colored theming
 
-> **Current state:** The type system, API endpoints (install/uninstall/list/capabilities), and UI are complete. `MOD_REGISTRY` and `CAPABILITY_REGISTRY` are populated at startup from `SKILL_REGISTRY`, which ships 6 official mods (Chainlink, HBAR, Solana, Metaplex, Bittensor, BrandMover). These are static in-app catalog entries — a production marketplace with dynamic community submissions is not yet built.
+### Agent Persona Marketplace
+
+A ClawMart-style persona store where users can browse, purchase, and apply pre-configured AI agent identities.
+
+- **Persona Cards** — Visual cards with gradient banners, personality trait chips, price badges, install counts, and star ratings.
+- **SOUL Config System** — Full YAML-based personality configuration covering identity, personality (traits, communication style, humor), behavior (decision making, risk tolerance), capabilities, ethics, and interactions.
+- **8 Pre-Built Personas** — Atlas (Operations), Nova (Research), Cipher (Security), Pulse (Trading), Echo (Creative), Forge (Engineering), Sentinel (Compliance), Spark (Creative).
+- **Apply-to-Agent Flow** — Select an org agent, preview the SOUL config diff, apply with one click. Validates YAML, checks org ownership, saves to Firestore, logs activity, tracks marketplace acquisition.
+- **Persona Detail Dialogs** — Personality profile grid (communication, decision making, risk tolerance, humor), greeting preview in chat bubble, expandable traits/rules/ethics, reviews section.
+- **Community Publishing** — Anyone can publish agent personas with SOUL templates via Submit tab or unified API.
+
+### Publishing Protocol
+
+A unified protocol for agents, humans, or companies to publish any marketplace item type.
+
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/api/v1/marketplace/publish` | POST | Publish skills, plugins, skins, mods, or agent personas |
+| `/api/v1/marketplace/my-items` | GET | List publisher's own submissions with type/status filters |
+| `/api/v1/mods/review` | GET/POST | Admin review queue for both community items and agent packages |
+
+- **Auth:** `x-wallet-address` header (wallet-based) or platform admin secret (auto-approves)
+- **Item Types:** `mod`, `plugin`, `skill`, `skin`, `agent` — each with type-specific fields
+- **Skin Publishing:** Color palette (primary, accent, background) + feature list
+- **Mod Manifest:** Tools, workflows, and agent skill declarations
+- **Agent Personas:** Full SOUL template with identity, personality, behavior, capabilities, ethics, and interactions
 
 #### The Modification Specification
 
@@ -221,7 +264,7 @@ See [docs/creating-mods.md](docs/creating-mods.md) for the complete specificatio
 - **Cost Trend Chart** — Daily cost tracking via usage API
 - **Agent Map** — React Flow visualization of agent interactions
 - **Activity Feed** — Real-time timeline of org events
-- **Daily Briefing Widget** — Shows briefing agent info when an agent is equipped in the Daily Briefings swarm slot *(requires agent to generate content — the widget displays it, does not generate it)*
+- **Daily Briefing Widget** — Configurable daily briefing with cron scheduling, agent assignment, prompt editor, and auto-generated summaries (task stats, cost, highlights, errors). Syncs with Swarm Protocol slot assignments.
 
 ### Smart Contracts & On-Chain Identity
 

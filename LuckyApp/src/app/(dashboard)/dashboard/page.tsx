@@ -56,7 +56,7 @@ import {
   computeActivityByHour,
 } from "@/lib/dashboard-data";
 import type { DailyCost } from "@/lib/usage";
-import { getCronJobs, createCronJob, updateCronJob, SCHEDULE_PRESETS, parseCronToHuman, type CronJob } from "@/lib/cron";
+import { getCronJobs, getNamedCronJob, createCronJob, updateCronJob, SCHEDULE_PRESETS, parseCronToHuman, type CronJob } from "@/lib/cron";
 import type { DailySummary } from "@/lib/daily-summary";
 
 const AgentMap = dynamic(
@@ -448,18 +448,18 @@ export default function DashboardPage() {
 
       // Load daily briefing cron job + latest summary
       try {
-        const cronJobs = await getCronJobs(currentOrg.id);
-        const briefingJob = cronJobs.find(j => j.name === "Daily Briefing" && j.enabled);
-        setBriefingCronJob(briefingJob || null);
-        if (briefingJob) {
+        // Use direct name lookup — avoids composite index requirement
+        const briefingJob = await getNamedCronJob(currentOrg.id, "Daily Briefing");
+        setBriefingCronJob(briefingJob && briefingJob.enabled ? briefingJob : null);
+        if (briefingJob?.enabled) {
           const res = await fetch(`/api/summaries?orgId=${currentOrg.id}&limit=1`);
           if (res.ok) {
             const data = await res.json();
             if (data.summaries?.length > 0) setLatestBriefing(data.summaries[0]);
           }
         }
-      } catch {
-        // Briefing data is non-critical
+      } catch (briefErr) {
+        console.error("[Dashboard] Failed to load briefing cron job:", briefErr);
       }
     } catch (err) {
       console.error('Failed to load dashboard data:', err);
@@ -492,8 +492,12 @@ export default function DashboardPage() {
       const scheduleLabel = parseCronToHuman(briefingSchedule);
       const isEditing = !!briefingCronJob;
 
-      // Save the agent ID even if the agent object isn't found yet
-      const agentIdsToSave = briefingAgentId ? [briefingAgentId] : undefined;
+      // Save the agent ID — preserve existing assignment if user didn't change it
+      const agentIdsToSave = briefingAgentId
+        ? [briefingAgentId]
+        : briefingCronJob?.agentIds?.length
+          ? briefingCronJob.agentIds
+          : undefined;
 
       if (isEditing) {
         await updateCronJob(briefingCronJob.id, {

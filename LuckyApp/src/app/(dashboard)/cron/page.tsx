@@ -14,6 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useOrg } from "@/contexts/OrgContext";
 import { useActiveAccount } from "thirdweb/react";
+import { useAuthAddress } from "@/hooks/useAuthAddress";
 import { getAgentsByOrg, type Agent } from "@/lib/firestore";
 import {
     type CronJob, type CronJobCreateInput,
@@ -298,6 +299,7 @@ function TaskDialog({
 export default function CronPage() {
     const { currentOrg } = useOrg();
     const account = useActiveAccount();
+    const authAddress = useAuthAddress();
     const [jobs, setJobs] = useState<CronJob[]>([]);
     const [agents, setAgents] = useState<Agent[]>([]);
     const [loading, setLoading] = useState(true);
@@ -379,7 +381,7 @@ export default function CronPage() {
         }).filter(Boolean) as { id: string; name: string; status: string }[];
     };
 
-    if (!account) {
+    if (!account && !authAddress) {
         return (
             <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4 text-muted-foreground">
                 <Clock className="h-12 w-12 opacity-30" />

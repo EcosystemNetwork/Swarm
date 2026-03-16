@@ -11,7 +11,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { useOrg } from "@/contexts/OrgContext";
-import { useActiveAccount } from "thirdweb/react";
+import { useAuthAddress } from "@/hooks/useAuthAddress";
 import {
     type Approval, type ApprovalStatus,
     APPROVAL_TYPE_CONFIG,
@@ -177,7 +177,7 @@ function ApprovalCard({
 
 export default function ApprovalsPage() {
     const { currentOrg } = useOrg();
-    const account = useActiveAccount();
+    const authAddress = useAuthAddress();
     const [approvals, setApprovals] = useState<Approval[]>([]);
     const [loading, setLoading] = useState(true);
     const [filter, setFilter] = useState<ApprovalStatus | "all">("pending");
@@ -205,12 +205,12 @@ export default function ApprovalsPage() {
     useEffect(() => { loadApprovals(); }, [loadApprovals]);
 
     const handleReview = async (id: string, status: "approved" | "rejected", comment?: string) => {
-        if (!account) return;
+        if (!authAddress) return;
         setBusyId(id);
         try {
             await reviewApproval(id, {
                 status,
-                reviewedBy: account.address,
+                reviewedBy: authAddress,
                 reviewComment: comment,
             });
             await loadApprovals();
@@ -219,7 +219,7 @@ export default function ApprovalsPage() {
         }
     };
 
-    if (!account) {
+    if (!authAddress) {
         return (
             <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4 text-muted-foreground">
                 <Shield className="h-12 w-12 opacity-30" />
