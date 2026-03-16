@@ -3,8 +3,9 @@
  */
 import { NextRequest } from "next/server";
 import { requireOrgMember } from "@/lib/auth-guard";
-import { getComputer, updateComputer } from "@/lib/compute/firestore";
+import { getComputer, updateComputer, getSessions } from "@/lib/compute/firestore";
 import { getComputeProvider } from "@/lib/compute/provider";
+import { endComputeSession } from "@/lib/compute/sessions";
 
 export async function POST(
   req: NextRequest,
@@ -31,6 +32,12 @@ export async function POST(
     if (computer.providerInstanceId) {
       await provider.stopInstance(computer.providerInstanceId);
     }
+
+    // End all active sessions for this computer
+    const sessions = await getSessions({ computerId: id, limit: 50 });
+    const activeSessions = sessions.filter((s) => !s.endedAt);
+    await Promise.all(activeSessions.map((s) => endComputeSession(s.id)));
+
     await updateComputer(id, { status: "stopped" });
     return Response.json({ ok: true });
   } catch (err) {

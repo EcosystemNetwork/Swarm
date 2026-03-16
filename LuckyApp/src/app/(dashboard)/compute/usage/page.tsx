@@ -32,26 +32,12 @@ export default function UsagePage() {
       .finally(() => setLoading(false));
   }, [currentOrg?.id]);
 
-  // Fetch sessions to derive summary when we have usage API
   useEffect(() => {
     if (!selectedWorkspace) return;
-    fetch(`/api/compute/sessions?workspaceId=${selectedWorkspace}`)
+    fetch(`/api/compute/usage?workspaceId=${selectedWorkspace}`)
       .then((r) => r.json())
       .then((data) => {
-        if (data.ok) {
-          const sessions = data.sessions || [];
-          setSummary({
-            totalComputeHours: sessions.reduce((sum: number, s: { startedAt: string | null; endedAt: string | null }) => {
-              if (!s.startedAt) return sum;
-              const end = s.endedAt ? new Date(s.endedAt).getTime() : Date.now();
-              return sum + (end - new Date(s.startedAt).getTime()) / 3600000;
-            }, 0),
-            totalStorageGb: 0,
-            totalActions: sessions.reduce((sum: number, s: { totalActions: number }) => sum + (s.totalActions || 0), 0),
-            totalSessions: sessions.length,
-            estimatedCostCents: sessions.reduce((sum: number, s: { estimatedCostCents: number }) => sum + (s.estimatedCostCents || 0), 0),
-          });
-        }
+        if (data.ok && data.summary) setSummary(data.summary);
       })
       .catch(console.error);
   }, [selectedWorkspace]);

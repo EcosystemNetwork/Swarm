@@ -54,6 +54,7 @@ const PROTECTED_PAGE_PREFIXES = [
   "/organizations",
   "/swarm",
   "/usage",
+  "/compute",
 ];
 
 /** API routes that require operator session (not agent auth) */
@@ -112,8 +113,16 @@ export async function middleware(req: NextRequest) {
   const token = req.cookies.get(SESSION_COOKIE)?.value;
   const session = token ? await verifyToken(token) : null;
 
-  // Inject session headers for downstream consumption (API routes, server components)
-  const response = NextResponse.next();
+  // Inject session headers into the REQUEST so API route handlers can read them
+  const requestHeaders = new Headers(req.headers);
+  if (session) {
+    requestHeaders.set("x-wallet-address", session.sub);
+    requestHeaders.set("x-session-address", session.sub);
+    requestHeaders.set("x-session-role", session.role);
+    requestHeaders.set("x-session-id", session.sid);
+  }
+  const response = NextResponse.next({ request: { headers: requestHeaders } });
+  // Also mirror to response headers for client-side consumption
   if (session) {
     response.headers.set("x-session-address", session.sub);
     response.headers.set("x-session-role", session.role);

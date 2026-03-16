@@ -8,6 +8,9 @@ import { getMemoryEntries, createMemoryEntry } from "@/lib/compute/firestore";
 import type { MemoryScopeType } from "@/lib/compute/types";
 
 export async function GET(req: NextRequest) {
+  const wallet = getWalletAddress(req);
+  if (!wallet) return Response.json({ error: "Authentication required" }, { status: 401 });
+
   const scopeType = req.nextUrl.searchParams.get("scopeType") as MemoryScopeType | null;
   const scopeId = req.nextUrl.searchParams.get("scopeId");
 

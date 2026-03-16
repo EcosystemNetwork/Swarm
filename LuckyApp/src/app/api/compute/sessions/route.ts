@@ -3,9 +3,13 @@
  * GET /api/compute/sessions?workspaceId=xxx — List sessions by workspace
  */
 import { NextRequest } from "next/server";
+import { getWalletAddress } from "@/lib/auth-guard";
 import { getSessions } from "@/lib/compute/firestore";
 
 export async function GET(req: NextRequest) {
+  const wallet = getWalletAddress(req);
+  if (!wallet) return Response.json({ error: "Authentication required" }, { status: 401 });
+
   const computerId = req.nextUrl.searchParams.get("computerId") || undefined;
   const workspaceId = req.nextUrl.searchParams.get("workspaceId") || undefined;
   const limit = parseInt(req.nextUrl.searchParams.get("limit") || "50");
