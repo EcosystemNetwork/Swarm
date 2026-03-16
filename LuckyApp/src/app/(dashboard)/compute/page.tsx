@@ -2,9 +2,9 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { Monitor, Plus, HardDrive, Clock, FolderKanban, LayoutGrid } from "lucide-react";
+import { Monitor, Plus, HardDrive, FolderKanban, LayoutGrid } from "lucide-react";
 import { useOrg } from "@/contexts/OrgContext";
-import type { Computer, Workspace, ComputeTemplate, ComputerSession } from "@/lib/compute/types";
+import type { Computer, Workspace, ComputeTemplate } from "@/lib/compute/types";
 import { StatusBadge } from "@/components/compute/status-badge";
 
 export default function ComputeOverview() {
@@ -13,30 +13,41 @@ export default function ComputeOverview() {
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [templates, setTemplates] = useState<ComputeTemplate[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     if (!currentOrg?.id) return;
+    setError("");
     Promise.all([
       fetch(`/api/compute/computers?orgId=${currentOrg.id}`).then((r) => r.json()),
       fetch(`/api/compute/workspaces?orgId=${currentOrg.id}`).then((r) => r.json()),
       fetch("/api/compute/templates?isPublic=true").then((r) => r.json()),
     ])
       .then(([cData, wData, tData]) => {
-        if (cData.ok) setComputers(cData.computers);
-        if (wData.ok) setWorkspaces(wData.workspaces);
-        if (tData.ok) setTemplates(tData.templates);
+        if (cData.ok) setComputers(cData.computers || []);
+        if (wData.ok) setWorkspaces(wData.workspaces || []);
+        if (tData.ok) setTemplates(tData.templates || []);
       })
-      .catch(console.error)
+      .catch((err) => setError(err.message || "Failed to load compute data"))
       .finally(() => setLoading(false));
   }, [currentOrg?.id]);
 
   const running = computers.filter((c) => c.status === "running").length;
-  const stopped = computers.filter((c) => c.status === "stopped").length;
 
   if (loading) {
     return (
       <div className="flex h-64 items-center justify-center">
         <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex h-64 flex-col items-center justify-center gap-2 p-6">
+        <p className="text-sm text-red-400">Failed to load compute data</p>
+        <p className="text-xs text-muted-foreground">{error}</p>
+        <button onClick={() => window.location.reload()} className="mt-2 rounded-md border border-border px-3 py-1.5 text-xs hover:bg-muted">Retry</button>
       </div>
     );
   }

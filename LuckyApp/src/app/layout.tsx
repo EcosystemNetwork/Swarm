@@ -9,6 +9,7 @@ import SparkleTrail from "@/components/SparkleTrail";
 import { ThemeProvider } from "@/components/theme-provider";
 import { SkinProvider } from "@/contexts/SkinContext";
 import { CommandBar } from "@/components/command-bar";
+import { PostHogProvider } from "@/components/posthog-provider";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 
@@ -39,10 +40,12 @@ export default function RootLayout({
           <Web3Provider>
             <SessionProvider>
             <OrgProvider>
+              <PostHogProvider>
               <SparkleTrail>
                 <CommandBar />
                 {children}
               </SparkleTrail>
+              </PostHogProvider>
             </OrgProvider>
             </SessionProvider>
           </Web3Provider>

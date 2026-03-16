@@ -12,7 +12,8 @@ import {
   MODEL_LABELS,
   DEFAULT_AUTO_STOP_MINUTES,
 } from "@/lib/compute/types";
-import { estimateHourlyCost } from "@/lib/compute/billing";
+import { estimateHourlyCost, estimateMonthlyCost } from "@/lib/compute/billing";
+import { trackComputeEvent } from "@/lib/posthog";
 import { StatusBadge } from "@/components/compute/status-badge";
 import { DesktopViewer } from "@/components/compute/desktop-viewer";
 import { TerminalViewer } from "@/components/compute/terminal-viewer";
@@ -31,6 +32,7 @@ export default function ComputerDetailPage({ params }: { params: Promise<{ id: s
   const [terminalUrl, setTerminalUrl] = useState("");
   const [activeSession, setActiveSession] = useState<string>("");
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
 
   // Settings state
@@ -41,31 +43,40 @@ export default function ComputerDetailPage({ params }: { params: Promise<{ id: s
   const [settingsModel, setSettingsModel] = useState<string>("");
 
   const fetchComputer = async () => {
-    const res = await fetch(`/api/compute/computers/${id}`);
-    const data = await res.json();
-    if (data.ok) {
-      setComputer(data.computer);
-      setSettingsName(data.computer.name);
-      setSettingsAutoStop(data.computer.autoStopMinutes);
-      setSettingsPersistence(data.computer.persistenceEnabled);
-      setSettingsController(data.computer.controllerType);
-      setSettingsModel(data.computer.modelKey || "");
+    try {
+      const res = await fetch(`/api/compute/computers/${id}`);
+      const data = await res.json();
+      if (data.ok) {
+        setComputer(data.computer);
+        setSettingsName(data.computer.name);
+        setSettingsAutoStop(data.computer.autoStopMinutes);
+        setSettingsPersistence(data.computer.persistenceEnabled);
+        setSettingsController(data.computer.controllerType);
+        setSettingsModel(data.computer.modelKey || "");
+      } else {
+        setError(data.error || "Failed to load computer");
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load computer");
     }
   };
 
   const fetchSessions = async () => {
-    const res = await fetch(`/api/compute/sessions?computerId=${id}`);
-    const data = await res.json();
-    if (data.ok) {
-      setSessions(data.sessions);
-      const active = data.sessions.find((s: ComputerSession) => !s.endedAt);
-      if (active) setActiveSession(active.id);
+    try {
+      const res = await fetch(`/api/compute/sessions?computerId=${id}`);
+      const data = await res.json();
+      if (data.ok) {
+        setSessions(data.sessions || []);
+        const active = (data.sessions || []).find((s: ComputerSession) => !s.endedAt);
+        if (active) setActiveSession(active.id);
+      }
+    } catch {
+      // Sessions are non-critical, silently skip
     }
   };
 
   useEffect(() => {
     Promise.all([fetchComputer(), fetchSessions()])
-      .catch(console.error)
       .finally(() => setLoading(false));
   }, [id]);
 
@@ -91,6 +102,7 @@ export default function ComputerDetailPage({ params }: { params: Promise<{ id: s
   }, [computer?.status]);
 
   const handleLifecycle = async (action: "start" | "stop" | "restart") => {
+    trackComputeEvent(`computer_${action}`, { computerId: id, sizeKey: computer?.sizeKey });
     await fetch(`/api/compute/computers/${id}/${action}`, { method: "POST" });
     await fetchComputer();
     if (action === "start") await fetchSessions();
@@ -159,10 +171,22 @@ export default function ComputerDetailPage({ params }: { params: Promise<{ id: s
     if (res.ok) router.push("/compute/computers");
   };
 
-  if (loading || !computer) {
+  if (loading) {
     return (
       <div className="flex h-64 items-center justify-center">
         <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+      </div>
+    );
+  }
+
+  if (error || !computer) {
+    return (
+      <div className="flex h-64 flex-col items-center justify-center gap-2 p-6">
+        <p className="text-sm text-red-400">{error || "Computer not found"}</p>
+        <div className="flex gap-2 mt-2">
+          <button onClick={() => { setError(""); setLoading(true); fetchComputer().finally(() => setLoading(false)); }} className="rounded-md border border-border px-3 py-1.5 text-xs hover:bg-muted">Retry</button>
+          <Link href="/compute/computers" className="rounded-md border border-border px-3 py-1.5 text-xs hover:bg-muted">Back to Computers</Link>
+        </div>
       </div>
     );
   }
@@ -292,7 +316,7 @@ export default function ComputerDetailPage({ params }: { params: Promise<{ id: s
 
         {/* Metrics Tab */}
         <TabsContent value="metrics">
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <div className="rounded-lg border border-border p-4">
               <p className="text-xs text-muted-foreground">Uptime</p>
               <p className="text-2xl font-bold mt-1">{totalHours.toFixed(1)}h</p>
@@ -308,6 +332,14 @@ export default function ComputerDetailPage({ params }: { params: Promise<{ id: s
             <div className="rounded-lg border border-border p-4">
               <p className="text-xs text-muted-foreground">Est. Cost</p>
               <p className="text-2xl font-bold mt-1">${(totalCostCents / 100).toFixed(2)}</p>
+            </div>
+            <div className="rounded-lg border border-border p-4">
+              <p className="text-xs text-muted-foreground">Hourly Rate</p>
+              <p className="text-2xl font-bold mt-1">${(costPerHour / 100).toFixed(2)}</p>
+            </div>
+            <div className="rounded-lg border border-border p-4">
+              <p className="text-xs text-muted-foreground">Projected Monthly (8h/day)</p>
+              <p className="text-2xl font-bold mt-1">${(estimateMonthlyCost(computer.sizeKey, 8) / 100).toFixed(2)}</p>
             </div>
           </div>
 
@@ -329,10 +361,6 @@ export default function ComputerDetailPage({ params }: { params: Promise<{ id: s
               <div>
                 <dt className="text-muted-foreground">Resolution</dt>
                 <dd className="font-medium">{computer.resolutionWidth}x{computer.resolutionHeight}</dd>
-              </div>
-              <div>
-                <dt className="text-muted-foreground">Rate</dt>
-                <dd className="font-medium">${(costPerHour / 100).toFixed(2)}/hr</dd>
               </div>
               <div>
                 <dt className="text-muted-foreground">Sessions</dt>

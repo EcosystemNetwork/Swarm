@@ -11,18 +11,20 @@ export default function SessionsPage() {
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [selectedWorkspace, setSelectedWorkspace] = useState<string>("");
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     if (!currentOrg?.id) return;
+    setError("");
     fetch(`/api/compute/workspaces?orgId=${currentOrg.id}`)
       .then((r) => r.json())
       .then((data) => {
-        if (data.ok && data.workspaces.length > 0) {
+        if (data.ok && data.workspaces?.length > 0) {
           setWorkspaces(data.workspaces);
           setSelectedWorkspace(data.workspaces[0].id);
         }
       })
-      .catch(console.error)
+      .catch((err) => setError(err.message || "Failed to load workspaces"))
       .finally(() => setLoading(false));
   }, [currentOrg?.id]);
 
@@ -30,8 +32,8 @@ export default function SessionsPage() {
     if (!selectedWorkspace) return;
     fetch(`/api/compute/sessions?workspaceId=${selectedWorkspace}`)
       .then((r) => r.json())
-      .then((data) => { if (data.ok) setSessions(data.sessions); })
-      .catch(console.error);
+      .then((data) => { if (data.ok) setSessions(data.sessions || []); })
+      .catch((err) => setError(err.message || "Failed to load sessions"));
   }, [selectedWorkspace]);
 
   if (loading) {

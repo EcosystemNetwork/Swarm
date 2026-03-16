@@ -16,10 +16,17 @@ export function MemoryEditor({ scopeType, scopeId }: MemoryEditorProps) {
   const [newContent, setNewContent] = useState("");
   const [newTags, setNewTags] = useState("");
 
+  const [error, setError] = useState("");
+
   const fetchEntries = async () => {
-    const res = await fetch(`/api/compute/memory?scopeType=${scopeType}&scopeId=${scopeId}`);
-    const data = await res.json();
-    if (data.ok) setEntries(data.entries);
+    try {
+      setError("");
+      const res = await fetch(`/api/compute/memory?scopeType=${scopeType}&scopeId=${scopeId}`);
+      const data = await res.json();
+      if (data.ok) setEntries(data.entries || []);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load memory");
+    }
     setLoading(false);
   };
 
@@ -67,6 +74,10 @@ export function MemoryEditor({ scopeType, scopeId }: MemoryEditorProps) {
 
   if (loading) {
     return <div className="flex h-40 items-center justify-center text-sm text-muted-foreground">Loading memory...</div>;
+  }
+
+  if (error) {
+    return <div className="flex h-40 items-center justify-center text-sm text-red-400">{error}</div>;
   }
 
   return (

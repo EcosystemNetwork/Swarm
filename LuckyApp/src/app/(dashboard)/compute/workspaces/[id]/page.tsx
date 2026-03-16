@@ -14,24 +14,36 @@ export default function WorkspaceDetailPage({ params }: { params: Promise<{ id: 
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [computers, setComputers] = useState<Computer[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   useEffect(() => {
+    setError("");
     Promise.all([
       fetch(`/api/compute/workspaces/${id}`).then((r) => r.json()),
       fetch(`/api/compute/computers?workspaceId=${id}`).then((r) => r.json()),
     ])
       .then(([wsData, cData]) => {
         if (wsData.ok) setWorkspace(wsData.workspace);
-        if (cData.ok) setComputers(cData.computers);
+        else setError(wsData.error || "Workspace not found");
+        if (cData.ok) setComputers(cData.computers || []);
       })
-      .catch(console.error)
+      .catch((err) => setError(err.message || "Failed to load workspace"))
       .finally(() => setLoading(false));
   }, [id]);
 
-  if (loading || !workspace) {
+  if (loading) {
     return (
       <div className="flex h-64 items-center justify-center">
         <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+      </div>
+    );
+  }
+
+  if (error || !workspace) {
+    return (
+      <div className="flex h-64 flex-col items-center justify-center gap-2 p-6">
+        <p className="text-sm text-red-400">{error || "Workspace not found"}</p>
+        <Link href="/compute/workspaces" className="mt-2 rounded-md border border-border px-3 py-1.5 text-xs hover:bg-muted">Back to Workspaces</Link>
       </div>
     );
   }

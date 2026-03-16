@@ -1,6 +1,7 @@
 "use client";
 
 import { SIZE_PRESETS, REGION_LABELS, type SizeKey, type Region } from "@/lib/compute/types";
+import { estimateHourlyCost } from "@/lib/compute/billing";
 
 interface ResourcePickerProps {
   sizeKey: SizeKey;
@@ -41,7 +42,10 @@ export function ResourcePicker({
                     : "border-border hover:border-muted-foreground/50"
                 }`}
               >
-                <div className="font-medium text-sm">{preset.label}</div>
+                <div className="flex items-center justify-between">
+                  <span className="font-medium text-sm">{preset.label}</span>
+                  <span className="text-xs font-medium text-primary">${(estimateHourlyCost(key) / 100).toFixed(2)}/hr</span>
+                </div>
                 <div className="text-xs text-muted-foreground mt-1">
                   {preset.disk} GB disk
                 </div>

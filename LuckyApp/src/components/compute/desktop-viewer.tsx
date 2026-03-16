@@ -14,9 +14,15 @@ export function DesktopViewer({ computerId, vncUrl }: DesktopViewerProps) {
 
   if (!vncUrl) {
     return (
-      <div className="flex h-[500px] items-center justify-center rounded-lg border border-border bg-muted/30">
+      <div className="flex h-[500px] flex-col items-center justify-center gap-2 rounded-lg border border-border bg-muted/30">
+        <div className="h-12 w-12 rounded-full border-2 border-dashed border-muted-foreground/30 flex items-center justify-center">
+          <Maximize2 className="h-5 w-5 text-muted-foreground/50" />
+        </div>
         <p className="text-sm text-muted-foreground">
-          Start the computer to view its desktop
+          Desktop not available
+        </p>
+        <p className="text-xs text-muted-foreground/70">
+          No compute provider connected. Start the computer with a real provider to stream the desktop.
         </p>
       </div>
     );

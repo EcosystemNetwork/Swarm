@@ -11,18 +11,20 @@ export default function MemoryPage() {
   const [selectedWorkspace, setSelectedWorkspace] = useState<string>("");
   const [scopeType, setScopeType] = useState<MemoryScopeType>("workspace");
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     if (!currentOrg?.id) return;
+    setError("");
     fetch(`/api/compute/workspaces?orgId=${currentOrg.id}`)
       .then((r) => r.json())
       .then((data) => {
-        if (data.ok && data.workspaces.length > 0) {
+        if (data.ok && data.workspaces?.length > 0) {
           setWorkspaces(data.workspaces);
           setSelectedWorkspace(data.workspaces[0].id);
         }
       })
-      .catch(console.error)
+      .catch((err) => setError(err.message || "Failed to load workspaces"))
       .finally(() => setLoading(false));
   }, [currentOrg?.id]);
 

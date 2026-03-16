@@ -13,9 +13,12 @@ export function TerminalViewer({ computerId, terminalUrl }: TerminalViewerProps)
 
   if (!terminalUrl) {
     return (
-      <div className="flex h-[400px] items-center justify-center rounded-lg border border-border bg-black/90">
+      <div className="flex h-[400px] flex-col items-center justify-center gap-2 rounded-lg border border-border bg-black/90">
         <p className="text-sm text-muted-foreground">
-          Start the computer to access its terminal
+          Terminal not available
+        </p>
+        <p className="text-xs text-muted-foreground/70">
+          No compute provider connected. Start the computer with a real provider to access the terminal.
         </p>
       </div>
     );

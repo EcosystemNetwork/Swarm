@@ -71,12 +71,14 @@ export class StubComputeProvider implements ComputeProvider {
     };
   }
 
-  async getVncUrl(providerInstanceId: string): Promise<string> {
-    return `wss://compute.stub/vnc/${providerInstanceId}`;
+  async getVncUrl(_providerInstanceId: string): Promise<string> {
+    // Stub mode — return empty so viewers show placeholder
+    return "";
   }
 
-  async getTerminalUrl(providerInstanceId: string): Promise<string> {
-    return `wss://compute.stub/terminal/${providerInstanceId}`;
+  async getTerminalUrl(_providerInstanceId: string): Promise<string> {
+    // Stub mode — return empty so viewers show placeholder
+    return "";
   }
 
   async createSnapshot(_providerInstanceId: string, _label: string): Promise<string> {

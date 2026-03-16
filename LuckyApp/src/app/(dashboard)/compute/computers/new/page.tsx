@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useOrg } from "@/contexts/OrgContext";
 import type { Workspace } from "@/lib/compute/types";
 import { CreateComputerWizard } from "@/components/compute/create-computer-wizard";
+import { trackComputeEvent } from "@/lib/posthog";
 
 export default function NewComputerPage() {
   const router = useRouter();
@@ -64,7 +65,7 @@ export default function NewComputerPage() {
       <h1 className="text-2xl font-bold mb-6">New Computer</h1>
       <CreateComputerWizard
         workspaces={workspaces}
-        onCreated={(id) => router.push(`/compute/computers/${id}`)}
+        onCreated={(id) => { trackComputeEvent("computer_created", { computerId: id }); router.push(`/compute/computers/${id}`); }}
         onCancel={() => router.push("/compute/computers")}
       />
     </div>

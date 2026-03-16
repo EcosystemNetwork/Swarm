@@ -47,6 +47,9 @@ export async function executeComputeAction(envelope: ActionEnvelope): Promise<{ 
   if (computer.status !== "running") {
     throw new Error(`Computer is ${computer.status}, must be running`);
   }
+  if (!computer.providerInstanceId) {
+    throw new Error("Computer has no provider instance — cannot execute actions in stub mode");
+  }
 
   // Record action as running
   const actionId = await recordAction({
@@ -64,7 +67,7 @@ export async function executeComputeAction(envelope: ActionEnvelope): Promise<{ 
   try {
     // Execute with timeout
     const result = await Promise.race<ActionResult>([
-      provider.executeAction(computer.providerInstanceId || "", envelope),
+      provider.executeAction(computer.providerInstanceId, envelope),
       new Promise<ActionResult>((_, reject) =>
         setTimeout(() => reject(new Error("Action timeout")), envelope.timeoutMs),
       ),

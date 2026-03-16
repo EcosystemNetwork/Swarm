@@ -3,6 +3,8 @@
 import { useState, useEffect } from "react";
 import { useOrg } from "@/contexts/OrgContext";
 import type { Workspace, UsageSummary } from "@/lib/compute/types";
+import { SIZE_PRESETS, type SizeKey } from "@/lib/compute/types";
+import { estimateHourlyCost, estimateMonthlyCost } from "@/lib/compute/billing";
 import { UsageChart } from "@/components/compute/usage-chart";
 
 export default function UsagePage() {
@@ -17,18 +19,20 @@ export default function UsagePage() {
     estimatedCostCents: 0,
   });
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     if (!currentOrg?.id) return;
+    setError("");
     fetch(`/api/compute/workspaces?orgId=${currentOrg.id}`)
       .then((r) => r.json())
       .then((data) => {
-        if (data.ok && data.workspaces.length > 0) {
+        if (data.ok && data.workspaces?.length > 0) {
           setWorkspaces(data.workspaces);
           setSelectedWorkspace(data.workspaces[0].id);
         }
       })
-      .catch(console.error)
+      .catch((err) => setError(err.message || "Failed to load workspaces"))
       .finally(() => setLoading(false));
   }, [currentOrg?.id]);
 
@@ -39,7 +43,7 @@ export default function UsagePage() {
       .then((data) => {
         if (data.ok && data.summary) setSummary(data.summary);
       })
-      .catch(console.error);
+      .catch((err) => setError(err.message || "Failed to load usage data"));
   }, [selectedWorkspace]);
 
   if (loading) {
@@ -68,6 +72,35 @@ export default function UsagePage() {
       </div>
 
       <UsageChart summary={summary} />
+
+      {/* Pricing Rates Reference */}
+      <div className="mt-6">
+        <h2 className="text-sm font-medium mb-3">Pricing Rates</h2>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {(Object.entries(SIZE_PRESETS) as [SizeKey, typeof SIZE_PRESETS[SizeKey]][]).map(
+            ([key, preset]) => {
+              const hourly = estimateHourlyCost(key);
+              const monthly = estimateMonthlyCost(key, 8);
+              return (
+                <div key={key} className="rounded-lg border border-border p-4">
+                  <p className="text-sm font-medium">{preset.label}</p>
+                  <p className="text-xs text-muted-foreground mt-1">{preset.disk} GB disk</p>
+                  <div className="mt-3 space-y-1">
+                    <div className="flex justify-between text-xs">
+                      <span className="text-muted-foreground">Hourly</span>
+                      <span className="font-medium">${(hourly / 100).toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between text-xs">
+                      <span className="text-muted-foreground">Monthly (8h/day)</span>
+                      <span className="font-medium">${(monthly / 100).toFixed(2)}</span>
+                    </div>
+                  </div>
+                </div>
+              );
+            },
+          )}
+        </div>
+      </div>
     </div>
   );
 }

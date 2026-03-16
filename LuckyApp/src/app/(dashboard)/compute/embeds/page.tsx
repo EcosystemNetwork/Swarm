@@ -16,18 +16,20 @@ export default function EmbedsPage() {
   const [showCreate, setShowCreate] = useState(false);
   const [mode, setMode] = useState<"read_only" | "interactive">("read_only");
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     if (!currentOrg?.id) return;
+    setError("");
     fetch(`/api/compute/workspaces?orgId=${currentOrg.id}`)
       .then((r) => r.json())
       .then((data) => {
-        if (data.ok && data.workspaces.length > 0) {
+        if (data.ok && data.workspaces?.length > 0) {
           setWorkspaces(data.workspaces);
           setSelectedWorkspace(data.workspaces[0].id);
         }
       })
-      .catch(console.error)
+      .catch((err) => setError(err.message || "Failed to load workspaces"))
       .finally(() => setLoading(false));
   }, [currentOrg?.id]);
 
@@ -37,12 +39,12 @@ export default function EmbedsPage() {
       fetch(`/api/compute/embeds?workspaceId=${selectedWorkspace}`).then((r) => r.json()),
       fetch(`/api/compute/computers?workspaceId=${selectedWorkspace}`).then((r) => r.json()),
     ]).then(([eData, cData]) => {
-      if (eData.ok) setTokens(eData.tokens);
+      if (eData.ok) setTokens(eData.tokens || []);
       if (cData.ok) {
-        setComputers(cData.computers);
-        if (cData.computers.length > 0) setSelectedComputer(cData.computers[0].id);
+        setComputers(cData.computers || []);
+        if (cData.computers?.length > 0) setSelectedComputer(cData.computers[0].id);
       }
-    });
+    }).catch((err) => setError(err.message || "Failed to load embed data"));
   }, [selectedWorkspace]);
 
   const handleCreate = async () => {

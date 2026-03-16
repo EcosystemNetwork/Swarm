@@ -306,6 +306,51 @@ export interface UsageRecord {
 }
 
 // ═══════════════════════════════════════════════════════════════
+// Billing Ledger — Cost vs Revenue Tracking
+// ═══════════════════════════════════════════════════════════════
+
+export interface BillingLedgerEntry {
+  id: string;
+  orgId: string;
+  workspaceId: string;
+  computerId: string;
+  sessionId: string | null;
+  provider: string;
+  sizeKey: SizeKey;
+  region: Region;
+  unitType: "compute_hour" | "storage_gb" | "action" | "session";
+  quantity: number;
+  providerCostCents: number;
+  markupPercent: number;
+  customerPriceCents: number;
+  platformProfitCents: number;
+  createdAt: Date | null;
+}
+
+export interface PricingSettings {
+  id: string;
+  defaultMarkupPercent: number;
+  sizeOverrides: Partial<Record<SizeKey, number>>;
+  regionOverrides: Partial<Record<Region, number>>;
+  providerOverrides: Record<string, number>;
+  minimumPriceFloorCents: number;
+  promoOverride: { percent: number; expiresAt: Date | null } | null;
+  updatedAt: Date | null;
+  updatedByUserId: string | null;
+}
+
+export interface ProfitabilitySummary {
+  totalProviderCostCents: number;
+  totalCustomerRevenueCents: number;
+  totalPlatformProfitCents: number;
+  marginPercent: number;
+  entriesByProvider: Record<string, { cost: number; revenue: number; profit: number }>;
+  entriesBySize: Record<string, { cost: number; revenue: number; profit: number }>;
+  entriesByOrg: Record<string, { cost: number; revenue: number; profit: number; orgId: string }>;
+  totalEntries: number;
+}
+
+// ═══════════════════════════════════════════════════════════════
 // Action Envelope — Internal Contract
 // ═══════════════════════════════════════════════════════════════
 

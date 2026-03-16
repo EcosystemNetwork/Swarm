@@ -16,7 +16,7 @@ import {
   type ModelKey,
   type Workspace,
 } from "@/lib/compute/types";
-import { estimateHourlyCost } from "@/lib/compute/billing";
+import { estimateHourlyCost, estimateMonthlyCost } from "@/lib/compute/billing";
 import { ResourcePicker } from "./resource-picker";
 
 interface CreateComputerWizardProps {
@@ -259,8 +259,12 @@ export function CreateComputerWizard({ workspaces, onCreated, onCancel }: Create
               </div>
             )}
             <div className="flex justify-between px-4 py-2.5">
-              <span className="text-sm text-muted-foreground">Est. Cost</span>
+              <span className="text-sm text-muted-foreground">Hourly Rate</span>
               <span className="text-sm font-medium">${(costPerHour / 100).toFixed(2)}/hr</span>
+            </div>
+            <div className="flex justify-between px-4 py-2.5">
+              <span className="text-sm text-muted-foreground">Projected Monthly (8 hrs/day)</span>
+              <span className="text-sm font-medium">${(estimateMonthlyCost(sizeKey, 8) / 100).toFixed(2)}/mo</span>
             </div>
           </div>
         </div>

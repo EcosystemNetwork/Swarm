@@ -16,8 +16,6 @@ import {
   deleteDoc,
   query,
   where,
-  orderBy,
-  limit as firestoreLimit,
   onSnapshot,
   serverTimestamp,
   Timestamp,
@@ -34,9 +32,13 @@ import type {
   MemoryEntry,
   EmbedToken,
   UsageRecord,
+  BillingLedgerEntry,
+  PricingSettings,
   ComputerStatus,
   TemplateCategory,
   MemoryScopeType,
+  SizeKey,
+  Region,
 } from "./types";
 
 // ═══════════════════════════════════════════════════════════════
@@ -55,6 +57,8 @@ const COLLECTIONS = {
   memory: "computeMemory",
   embedTokens: "computeEmbedTokens",
   usage: "computeUsage",
+  billingLedger: "computeBillingLedger",
+  pricingSettings: "computePricingSettings",
 } as const;
 
 // ═══════════════════════════════════════════════════════════════
@@ -315,14 +319,11 @@ export async function getSessions(opts: { computerId?: string; workspaceId?: str
   const constraints = [];
   if (opts.computerId) constraints.push(where("computerId", "==", opts.computerId));
   if (opts.workspaceId) constraints.push(where("workspaceId", "==", opts.workspaceId));
-  const q = query(
-    collection(db, COLLECTIONS.sessions),
-    ...constraints,
-    orderBy("startedAt", "desc"),
-    firestoreLimit(opts.limit || 50),
-  );
+  const q = query(collection(db, COLLECTIONS.sessions), ...constraints);
   const snap = await getDocs(q);
-  return snap.docs.map((s) => parseSession(s.id, s.data()));
+  const items = snap.docs.map((s) => parseSession(s.id, s.data()));
+  items.sort((a, b) => (b.startedAt?.getTime() ?? 0) - (a.startedAt?.getTime() ?? 0));
+  return items.slice(0, opts.limit || 50);
 }
 
 export async function endSession(id: string, stats: { totalActions: number; totalScreenshots: number; estimatedCostCents: number }): Promise<void> {
@@ -348,11 +349,9 @@ export async function getActions(sessionId: string, max?: number): Promise<Compu
   const q = query(
     collection(db, COLLECTIONS.actions),
     where("sessionId", "==", sessionId),
-    orderBy("createdAt", "desc"),
-    firestoreLimit(max || 100),
   );
   const snap = await getDocs(q);
-  return snap.docs.map((s) => {
+  const items = snap.docs.map((s) => {
     const d = s.data();
     return {
       id: s.id,
@@ -365,6 +364,8 @@ export async function getActions(sessionId: string, max?: number): Promise<Compu
       createdAt: toDate(d.createdAt),
     };
   });
+  items.sort((a, b) => (b.createdAt?.getTime() ?? 0) - (a.createdAt?.getTime() ?? 0));
+  return items.slice(0, max || 100);
 }
 
 export async function updateAction(id: string, data: Partial<ComputerAction>): Promise<void> {
@@ -387,9 +388,9 @@ export async function createFileRecord(data: Omit<ComputeFile, "id" | "createdAt
 export async function getFiles(workspaceId: string, computerId?: string): Promise<ComputeFile[]> {
   const constraints = [where("workspaceId", "==", workspaceId)];
   if (computerId) constraints.push(where("computerId", "==", computerId));
-  const q = query(collection(db, COLLECTIONS.files), ...constraints, orderBy("createdAt", "desc"));
+  const q = query(collection(db, COLLECTIONS.files), ...constraints);
   const snap = await getDocs(q);
-  return snap.docs.map((s) => {
+  const items = snap.docs.map((s) => {
     const d = s.data();
     return {
       id: s.id,
@@ -405,6 +406,8 @@ export async function getFiles(workspaceId: string, computerId?: string): Promis
       createdAt: toDate(d.createdAt),
     };
   });
+  items.sort((a, b) => (b.createdAt?.getTime() ?? 0) - (a.createdAt?.getTime() ?? 0));
+  return items;
 }
 
 export async function deleteFileRecord(id: string): Promise<void> {
@@ -513,14 +516,11 @@ export async function getMemoryEntries(scopeType: MemoryScopeType, scopeId: stri
     where("scopeId", "==", scopeId),
   ];
   if (opts?.pinned !== undefined) constraints.push(where("pinned", "==", opts.pinned));
-  const q = query(
-    collection(db, COLLECTIONS.memory),
-    ...constraints,
-    orderBy("createdAt", "desc"),
-    firestoreLimit(opts?.limit || 100),
-  );
+  const q = query(collection(db, COLLECTIONS.memory), ...constraints);
   const snap = await getDocs(q);
-  return snap.docs.map((s) => parseMemory(s.id, s.data()));
+  const items = snap.docs.map((s) => parseMemory(s.id, s.data()));
+  items.sort((a, b) => (b.createdAt?.getTime() ?? 0) - (a.createdAt?.getTime() ?? 0));
+  return items.slice(0, opts?.limit || 100);
 }
 
 export async function updateMemoryEntry(id: string, data: Partial<MemoryEntry>): Promise<void> {
@@ -603,11 +603,9 @@ export async function getUsage(workspaceId: string, opts?: { limit?: number }): 
   const q = query(
     collection(db, COLLECTIONS.usage),
     where("workspaceId", "==", workspaceId),
-    orderBy("createdAt", "desc"),
-    firestoreLimit(opts?.limit || 100),
   );
   const snap = await getDocs(q);
-  return snap.docs.map((s) => {
+  const items = snap.docs.map((s) => {
     const d = s.data();
     return {
       id: s.id,
@@ -621,4 +619,125 @@ export async function getUsage(workspaceId: string, opts?: { limit?: number }): 
       createdAt: toDate(d.createdAt),
     };
   });
+  items.sort((a, b) => (b.createdAt?.getTime() ?? 0) - (a.createdAt?.getTime() ?? 0));
+  return items.slice(0, opts?.limit || 100);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Billing Ledger
+// ═══════════════════════════════════════════════════════════════
+
+function parseLedgerEntry(id: string, d: Record<string, unknown>): BillingLedgerEntry {
+  return {
+    id,
+    orgId: d.orgId as string,
+    workspaceId: d.workspaceId as string,
+    computerId: d.computerId as string,
+    sessionId: (d.sessionId as string) || null,
+    provider: (d.provider as string) || "stub",
+    sizeKey: (d.sizeKey as SizeKey) || "small",
+    region: (d.region as Region) || "us-east",
+    unitType: d.unitType as BillingLedgerEntry["unitType"],
+    quantity: (d.quantity as number) || 0,
+    providerCostCents: (d.providerCostCents as number) || 0,
+    markupPercent: (d.markupPercent as number) || 0,
+    customerPriceCents: (d.customerPriceCents as number) || 0,
+    platformProfitCents: (d.platformProfitCents as number) || 0,
+    createdAt: toDate(d.createdAt),
+  };
+}
+
+export async function createLedgerEntry(data: Omit<BillingLedgerEntry, "id" | "createdAt">): Promise<string> {
+  const ref = await addDoc(collection(db, COLLECTIONS.billingLedger), {
+    ...data,
+    createdAt: serverTimestamp(),
+  });
+  return ref.id;
+}
+
+export async function getLedgerEntries(opts?: {
+  workspaceId?: string;
+  orgId?: string;
+  limit?: number;
+}): Promise<BillingLedgerEntry[]> {
+  const constraints = [];
+  if (opts?.workspaceId) constraints.push(where("workspaceId", "==", opts.workspaceId));
+  if (opts?.orgId) constraints.push(where("orgId", "==", opts.orgId));
+  const q = query(collection(db, COLLECTIONS.billingLedger), ...constraints);
+  const snap = await getDocs(q);
+  const items = snap.docs.map((s) => parseLedgerEntry(s.id, s.data()));
+  items.sort((a, b) => (b.createdAt?.getTime() ?? 0) - (a.createdAt?.getTime() ?? 0));
+  return items.slice(0, opts?.limit || 500);
+}
+
+export async function getAllLedgerEntries(limit?: number): Promise<BillingLedgerEntry[]> {
+  const q = query(collection(db, COLLECTIONS.billingLedger));
+  const snap = await getDocs(q);
+  const items = snap.docs.map((s) => parseLedgerEntry(s.id, s.data()));
+  items.sort((a, b) => (b.createdAt?.getTime() ?? 0) - (a.createdAt?.getTime() ?? 0));
+  return items.slice(0, limit || 1000);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Pricing Settings (singleton document)
+// ═══════════════════════════════════════════════════════════════
+
+const PRICING_DOC_ID = "global";
+
+const DEFAULT_PRICING: Omit<PricingSettings, "id"> = {
+  defaultMarkupPercent: 30,
+  sizeOverrides: {},
+  regionOverrides: {},
+  providerOverrides: {},
+  minimumPriceFloorCents: 1,
+  promoOverride: null,
+  updatedAt: null,
+  updatedByUserId: null,
+};
+
+function parsePricingSettings(id: string, d: Record<string, unknown>): PricingSettings {
+  return {
+    id,
+    defaultMarkupPercent: (d.defaultMarkupPercent as number) ?? 30,
+    sizeOverrides: (d.sizeOverrides as Partial<Record<SizeKey, number>>) || {},
+    regionOverrides: (d.regionOverrides as Partial<Record<Region, number>>) || {},
+    providerOverrides: (d.providerOverrides as Record<string, number>) || {},
+    minimumPriceFloorCents: (d.minimumPriceFloorCents as number) ?? 1,
+    promoOverride: d.promoOverride
+      ? {
+          percent: (d.promoOverride as { percent: number; expiresAt: unknown }).percent,
+          expiresAt: toDate((d.promoOverride as { expiresAt: unknown }).expiresAt),
+        }
+      : null,
+    updatedAt: toDate(d.updatedAt),
+    updatedByUserId: (d.updatedByUserId as string) || null,
+  };
+}
+
+export async function getPricingSettings(): Promise<PricingSettings> {
+  const snap = await getDoc(doc(db, COLLECTIONS.pricingSettings, PRICING_DOC_ID));
+  if (!snap.exists()) {
+    return { id: PRICING_DOC_ID, ...DEFAULT_PRICING };
+  }
+  return parsePricingSettings(snap.id, snap.data());
+}
+
+export async function updatePricingSettings(
+  data: Partial<Omit<PricingSettings, "id">>,
+  userId: string,
+): Promise<void> {
+  const { setDoc } = await import("firebase/firestore");
+  const ref = doc(db, COLLECTIONS.pricingSettings, PRICING_DOC_ID);
+  const snap = await getDoc(ref);
+  const update = {
+    ...data,
+    updatedAt: serverTimestamp(),
+    updatedByUserId: userId,
+  };
+
+  if (snap.exists()) {
+    await updateDoc(ref, update);
+  } else {
+    await setDoc(ref, { ...DEFAULT_PRICING, ...update });
+  }
 }

@@ -10,33 +10,42 @@ export default function WorkspacesPage() {
   const { currentOrg } = useOrg();
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
   const [showCreate, setShowCreate] = useState(false);
   const [newName, setNewName] = useState("");
   const [newDesc, setNewDesc] = useState("");
 
-  useEffect(() => {
+  const loadWorkspaces = () => {
     if (!currentOrg?.id) return;
+    setError("");
     fetch(`/api/compute/workspaces?orgId=${currentOrg.id}`)
       .then((r) => r.json())
-      .then((data) => { if (data.ok) setWorkspaces(data.workspaces); })
-      .catch(console.error)
+      .then((data) => { if (data.ok) setWorkspaces(data.workspaces || []); })
+      .catch((err) => setError(err.message || "Failed to load workspaces"))
       .finally(() => setLoading(false));
-  }, [currentOrg?.id]);
+  };
+
+  useEffect(() => { loadWorkspaces(); }, [currentOrg?.id]);
 
   const handleCreate = async () => {
     if (!newName.trim()) return;
-    const res = await fetch("/api/compute/workspaces", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ orgId: currentOrg?.id, name: newName, description: newDesc }),
-    });
-    if (res.ok) {
-      setShowCreate(false);
-      setNewName("");
-      setNewDesc("");
-      // Refresh
-      const data = await fetch(`/api/compute/workspaces?orgId=${currentOrg?.id}`).then((r) => r.json());
-      if (data.ok) setWorkspaces(data.workspaces);
+    try {
+      const res = await fetch("/api/compute/workspaces", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orgId: currentOrg?.id, name: newName, description: newDesc }),
+      });
+      if (res.ok) {
+        setShowCreate(false);
+        setNewName("");
+        setNewDesc("");
+        loadWorkspaces();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        setError(data.error || "Failed to create workspace");
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to create workspace");
     }
   };
 
@@ -44,6 +53,15 @@ export default function WorkspacesPage() {
     return (
       <div className="flex h-64 items-center justify-center">
         <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+      </div>
+    );
+  }
+
+  if (error && workspaces.length === 0) {
+    return (
+      <div className="flex h-64 flex-col items-center justify-center gap-2 p-6">
+        <p className="text-sm text-red-400">{error}</p>
+        <button onClick={() => { setLoading(true); loadWorkspaces(); }} className="mt-2 rounded-md border border-border px-3 py-1.5 text-xs hover:bg-muted">Retry</button>
       </div>
     );
   }

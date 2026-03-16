@@ -11,23 +11,31 @@ export default function ComputersListPage() {
   const { currentOrg } = useOrg();
   const [computers, setComputers] = useState<Computer[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
 
-  useEffect(() => {
+  const loadComputers = () => {
     if (!currentOrg?.id) return;
+    setError("");
     fetch(`/api/compute/computers?orgId=${currentOrg.id}`)
       .then((r) => r.json())
-      .then((data) => { if (data.ok) setComputers(data.computers); })
-      .catch(console.error)
+      .then((data) => { if (data.ok) setComputers(data.computers || []); })
+      .catch((err) => setError(err.message || "Failed to load computers"))
       .finally(() => setLoading(false));
-  }, [currentOrg?.id]);
+  };
+
+  useEffect(() => { loadComputers(); }, [currentOrg?.id]);
 
   const handleLifecycle = async (id: string, action: "start" | "stop" | "restart") => {
-    const res = await fetch(`/api/compute/computers/${id}/${action}`, { method: "POST" });
-    if (res.ok) {
-      // Refresh list
-      const data = await fetch(`/api/compute/computers?orgId=${currentOrg?.id}`).then((r) => r.json());
-      if (data.ok) setComputers(data.computers);
+    try {
+      const res = await fetch(`/api/compute/computers/${id}/${action}`, { method: "POST" });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setError(data.error || `Failed to ${action} computer`);
+      }
+      loadComputers();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : `Failed to ${action}`);
     }
   };
 
@@ -39,6 +47,16 @@ export default function ComputersListPage() {
     return (
       <div className="flex h-64 items-center justify-center">
         <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+      </div>
+    );
+  }
+
+  if (error && computers.length === 0) {
+    return (
+      <div className="flex h-64 flex-col items-center justify-center gap-2 p-6">
+        <p className="text-sm text-red-400">Failed to load computers</p>
+        <p className="text-xs text-muted-foreground">{error}</p>
+        <button onClick={() => { setLoading(true); loadComputers(); }} className="mt-2 rounded-md border border-border px-3 py-1.5 text-xs hover:bg-muted">Retry</button>
       </div>
     );
   }

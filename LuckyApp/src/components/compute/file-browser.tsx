@@ -12,13 +12,15 @@ interface FileBrowserProps {
 export function FileBrowser({ workspaceId, computerId }: FileBrowserProps) {
   const [files, setFiles] = useState<ComputeFile[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   useEffect(() => {
+    setError("");
     const url = `/api/compute/files?workspaceId=${workspaceId}${computerId ? `&computerId=${computerId}` : ""}`;
     fetch(url)
       .then((r) => r.json())
-      .then((data) => { if (data.ok) setFiles(data.files); })
-      .catch(console.error)
+      .then((data) => { if (data.ok) setFiles(data.files || []); })
+      .catch((err) => setError(err.message || "Failed to load files"))
       .finally(() => setLoading(false));
   }, [workspaceId, computerId]);
 
@@ -35,6 +37,10 @@ export function FileBrowser({ workspaceId, computerId }: FileBrowserProps) {
 
   if (loading) {
     return <div className="flex h-40 items-center justify-center text-sm text-muted-foreground">Loading files...</div>;
+  }
+
+  if (error) {
+    return <div className="flex h-40 items-center justify-center text-sm text-red-400">{error}</div>;
   }
 
   return (

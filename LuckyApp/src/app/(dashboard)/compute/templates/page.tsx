@@ -8,13 +8,14 @@ import { TemplateCard } from "@/components/compute/template-card";
 export default function TemplatesPage() {
   const [templates, setTemplates] = useState<ComputeTemplate[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
 
   useEffect(() => {
     fetch("/api/compute/templates?isPublic=true")
       .then((r) => r.json())
-      .then((data) => { if (data.ok) setTemplates(data.templates); })
-      .catch(console.error)
+      .then((data) => { if (data.ok) setTemplates(data.templates || []); })
+      .catch((err) => setError(err.message || "Failed to load templates"))
       .finally(() => setLoading(false));
   }, []);
 
@@ -26,6 +27,15 @@ export default function TemplatesPage() {
     return (
       <div className="flex h-64 items-center justify-center">
         <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex h-64 flex-col items-center justify-center gap-2 p-6">
+        <p className="text-sm text-red-400">{error}</p>
+        <button onClick={() => window.location.reload()} className="mt-2 rounded-md border border-border px-3 py-1.5 text-xs hover:bg-muted">Retry</button>
       </div>
     );
   }

@@ -12,19 +12,33 @@ export default function TemplateDetailPage({ params }: { params: Promise<{ id: s
   const router = useRouter();
   const [template, setTemplate] = useState<ComputeTemplate | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   useEffect(() => {
+    setError("");
     fetch(`/api/compute/templates/${id}`)
       .then((r) => r.json())
-      .then((data) => { if (data.ok) setTemplate(data.template); })
-      .catch(console.error)
+      .then((data) => {
+        if (data.ok) setTemplate(data.template);
+        else setError(data.error || "Template not found");
+      })
+      .catch((err) => setError(err.message || "Failed to load template"))
       .finally(() => setLoading(false));
   }, [id]);
 
-  if (loading || !template) {
+  if (loading) {
     return (
       <div className="flex h-64 items-center justify-center">
         <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+      </div>
+    );
+  }
+
+  if (error || !template) {
+    return (
+      <div className="flex h-64 flex-col items-center justify-center gap-2 p-6">
+        <p className="text-sm text-red-400">{error || "Template not found"}</p>
+        <Link href="/compute/templates" className="mt-2 rounded-md border border-border px-3 py-1.5 text-xs hover:bg-muted">Back to Templates</Link>
       </div>
     );
   }
