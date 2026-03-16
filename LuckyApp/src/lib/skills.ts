@@ -25,6 +25,7 @@ import { HBAR_MANIFEST } from "./hbar";
 import { SOLANA_MANIFEST } from "./solana";
 import { METAPLEX_MANIFEST } from "./metaplex";
 import { BITTENSOR_MANIFEST } from "./bittensor";
+import { BRANDMOVER_MANIFEST } from "./brandmover";
 
 // ═══════════════════════════════════════════════════════════════
 // Types
@@ -447,9 +448,31 @@ export const SKILL_REGISTRY: Skill[] = [
         modManifest: HBAR_MANIFEST,
     },
     {
+        id: "brandmover",
+        name: "BrandMover",
+        description: "Autonomous AI CMO on Hedera — encrypted brand vault, multi-platform campaign generation, on-chain audit trail, HSS auto-remarketing, and HBAR-escrowed task delegation.",
+        type: "mod",
+        source: "verified",
+        category: "Web3",
+        icon: "📢",
+        version: "1.0.0",
+        author: "Swarm Core",
+        requires: ["hbar-onchain"],
+        tags: ["brandmover", "marketing", "hedera", "campaigns", "hss", "brand"],
+        pricing: { model: "free" },
+        sidebarConfig: {
+            sectionId: "modifications",
+            label: "BrandMover",
+            href: "/hbar?tab=brandmover",
+            iconName: "Megaphone",
+            parentModId: "hbar-onchain",
+        },
+        modManifest: BRANDMOVER_MANIFEST,
+    },
+    {
         id: "solana-web3",
         name: "Solana",
-        description: "Wallet connectivity, SPL token operations, staking, and program interactions on Solana. The foundational chain integration for Solana ecosystem mods.",
+        description: "Solana dashboard — wallet connectivity, SPL token operations, staking, and program interactions. UI manifest with tool definitions; on-chain programs not yet deployed.",
         type: "mod",
         source: "verified",
         category: "Web3",
@@ -469,7 +492,7 @@ export const SKILL_REGISTRY: Skill[] = [
     {
         id: "metaplex-nft",
         name: "Metaplex",
-        description: "NFT minting, collections, and metadata management on Solana via Metaplex. Mint agent identity NFTs, create collections, and manage on-chain metadata.",
+        description: "Metaplex NFT dashboard — minting, collections, and metadata management on Solana. UI manifest with tool definitions; Candy Machine programs not yet deployed.",
         type: "mod",
         source: "verified",
         category: "Web3",

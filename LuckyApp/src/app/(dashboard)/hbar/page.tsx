@@ -1,7 +1,8 @@
 /** HBAR — On-chain task board, agent registry, and treasury on Hedera. */
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -18,7 +19,7 @@ import { useActiveAccount } from "thirdweb/react";
 import {
   TaskStatus,
   STATUS_CONFIG,
-  CONTRACTS,
+  HEDERA_CONTRACTS as CONTRACTS,
   shortAddr,
   timeRemaining,
   explorerContract,
@@ -34,7 +35,7 @@ import CountUp from "@/components/reactbits/CountUp";
 // Types
 // ═══════════════════════════════════════════════════════════════
 
-type HbarTab = "overview" | "tasks" | "agents" | "treasury" | "explorer";
+type HbarTab = "overview" | "tasks" | "agents" | "treasury" | "explorer" | "brandmover";
 
 interface AgentPerformance {
   agentId: string;
@@ -54,8 +55,16 @@ interface AgentPerformance {
 // ═══════════════════════════════════════════════════════════════
 
 export default function HbarPage() {
-  const [tab, setTab] = useState<HbarTab>("overview");
+  const searchParams = useSearchParams();
+  const initialTab = (searchParams.get("tab") as HbarTab) || "overview";
+  const [tab, setTab] = useState<HbarTab>(initialTab);
   const account = useActiveAccount();
+
+  // Sync tab from URL changes (e.g. sidebar click to ?tab=brandmover)
+  useEffect(() => {
+    const urlTab = searchParams.get("tab") as HbarTab;
+    if (urlTab && urlTab !== tab) setTab(urlTab);
+  }, [searchParams]); // eslint-disable-line react-hooks/exhaustive-deps
   const swarm = useSwarmData();
   const swarmWrite = useSwarmWrite();
   const { symbol: currencySymbol, fmt: fmtCurrency } = useChainCurrency();
@@ -219,6 +228,7 @@ export default function HbarPage() {
     { id: "agents", label: "Agents", icon: "🤖" },
     { id: "treasury", label: "Treasury", icon: "🏦" },
     { id: "explorer", label: "Explorer", icon: "🔗" },
+    { id: "brandmover", label: "BrandMover", icon: "📢" },
   ];
 
   // ── Render ──
@@ -626,6 +636,182 @@ export default function HbarPage() {
                       <p className="font-medium font-mono text-xs">https://testnet.hashio.io/api</p>
                     </div>
                   </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
+          {/* ═══════════ BRANDMOVER TAB ═══════════ */}
+          {tab === "brandmover" && (
+            <div className="space-y-6">
+              {/* BrandMover Header */}
+              <div className="flex items-center gap-3">
+                <span className="text-3xl">📢</span>
+                <div>
+                  <h2 className="text-xl font-bold">BrandMover</h2>
+                  <p className="text-sm text-muted-foreground">Autonomous AI CMO — encrypted brand vault, campaigns, HSS remarketing</p>
+                </div>
+                <Badge variant="outline" className="ml-auto bg-emerald-500/10 border-emerald-500/20 text-emerald-400">Live on Hedera Testnet</Badge>
+              </div>
+
+              {/* Architecture Overview */}
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium flex items-center gap-2">🔐 Brand Vault</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-xs text-muted-foreground mb-2">AES-256-CBC encrypted brand guidelines stored on-chain. Agent access control with time-locked delegation.</p>
+                    <code className="text-[10px] font-mono text-muted-foreground/70 block break-all">0x2254185AB8B6AC995F97C769a414A0281B42853b</code>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium flex items-center gap-2">📢 Campaign Engine</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-xs text-muted-foreground mb-2">Generate campaigns across 7 platforms — Twitter, LinkedIn, Discord, Instagram, YouTube, Email, PR. Content hashed on-chain.</p>
+                    <div className="flex flex-wrap gap-1">
+                      {["twitter", "linkedin", "discord", "instagram", "youtube", "email", "pr"].map(p => (
+                        <Badge key={p} variant="outline" className="text-[9px] px-1.5 py-0">{p}</Badge>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium flex items-center gap-2">⏰ HSS Scheduler</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-xs text-muted-foreground mb-2">Auto-schedule remarketing via Hedera Schedule Service (0x16b). Truly autonomous — no bots or keepers needed.</p>
+                    <Badge variant="outline" className="text-[9px] bg-amber-500/10 border-amber-500/20 text-amber-400">HIP-1215</Badge>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Campaign Pricing */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Campaign Pricing</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    {[
+                      { tier: "Full Campaign", price: "100 HBAR", platforms: "All 7 platforms", desc: "PR, social, video, email" },
+                      { tier: "Social Only", price: "40 HBAR", platforms: "Social platforms", desc: "Twitter, LinkedIn, Discord, Instagram" },
+                      { tier: "Single Platform", price: "15 HBAR", platforms: "1 platform", desc: "Any single channel" },
+                    ].map(t => (
+                      <div key={t.tier} className="p-4 rounded-lg border border-border hover:border-emerald-500/50 transition-colors">
+                        <div className="font-semibold text-sm">{t.tier}</div>
+                        <div className="text-2xl font-bold text-emerald-400 my-1">{t.price}</div>
+                        <div className="text-xs text-muted-foreground">{t.platforms}</div>
+                        <div className="text-xs text-muted-foreground/60 mt-1">{t.desc}</div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Treasury Auto-Split */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Agent Treasury Auto-Split</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-muted-foreground mb-4">All incoming payments auto-split on receive(). Trading agents earn, brand agents spend.</p>
+                  <div className="grid gap-2 sm:grid-cols-3">
+                    <div className="p-3 rounded-lg bg-emerald-500/5 border border-emerald-500/10">
+                      <div className="text-xs text-muted-foreground">Reserve</div>
+                      <div className="text-xl font-bold text-emerald-400">80%</div>
+                      <div className="text-[10px] text-muted-foreground/60">Worker payments, escrow</div>
+                    </div>
+                    <div className="p-3 rounded-lg bg-blue-500/5 border border-blue-500/10">
+                      <div className="text-xs text-muted-foreground">Compute</div>
+                      <div className="text-xl font-bold text-blue-400">10%</div>
+                      <div className="text-[10px] text-muted-foreground/60">Claude API costs</div>
+                    </div>
+                    <div className="p-3 rounded-lg bg-amber-500/5 border border-amber-500/10">
+                      <div className="text-xs text-muted-foreground">Growth</div>
+                      <div className="text-xl font-bold text-amber-400">10%</div>
+                      <div className="text-[10px] text-muted-foreground/60">Self-marketing campaigns</div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Task Delegation Flow */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Task Delegation Flow</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    {[
+                      { step: "1", label: "Post Task", desc: "Brand agent posts task to SwarmTaskBoard with HBAR escrow" },
+                      { step: "2", label: "Grant Access", desc: "Time-locked encrypted guidelines shared with worker via grantTaskAccess()" },
+                      { step: "3", label: "Claim & Work", desc: "Worker claims task, receives re-encrypted guidelines subset" },
+                      { step: "4", label: "Submit Proof", desc: "Worker submits delivery hash (SHA-256) as proof of completion" },
+                      { step: "5", label: "Approve & Pay", desc: "Creator approves — escrow released to worker, registry stats updated" },
+                    ].map(s => (
+                      <div key={s.step} className="flex items-start gap-3">
+                        <div className="flex items-center justify-center w-7 h-7 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-bold shrink-0">{s.step}</div>
+                        <div>
+                          <div className="font-semibold text-sm">{s.label}</div>
+                          <div className="text-xs text-muted-foreground">{s.desc}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* BrandMover Contracts */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">BrandMover Contracts</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {[
+                    { label: "BrandVault", address: "0x2254185AB8B6AC995F97C769a414A0281B42853b", desc: "Encrypted guidelines, campaigns, HSS scheduling" },
+                    { label: "BrandRegistry", address: "0x76c00C56A60F0a92ED899246Af76c65D835A8EAA", desc: "All vault deployments, aggregate revenue" },
+                    { label: "AgentTreasury", address: "0x1AC9C959459ED904899a1d52f493e9e4A879a9f4", desc: "Auto-split 80/10/10 treasury" },
+                    { label: "SwarmTaskBoard", address: "0x00CBBA3bb2Bd5B860b2D17660F801eA5a2e9a8c9", desc: "HBAR-escrowed task marketplace" },
+                    { label: "SwarmAgentRegistry", address: "0x557Ac244E4D73910C89631937699cDb44Fb04cc6", desc: "Worker registration, stats tracking" },
+                  ].map(c => (
+                    <div key={c.label} className="flex items-center justify-between py-2 border-b border-border last:border-0">
+                      <div>
+                        <p className="text-sm font-medium">{c.label}</p>
+                        <p className="text-[10px] text-muted-foreground mb-0.5">{c.desc}</p>
+                        <p className="text-xs font-mono text-muted-foreground/70 break-all">{c.address}</p>
+                      </div>
+                      <a
+                        href={`https://hashscan.io/testnet/contract/${c.address}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-emerald-600 hover:text-emerald-500 underline-offset-2 hover:underline shrink-0 ml-3"
+                      >
+                        HashScan
+                      </a>
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+
+              {/* GitHub Link */}
+              <Card>
+                <CardContent className="flex items-center justify-between py-4">
+                  <div>
+                    <p className="font-semibold text-sm">Source Code</p>
+                    <p className="text-xs text-muted-foreground">5 contracts, 11 agent scripts, 9 dashboard panels</p>
+                  </div>
+                  <a
+                    href="https://github.com/The-Swarm-Protocol/brandmover"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-sm text-emerald-600 hover:text-emerald-500 underline-offset-2 hover:underline"
+                  >
+                    github.com/The-Swarm-Protocol/brandmover →
+                  </a>
                 </CardContent>
               </Card>
             </div>

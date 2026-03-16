@@ -13,7 +13,7 @@ import {
   LayoutGrid, Shield, Clock, Activity, BarChart3, Settings,
   Map, FileText, ChevronLeft, ChevronRight, ChevronDown, GripVertical,
   Command, Coins, Stethoscope, Brain, UserCog, Network, HardDrive, BookOpen, Store, Building2,
-  Link as LinkIcon, Zap, Palette,
+  Link as LinkIcon, Zap, Palette, Megaphone,
 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
@@ -24,6 +24,7 @@ const ICON_MAP: Record<string, typeof LayoutDashboard> = {
   Zap: Zap,
   Palette: Palette,
   Brain: Brain,
+  Megaphone: Megaphone,
 };
 
 // ═══════════════════════════════════════════════════════════════
@@ -308,6 +309,7 @@ export function Sidebar() {
     try {
       const owned = await getOwnedItems(orgId);
       const ownedIds = new Set(owned.filter(o => o.enabled).map(o => o.skillId));
+      console.log('[Sidebar] Owned items:', Array.from(ownedIds));
 
       // Separate parent items from child items
       const parentItems: { sectionId: string; item: NavItem }[] = [];
@@ -316,6 +318,7 @@ export function Sidebar() {
       for (const skill of SKILL_REGISTRY) {
         if (skill.sidebarConfig && ownedIds.has(skill.id)) {
           const icon = ICON_MAP[skill.sidebarConfig.iconName] as typeof LayoutDashboard | undefined;
+          console.log('[Sidebar] Processing mod:', skill.id, 'icon:', skill.sidebarConfig.iconName, 'found:', icon != null);
           if (icon != null) {
             const navItem: NavItem = {
               id: `mod-${skill.id}`,

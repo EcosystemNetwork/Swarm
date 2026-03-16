@@ -16,7 +16,7 @@
 - ✅ Updated [`src/hooks/useAutoSiwe.ts`](src/hooks/useAutoSiwe.ts) - All console.log → debug.log
 - ✅ Updated [`src/contexts/SessionContext.tsx`](src/contexts/SessionContext.tsx) - All console.log → debug.log
 - ✅ Updated [`src/app/page.tsx`](src/app/page.tsx) - All console.log → debug.log
-- ✅ Updated [`src/lib/fetch-interceptor.ts`](src/lib/fetch-interceptor.ts) - Only log errors in prod
+- ~~`src/lib/fetch-interceptor.ts`~~ — Removed (circuit breaker logging handled elsewhere)
 
 **Impact:**
 - Development: All debug logs visible
@@ -103,25 +103,11 @@ X-RateLimit-Reset: 1709299200
 **Solution:** Conditional logging - only in development
 
 **Files Changed:**
-- ✅ Updated [`src/lib/fetch-interceptor.ts`](src/lib/fetch-interceptor.ts)
+- ~~`src/lib/fetch-interceptor.ts`~~ — Removed; circuit breaker noise handled by `debug.ts` utility
 
 **Behavior:**
-- **Development:** All circuit breaker logs visible (info, warn, error)
-- **Production:** Only error logs (circuit state changes still work silently)
-
-**Before:**
-```
-[Swarm:fetch] [social.thirdweb.com] Non-OK response {"status":500}
-[Swarm:fetch] [social.thirdweb.com] Retry 1/2 after 800ms
-[Swarm:fetch] [social.thirdweb.com] Non-OK response {"status":500}
-[Swarm:fetch] [social.thirdweb.com] Retry 2/2 after 2000ms
-... (spam continues)
-```
-
-**After (Production):**
-```
-(silent - circuit breaker handles gracefully)
-```
+- **Development:** All circuit breaker logs visible via `debug.log()`
+- **Production:** Only `debug.error()` logs (errors always visible)
 
 ---
 

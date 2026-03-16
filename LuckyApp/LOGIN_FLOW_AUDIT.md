@@ -2,7 +2,7 @@
 
 **Generated:** 2026-03-11
 **Status:** ✅ WORKING (as of latest test)
-**Authentication Method:** Wallet-based (no signature required)
+**Authentication Method:** SIWE (Sign-In With Ethereum) via Thirdweb — wallet signature required
 
 ---
 
@@ -36,9 +36,13 @@ useAutoSiwe effect fires
   ├─ account changed from undefined → { address: "0x..." }
   ├─ loading = false (session check complete)
   ├─ authenticated = false (no session yet)
-  └─ Calls triggerLogin(account.address)
-      ├─ POST /api/auth/verify { address: "0x..." }
-      │   ├─ Fetches organizations from Firestore
+  └─ Calls triggerLogin(account)
+      ├─ POST /api/auth/payload { address: "0x..." }
+      │   └─ Server returns SIWE login payload
+      ├─ User signs payload in wallet (SIWE)
+      ├─ POST /api/auth/verify { payload, signature }
+      │   ├─ Verifies SIWE signature via thirdweb
+      │   ├─ Fetches organizations from Firestore (cached 5min)
       │   ├─ Resolves role (operator | org_admin | platform_admin)
       │   ├─ Creates Firestore session record (24h TTL)
       │   ├─ Signs JWT with SESSION_SECRET (HS256)
@@ -127,20 +131,25 @@ if (signingRef.current) return;   // Login in progress
 ### Server-Side Endpoints
 
 #### [POST /api/auth/verify](src/app/api/auth/verify/route.ts)
-**Purpose:** Create session for a wallet address (no signature required)
+**Purpose:** Verify SIWE signature and create authenticated session
 
-**Input:** `{ address: string }`
+**Input:** `{ payload: LoginPayload, signature: string }`
 
 **Flow:**
-1. Validate address is non-empty string
-2. `getOrganizationsByWallet(address)` → fetch orgs from Firestore
-3. `resolveRole(address, ownedOrgIds)` → determine role
-4. `createSession(address, role)` → create Firestore session record
-5. `signSessionJWT(address, sessionId, role)` → create JWT
-6. `setSessionCookie(token)` → set httpOnly cookie
-7. Return `{ success: true, session: { address, role } }`
+1. Rate-limit check (10 req/min per IP via Firestore-backed limiter)
+2. Validate `payload` and `signature` are present
+3. Verify SIWE signature via `thirdwebAuth.verifyPayload({ payload, signature })`
+4. Extract `address` from verified payload
+5. `getOrganizationsByWallet(address)` → fetch orgs (with in-memory cache, 5min TTL)
+6. `resolveRole(address, ownedOrgIds)` → determine role
+7. `createSession(address, role)` → create Firestore session record
+8. `signSessionJWT(address, sessionId, role)` → create JWT
+9. `setSessionCookie(token)` → set httpOnly cookie
+10. Return `{ success: true, session: { address, role } }`
 
 **Error Handling:**
+- Invalid/missing signature → 401
+- Rate limit exceeded → 429 with Retry-After header
 - Firestore errors → 500 with user-friendly message
 - JWT signing errors → 500 with SESSION_SECRET hint
 - Cookie errors → logged but doesn't fail request
@@ -260,21 +269,20 @@ return orgs
 
 ### ⚠️ Potential Issues
 
-#### 1. **No Signature Verification**
-**Current:** User connects wallet → auto-logged in with just address
-**Risk:** Anyone can claim any address if they can connect a wallet
-**Mitigation:** Wallet connection itself requires user approval in wallet UI
-**Recommendation:** Consider adding signature verification for high-value operations
+#### 1. ~~No Signature Verification~~ ✅ RESOLVED
+**Status:** SIWE signature verification is now enforced via `thirdwebAuth.verifyPayload()`.
+Both `payload` and `signature` are required; invalid signatures return 401.
 
-#### 2. **Firestore Query Performance**
-**Issue:** `getOrganizationsByWallet()` makes 2 Firestore queries per login
-**Impact:** First login can take 7+ seconds (cold start)
-**Mitigation:** Consider caching or indexing strategy
+#### 2. ~~Firestore Query Performance~~ ✅ MITIGATED
+**Status:** In-memory org cache added (`src/lib/org-cache.ts`, 5-minute TTL).
+Warm logins now ~50ms instead of ~500ms. Cold start still ~7s (architectural).
 
-#### 3. **No Rate Limiting**
-**Issue:** `/api/auth/verify` has no rate limiting
-**Risk:** Spam account creation, Firestore abuse
-**Recommendation:** Add rate limiting (e.g., 5 logins per IP per minute)
+#### 3. ~~No Rate Limiting~~ ✅ RESOLVED
+**Status:** Firestore-backed rate limiter applied (`src/lib/rate-limit-firestore.ts`).
+10 requests/min per IP. Returns 429 with `Retry-After` header when exceeded.
+Fail-open note: if Firestore is unreachable, the limiter allows the request through
+to avoid locking out all users during an outage. This is intentional — monitor
+Firestore availability separately.
 
 #### 4. **SESSION_SECRET in plaintext**
 **Current:** Stored in `.env.local`
@@ -284,9 +292,10 @@ return orgs
 **Mitigation:** All addresses normalized to lowercase before storage/comparison
 **Code:** `address.toLowerCase()` used consistently
 
-#### 6. **Debug Logging in Production**
-**Issue:** console.log statements everywhere
-**Recommendation:** Use environment-aware logging (only debug logs in dev)
+#### 6. ~~Debug Logging in Production~~ ✅ MITIGATED
+**Status:** `src/lib/debug.ts` utility created. Client-side hooks and session context
+use `debug.log()` (dev-only). Server-side auth routes still use `console.log` for
+operational visibility — acceptable for Next.js server logs.
 
 ---
 

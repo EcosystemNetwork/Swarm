@@ -123,8 +123,10 @@ export async function checkRateLimit(
     });
   } catch (err) {
     console.error("[RateLimit] Transaction failed:", err);
-    // Fail-open: allow request if Firestore unavailable
-    // In production, you might want fail-closed for security
+    // Fail-open: allow request if Firestore is unavailable.
+    // This is intentional — a Firestore outage should not lock out all users.
+    // Trade-off: during outage, rate limiting is bypassed. Monitor Firestore
+    // availability separately (e.g., GCP uptime checks).
     return {
       allowed: true,
       remaining: config.max - 1,

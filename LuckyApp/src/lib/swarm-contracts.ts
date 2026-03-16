@@ -19,28 +19,37 @@ import {
 } from "./chains";
 
 // ============================================================
-// Default Config — used for on-chain agent registration
+// Default Config — Sepolia LINK is the primary chain
 // ============================================================
 
-export const DEFAULT_RPC_URL = "https://ethereum-rpc.publicnode.com";
-export const DEFAULT_CHAIN_ID = 1;
-export const EXPLORER_BASE = "https://etherscan.io";
+export const DEFAULT_RPC_URL = "https://ethereum-sepolia-rpc.publicnode.com";
+export const DEFAULT_CHAIN_ID = 11155111; // Sepolia
+export const EXPLORER_BASE = "https://sepolia.etherscan.io";
 export const DEFAULT_GAS_LIMIT = 3_000_000;
 
-// Hedera-specific gas limit for agent registration (high gas due to on-chain storage)
-export const HEDERA_GAS_LIMIT = DEFAULT_GAS_LIMIT;
-
 // ============================================================
-// Contract Addresses — defaults to Hedera (where contracts are deployed)
-// Use getContracts(chainId) for multi-chain
+// Contract Addresses — primary chain is Sepolia LINK
+// For LINK ABIs with ASN + credit scoring, use link-contracts.ts
 // ============================================================
 
 export const CONTRACTS = {
+  // Sepolia LINK contracts (primary — deployed 2026-03-08)
+  TASK_BOARD: CHAIN_CONFIGS.sepolia?.contracts?.linkTaskBoard || "",
+  AGENT_REGISTRY: CHAIN_CONFIGS.sepolia?.contracts?.linkAgentRegistry || "",
+  ASN_REGISTRY: CHAIN_CONFIGS.sepolia?.contracts?.linkASNRegistry || "",
+  AGENT_TREASURY: CHAIN_CONFIGS.sepolia?.contracts?.linkTreasury || "",
+} as const;
+
+// Legacy Hedera contracts (kept for backward compatibility)
+export const HEDERA_CONTRACTS = {
   TASK_BOARD: CHAIN_CONFIGS.hedera.contracts.taskBoard!,
   AGENT_REGISTRY: CHAIN_CONFIGS.hedera.contracts.agentRegistry!,
   BRAND_VAULT: CHAIN_CONFIGS.hedera.contracts.brandVault!,
   AGENT_TREASURY: CHAIN_CONFIGS.hedera.contracts.agentTreasury!,
 } as const;
+
+// Hedera-specific gas limit (kept for backward compatibility)
+export const HEDERA_GAS_LIMIT = DEFAULT_GAS_LIMIT;
 
 /** Get contracts for a specific chain */
 export { getContracts, getCurrencySymbol };
@@ -120,7 +129,10 @@ export interface AgentProfile {
   agentAddress: string;
   name: string;
   skills: string;
+  asn?: string;
   feeRate: number;
+  creditScore?: number;
+  trustScore?: number;
   active: boolean;
   registeredAt: number;
 }
