@@ -492,12 +492,15 @@ export default function DashboardPage() {
       const scheduleLabel = parseCronToHuman(briefingSchedule);
       const isEditing = !!briefingCronJob;
 
+      // Save the agent ID even if the agent object isn't found yet
+      const agentIdsToSave = briefingAgentId ? [briefingAgentId] : undefined;
+
       if (isEditing) {
         await updateCronJob(briefingCronJob.id, {
           message: briefingPrompt,
           schedule: briefingSchedule,
           scheduleLabel,
-          agentIds: briefingAgent ? [briefingAgent.id] : undefined,
+          agentIds: agentIdsToSave,
         });
       } else {
         await createCronJob({
@@ -506,7 +509,7 @@ export default function DashboardPage() {
           message: briefingPrompt,
           schedule: briefingSchedule,
           scheduleLabel,
-          agentIds: briefingAgent ? [briefingAgent.id] : undefined,
+          agentIds: agentIdsToSave,
           priority: "medium",
           enabled: true,
           createdBy: userAddress || "unknown",
@@ -1306,6 +1309,14 @@ export default function DashboardPage() {
         const scheduleLabel = briefingCronJob.scheduleLabel || parseCronToHuman(briefingCronJob.schedule);
         const summary = latestBriefing?.summary;
 
+        // Debug logging for agent assignment
+        if (process.env.NODE_ENV === 'development' && cronAgentId && !briefingAgent) {
+          console.log('[Briefing] Agent assigned but not found:', {
+            cronAgentId,
+            availableAgents: agents.map(a => ({ id: a.id, name: a.name })),
+          });
+        }
+
         return (
           <SpotlightCard className="p-0 glass-card-enhanced h-full overflow-hidden">
             <CardHeader className="flex flex-row items-center justify-between px-2 pt-2 pb-1">
@@ -1330,7 +1341,7 @@ export default function DashboardPage() {
             </CardHeader>
             <CardContent className="px-2 pb-2 space-y-2">
               {/* Agent badge */}
-              {briefingAgent && (
+              {briefingAgent ? (
                 <div className="flex items-center gap-3 p-3 rounded-lg bg-amber-500/5 border border-amber-500/10">
                   <img
                     src={briefingAgent.avatarUrl || getAgentAvatarUrl(briefingAgent.name, briefingAgent.type)}
@@ -1345,7 +1356,19 @@ export default function DashboardPage() {
                   </div>
                   <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${briefingAgent.status === "online" ? "bg-emerald-400" : briefingAgent.status === "busy" ? "bg-amber-400" : "bg-gray-400"}`} />
                 </div>
-              )}
+              ) : cronAgentId ? (
+                <div className="flex items-center gap-3 p-3 rounded-lg bg-amber-500/5 border border-amber-500/10">
+                  <div className="w-8 h-8 rounded-full border-2 border-amber-500/30 bg-amber-500/10 flex items-center justify-center">
+                    <span className="text-xs">🤖</span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">Agent {cronAgentId.slice(0, 8)}...</p>
+                    <p className="text-[10px] text-muted-foreground">
+                      Briefing Agent (loading...)
+                    </p>
+                  </div>
+                </div>
+              ) : null}
 
               {/* Summary data from Firestore */}
               {summary ? (

@@ -24,6 +24,7 @@ import { CHAINLINK_MANIFEST } from "./chainlink";
 import { HBAR_MANIFEST } from "./hbar";
 import { SOLANA_MANIFEST } from "./solana";
 import { METAPLEX_MANIFEST } from "./metaplex";
+import { BITTENSOR_MANIFEST } from "./bittensor";
 
 // ═══════════════════════════════════════════════════════════════
 // Types
@@ -486,6 +487,26 @@ export const SKILL_REGISTRY: Skill[] = [
             parentModId: "solana-web3",
         },
         modManifest: METAPLEX_MANIFEST,
+    },
+    {
+        id: "bittensor-subnet",
+        name: "Bittensor",
+        description: "SwarmCare decentralized AI training subnet — fine-tune LLaMA models for elderly care coordination. Miners compete, validators score, TAO emissions reward quality.",
+        type: "mod",
+        source: "verified",
+        category: "AI",
+        icon: "τ",
+        version: "1.0.0",
+        author: "Swarm Core",
+        tags: ["bittensor", "ai", "training", "subnet", "tao", "llama"],
+        pricing: { model: "free" },
+        sidebarConfig: {
+            sectionId: "modifications",
+            label: "Bittensor",
+            href: "/bittensor",
+            iconName: "Brain",
+        },
+        modManifest: BITTENSOR_MANIFEST,
     },
 
     // ── Plugins ──
