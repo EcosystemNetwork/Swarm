@@ -23,6 +23,7 @@ const ICON_MAP: Record<string, typeof LayoutDashboard> = {
   Coins: Coins,
   Zap: Zap,
   Palette: Palette,
+  Brain: Brain,
 };
 
 // ═══════════════════════════════════════════════════════════════
