@@ -41,9 +41,21 @@ export async function validateEmbedAccess(
   if (!token) return { valid: false, error: "Token not found or expired" };
 
   if (origin && token.allowedOrigins.length > 0) {
-    const allowed = token.allowedOrigins.some(
-      (o) => o === "*" || origin.startsWith(o),
-    );
+    let parsedOrigin: string;
+    try {
+      const u = new URL(origin);
+      parsedOrigin = u.origin; // normalises to scheme://host(:port)
+    } catch {
+      return { valid: false, error: "Invalid origin" };
+    }
+    const allowed = token.allowedOrigins.some((o) => {
+      if (o === "*") return true;
+      try {
+        return new URL(o).origin === parsedOrigin;
+      } catch {
+        return false;
+      }
+    });
     if (!allowed) return { valid: false, error: "Origin not allowed" };
   }
 

@@ -2,7 +2,7 @@
  * Swarm Compute — Template Helpers
  */
 
-import type { ComputeTemplate, SizeKey, Region, ControllerType, ModelKey } from "./types";
+import type { ComputeTemplate, SizeKey, Region, ControllerType, ModelKey, ProviderKey } from "./types";
 import { SIZE_PRESETS, DEFAULT_AUTO_STOP_MINUTES, DEFAULT_RESOLUTION } from "./types";
 import { getTemplate, createComputer } from "./firestore";
 import { getComputeProvider } from "./provider";
@@ -17,6 +17,7 @@ export async function launchFromTemplate(opts: {
   name: string;
   sizeKey?: SizeKey;
   region?: Region;
+  provider?: ProviderKey;
   controllerType?: ControllerType;
   modelKey?: ModelKey | null;
   createdByUserId: string;
@@ -27,14 +28,19 @@ export async function launchFromTemplate(opts: {
 
   const sizeKey = opts.sizeKey || "medium";
   const preset = SIZE_PRESETS[sizeKey];
+  const providerKey = opts.provider || (process.env.COMPUTE_PROVIDER as ProviderKey) || "stub";
 
   const computerId = await createComputer({
     workspaceId: opts.workspaceId,
     orgId: opts.orgId,
     name: opts.name,
     status: opts.autoStart ? "provisioning" : "stopped",
-    provider: process.env.COMPUTE_PROVIDER || "stub",
+    provider: providerKey,
     providerInstanceId: null,
+    providerInstanceType: null,
+    providerRegion: null,
+    providerImage: null,
+    providerMetadata: {},
     templateId: opts.templateId,
     sizeKey,
     cpuCores: preset.cpu,
@@ -52,7 +58,7 @@ export async function launchFromTemplate(opts: {
   });
 
   if (opts.autoStart) {
-    const provider = getComputeProvider();
+    const provider = getComputeProvider(providerKey);
     try {
       const result = await provider.createInstance({
         name: opts.name,
@@ -71,6 +77,8 @@ export async function launchFromTemplate(opts: {
       const { updateComputer } = await import("./firestore");
       await updateComputer(computerId, {
         providerInstanceId: result.providerInstanceId,
+        providerInstanceType: result.providerInstanceType || null,
+        providerRegion: result.providerRegion || null,
         status: result.status,
       });
     } catch (err) {

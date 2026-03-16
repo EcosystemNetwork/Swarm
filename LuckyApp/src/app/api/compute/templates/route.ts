@@ -32,6 +32,18 @@ export async function POST(req: NextRequest) {
   if (!name || !category) {
     return Response.json({ error: "name and category are required" }, { status: 400 });
   }
+  const VALID_CATEGORIES: TemplateCategory[] = [
+    "dev", "browser", "research", "trading", "openclaw", "design", "web3", "sales",
+  ];
+  if (!VALID_CATEGORIES.includes(category)) {
+    return Response.json({ error: `Invalid category. Must be one of: ${VALID_CATEGORIES.join(", ")}` }, { status: 400 });
+  }
+  if (typeof name !== "string" || name.length < 1 || name.length > 100) {
+    return Response.json({ error: "name must be a string between 1 and 100 characters" }, { status: 400 });
+  }
+  if (startupScript && typeof startupScript === "string" && startupScript.length > 10000) {
+    return Response.json({ error: "startupScript must be at most 10000 characters" }, { status: 400 });
+  }
 
   const id = await createTemplate({
     workspaceId: workspaceId || null,

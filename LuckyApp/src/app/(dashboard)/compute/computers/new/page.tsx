@@ -49,7 +49,7 @@ export default function NewComputerPage() {
             });
             if (res.ok) {
               const data = await res.json();
-              setWorkspaces([{ id: data.id, orgId: currentOrg?.id || "", ownerUserId: "", name: "Default Workspace", slug: "default", description: "", planTier: "free", defaultAutoStopMinutes: 30, allowedInstanceSizes: ["small", "medium", "large"], staticIpEnabled: false, createdAt: null, updatedAt: null }]);
+              setWorkspaces([{ id: data.id, orgId: currentOrg?.id || "", ownerUserId: "", name: "Default Workspace", slug: "default", description: "", planTier: "free", defaultProvider: "e2b", defaultAutoStopMinutes: 30, allowedInstanceSizes: ["small", "medium", "large"], staticIpEnabled: false, createdAt: null, updatedAt: null }]);
             }
           }}
           className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"

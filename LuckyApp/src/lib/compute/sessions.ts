@@ -1,10 +1,13 @@
 /**
  * Swarm Compute — Session Management
+ *
+ * Handles session lifecycle and wires billing/metering into
+ * session end events automatically via recordComputeHours.
  */
 
 import type { ControllerType, ModelKey } from "./types";
-import { createSession, endSession, getSession, getSessions as getSessionsDb } from "./firestore";
-import { estimateHourlyCost } from "./billing";
+import { createSession, endSession, getSession, getSessions as getSessionsDb, addHoursUsed } from "./firestore";
+import { estimateHourlyCost, recordComputeHours } from "./billing";
 import { getComputer } from "./firestore";
 
 export async function startComputeSession(
@@ -35,12 +38,33 @@ export async function endComputeSession(sessionId: string): Promise<void> {
 
   const computer = await getComputer(session.computerId);
   const costPerHour = computer ? estimateHourlyCost(computer.sizeKey) : 8;
+  const estimatedCostCents = Math.ceil(hours * costPerHour);
 
+  // End the session record
   await endSession(sessionId, {
     totalActions: session.totalActions,
     totalScreenshots: session.totalScreenshots,
-    estimatedCostCents: Math.ceil(hours * costPerHour),
+    estimatedCostCents,
   });
+
+  // Write to billing ledger + usage records for real metering
+  if (computer && hours > 0) {
+    await recordComputeHours(
+      session.workspaceId,
+      session.computerId,
+      hours,
+      computer.sizeKey,
+      {
+        orgId: computer.orgId,
+        sessionId,
+        provider: computer.provider || "stub",
+        region: computer.region,
+      },
+    );
+
+    // Track hours against entitlement quota
+    await addHoursUsed(computer.orgId, hours);
+  }
 }
 
 export async function getActiveSessions(workspaceId: string): Promise<number> {

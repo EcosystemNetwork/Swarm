@@ -30,7 +30,7 @@ export async function POST(
   const prevStatus = computer.status;
   await updateComputer(id, { status: "snapshotting" });
 
-  const provider = getComputeProvider();
+  const provider = getComputeProvider(computer.provider);
   try {
     const providerSnapshotId = computer.providerInstanceId
       ? await provider.createSnapshot(computer.providerInstanceId, label)

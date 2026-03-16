@@ -7,6 +7,7 @@ import {
   SIZE_PRESETS,
   MODEL_LABELS,
   REGION_LABELS,
+  PROVIDER_LABELS,
   DEFAULT_AUTO_STOP_MINUTES,
   DEFAULT_RESOLUTION,
   type ComputerMode,
@@ -14,9 +15,11 @@ import {
   type Region,
   type ControllerType,
   type ModelKey,
+  type ProviderKey,
   type Workspace,
 } from "@/lib/compute/types";
 import { estimateHourlyCost, estimateMonthlyCost } from "@/lib/compute/billing";
+import { trackComputeEvent } from "@/lib/posthog";
 import { ResourcePicker } from "./resource-picker";
 
 interface CreateComputerWizardProps {
@@ -38,6 +41,7 @@ export function CreateComputerWizard({ workspaces, onCreated, onCancel }: Create
   const [mode, setMode] = useState<ComputerMode>("blank");
   const [sizeKey, setSizeKey] = useState<SizeKey>("medium");
   const [region, setRegion] = useState<Region>("us-east");
+  const [provider, setProvider] = useState<ProviderKey>("e2b");
   const [autoStopMinutes, setAutoStopMinutes] = useState(DEFAULT_AUTO_STOP_MINUTES);
   const [persistenceEnabled, setPersistenceEnabled] = useState(true);
   const [controllerType, setControllerType] = useState<ControllerType>("human");
@@ -49,6 +53,7 @@ export function CreateComputerWizard({ workspaces, onCreated, onCancel }: Create
 
   const goBack = () => { if (canGoBack) setStep(STEPS[currentIdx - 1]); };
   const goNext = () => {
+    trackComputeEvent("wizard_step", { from: step, to: STEPS[currentIdx + 1] || "review" });
     // Skip model step if controller is human
     if (step === "controller" && controllerType === "human") {
       setStep("review");
@@ -66,6 +71,7 @@ export function CreateComputerWizard({ workspaces, onCreated, onCancel }: Create
         body: JSON.stringify({
           workspaceId,
           name: name || `${MODE_PRESETS[mode].label} Computer`,
+          provider,
           sizeKey,
           region,
           controllerType,
@@ -87,7 +93,7 @@ export function CreateComputerWizard({ workspaces, onCreated, onCancel }: Create
   };
 
   const preset = SIZE_PRESETS[sizeKey];
-  const costPerHour = estimateHourlyCost(sizeKey);
+  const costPerHour = estimateHourlyCost(sizeKey, undefined, provider);
 
   return (
     <div className="mx-auto max-w-2xl">
@@ -159,10 +165,12 @@ export function CreateComputerWizard({ workspaces, onCreated, onCancel }: Create
           <h2 className="text-lg font-semibold">Choose Resources</h2>
           <p className="text-sm text-muted-foreground">Configure compute resources, region, and behavior.</p>
           <ResourcePicker
+            provider={provider}
             sizeKey={sizeKey}
             region={region}
             autoStopMinutes={autoStopMinutes}
             persistenceEnabled={persistenceEnabled}
+            onProviderChange={setProvider}
             onSizeChange={setSizeKey}
             onRegionChange={setRegion}
             onAutoStopChange={setAutoStopMinutes}
@@ -241,6 +249,10 @@ export function CreateComputerWizard({ workspaces, onCreated, onCancel }: Create
               <span className="text-sm font-medium">{MODE_PRESETS[mode].label}</span>
             </div>
             <div className="flex justify-between px-4 py-2.5">
+              <span className="text-sm text-muted-foreground">Provider</span>
+              <span className="text-sm font-medium">{PROVIDER_LABELS[provider].label}</span>
+            </div>
+            <div className="flex justify-between px-4 py-2.5">
               <span className="text-sm text-muted-foreground">Size</span>
               <span className="text-sm font-medium">{preset.label}</span>
             </div>
@@ -264,7 +276,7 @@ export function CreateComputerWizard({ workspaces, onCreated, onCancel }: Create
             </div>
             <div className="flex justify-between px-4 py-2.5">
               <span className="text-sm text-muted-foreground">Projected Monthly (8 hrs/day)</span>
-              <span className="text-sm font-medium">${(estimateMonthlyCost(sizeKey, 8) / 100).toFixed(2)}/mo</span>
+              <span className="text-sm font-medium">${(estimateMonthlyCost(sizeKey, 8, undefined, provider) / 100).toFixed(2)}/mo</span>
             </div>
           </div>
         </div>

@@ -33,44 +33,56 @@ export function forbidden(message = "Insufficient permissions") {
   return authError(message, 403);
 }
 
-// ─── Platform admin (env-based secret) ───────────────────
+// ─── Platform admin (wallet session OR env-based secret) ─
+
+/** Hardcoded platform admin address (always has access) */
+const HARDCODED_PLATFORM_ADMIN = "0x723708273e811a07d90d2e81e799b9Ab27F0B549".toLowerCase();
 
 export function requirePlatformAdmin(req: NextRequest): { ok: boolean; error?: string } {
-  const secret = process.env.PLATFORM_ADMIN_SECRET;
-  if (!secret) {
-    return { ok: false, error: "Platform admin auth not configured" };
-  }
+  // 1. Wallet-based auth via session (injected by middleware)
+  const sessionRole = req.headers.get("x-session-role");
+  const walletAddress = req.headers.get("x-wallet-address")?.toLowerCase();
 
-  const authHeader = req.headers.get("authorization") || "";
-  const headerSecret = req.headers.get("x-platform-secret") || "";
-
-  const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
-
-  // Timing-safe comparison to prevent timing attacks
-  let tokenMatch = false;
-  let headerMatch = false;
-
-  try {
-    if (token.length === secret.length) {
-      tokenMatch = crypto.timingSafeEqual(Buffer.from(token), Buffer.from(secret));
-    }
-  } catch {
-    tokenMatch = false;
-  }
-
-  try {
-    if (headerSecret.length === secret.length) {
-      headerMatch = crypto.timingSafeEqual(Buffer.from(headerSecret), Buffer.from(secret));
-    }
-  } catch {
-    headerMatch = false;
-  }
-
-  if (tokenMatch || headerMatch) {
+  if (sessionRole === "platform_admin") {
     return { ok: true };
   }
 
-  return { ok: false, error: "Invalid platform admin credentials" };
+  if (walletAddress === HARDCODED_PLATFORM_ADMIN) {
+    return { ok: true };
+  }
+
+  // 2. Secret-based auth (programmatic / API access fallback)
+  const secret = process.env.PLATFORM_ADMIN_SECRET;
+  if (secret) {
+    const authHeader = req.headers.get("authorization") || "";
+    const headerSecret = req.headers.get("x-platform-secret") || "";
+    const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
+
+    let tokenMatch = false;
+    let headerMatch = false;
+
+    try {
+      if (token.length === secret.length) {
+        tokenMatch = crypto.timingSafeEqual(Buffer.from(token), Buffer.from(secret));
+      }
+    } catch {
+      tokenMatch = false;
+    }
+
+    try {
+      if (headerSecret.length === secret.length) {
+        headerMatch = crypto.timingSafeEqual(Buffer.from(headerSecret), Buffer.from(secret));
+      }
+    } catch {
+      headerMatch = false;
+    }
+
+    if (tokenMatch || headerMatch) {
+      return { ok: true };
+    }
+  }
+
+  return { ok: false, error: "Platform admin access required" };
 }
 
 // ─── Internal service (env-based secret) ─────────────────

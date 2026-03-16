@@ -61,7 +61,7 @@ export async function executeComputeAction(envelope: ActionEnvelope): Promise<{ 
     status: "running",
   });
 
-  const provider = getComputeProvider();
+  const provider = getComputeProvider(computer.provider);
   const start = Date.now();
 
   try {

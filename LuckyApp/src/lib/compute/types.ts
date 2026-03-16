@@ -24,6 +24,8 @@ export type ModelKey = "claude" | "openai" | "gemini" | "generic";
 
 export type SizeKey = "small" | "medium" | "large" | "xl";
 
+export type ProviderKey = "e2b" | "aws" | "gcp" | "azure" | "stub";
+
 export type Region = "us-east" | "us-west" | "eu-west" | "ap-southeast";
 
 export type ComputerMode =
@@ -100,6 +102,50 @@ export const REGION_LABELS: Record<Region, string> = {
   "ap-southeast": "Asia Pacific (Singapore)",
 };
 
+export const PROVIDER_LABELS: Record<ProviderKey, { label: string; description: string }> = {
+  e2b:   { label: "E2B Desktop",       description: "Managed cloud sandbox — fastest setup, built-in VNC" },
+  aws:   { label: "AWS EC2",           description: "Amazon EC2 — widest region coverage, SSM integration" },
+  gcp:   { label: "GCP Compute Engine", description: "Google Compute Engine — strong ML/data tooling" },
+  azure: { label: "Azure VMs",         description: "Azure Virtual Machines — enterprise & hybrid cloud" },
+  stub:  { label: "Development",        description: "Local stub provider for development" },
+};
+
+/** Maps Swarm regions to provider-native region identifiers */
+export const PROVIDER_REGION_MAP: Record<ProviderKey, Record<Region, string>> = {
+  e2b:   { "us-east": "us-east-1", "us-west": "us-west-1", "eu-west": "eu-west-1", "ap-southeast": "ap-southeast-1" },
+  aws:   { "us-east": "us-east-1", "us-west": "us-west-2", "eu-west": "eu-west-1", "ap-southeast": "ap-southeast-1" },
+  gcp:   { "us-east": "us-east1",  "us-west": "us-west1",  "eu-west": "europe-west1", "ap-southeast": "asia-southeast1" },
+  azure: { "us-east": "eastus",    "us-west": "westus2",   "eu-west": "westeurope",   "ap-southeast": "southeastasia" },
+  stub:  { "us-east": "stub",      "us-west": "stub",      "eu-west": "stub",          "ap-southeast": "stub" },
+};
+
+/** Maps Swarm sizes to provider-native instance types */
+export const PROVIDER_SIZE_MAP: Record<ProviderKey, Record<SizeKey, string>> = {
+  e2b:   { small: "default", medium: "default", large: "default", xl: "default" },
+  aws:   { small: "t3.medium", medium: "t3.xlarge", large: "m5.2xlarge", xl: "m5.4xlarge" },
+  gcp:   { small: "e2-standard-2", medium: "e2-standard-4", large: "e2-standard-8", xl: "e2-standard-16" },
+  azure: { small: "Standard_B2s", medium: "Standard_B4ms", large: "Standard_D8s_v3", xl: "Standard_D16s_v3" },
+  stub:  { small: "stub-small", medium: "stub-medium", large: "stub-large", xl: "stub-xl" },
+};
+
+/** Provider-specific base images */
+export const PROVIDER_BASE_IMAGES: Record<ProviderKey, string> = {
+  e2b:   "desktop",
+  aws:   "ami-0c7217cdde317cfec", // Ubuntu 22.04 LTS in us-east-1
+  gcp:   "projects/ubuntu-os-cloud/global/images/family/ubuntu-2204-lts",
+  azure: "Canonical:0001-com-ubuntu-server-jammy:22_04-lts:latest",
+  stub:  "ubuntu:22.04",
+};
+
+/** Provider-specific hourly cost in cents (raw, before markup) */
+export const PROVIDER_HOURLY_COSTS: Record<ProviderKey, Record<SizeKey, number>> = {
+  e2b:   { small: 8,   medium: 16,  large: 32,  xl: 64 },
+  aws:   { small: 4,   medium: 17,  large: 38,  xl: 77 },
+  gcp:   { small: 5,   medium: 19,  large: 40,  xl: 80 },
+  azure: { small: 5,   medium: 18,  large: 40,  xl: 79 },
+  stub:  { small: 8,   medium: 16,  large: 32,  xl: 64 },
+};
+
 export const TEMPLATE_CATEGORY_LABELS: Record<TemplateCategory, string> = {
   dev:      "Development",
   browser:  "Browser Automation",
@@ -156,6 +202,7 @@ export interface Workspace {
   slug: string;
   description: string;
   planTier: string;
+  defaultProvider: ProviderKey;
   defaultAutoStopMinutes: number;
   allowedInstanceSizes: SizeKey[];
   staticIpEnabled: boolean;
@@ -177,8 +224,16 @@ export interface Computer {
   orgId: string;
   name: string;
   status: ComputerStatus;
-  provider: string;
+  provider: ProviderKey;
   providerInstanceId: string | null;
+  /** Provider-native instance type (e.g. "t3.xlarge", "e2-standard-4") */
+  providerInstanceType: string | null;
+  /** Provider-native region (e.g. "us-east-1", "eastus") */
+  providerRegion: string | null;
+  /** Provider-native base image (AMI, image family, etc.) */
+  providerImage: string | null;
+  /** Provider-specific metadata (SSM document ARN, VPC ID, etc.) */
+  providerMetadata: Record<string, unknown>;
   templateId: string | null;
   sizeKey: SizeKey;
   cpuCores: number;
@@ -388,11 +443,23 @@ export interface InstanceConfig {
   baseImage: string;
   startupScript?: string;
   persistenceEnabled: boolean;
+  /** Provider-native instance type override */
+  providerInstanceType?: string;
+  /** Provider-native region override */
+  providerRegion?: string;
+  /** Provider-native image override */
+  providerImage?: string;
 }
 
 export interface ProviderResult {
   providerInstanceId: string;
   status: ComputerStatus;
+  /** Provider-native instance type actually used */
+  providerInstanceType?: string;
+  /** Provider-native region actually used */
+  providerRegion?: string;
+  /** Extra metadata from the provider */
+  metadata?: Record<string, unknown>;
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -406,3 +473,39 @@ export interface UsageSummary {
   totalSessions: number;
   estimatedCostCents: number;
 }
+
+// ═══════════════════════════════════════════════════════════════
+// Compute Entitlements — Credit Balance & Quotas
+// ═══════════════════════════════════════════════════════════════
+
+export interface ComputeEntitlement {
+  id: string;
+  orgId: string;
+  /** Credit balance in cents — gets deducted as usage accrues */
+  creditBalanceCents: number;
+  /** Monthly compute hour quota (0 = unlimited for paid plans) */
+  monthlyHourQuota: number;
+  /** Hours used this billing period */
+  hoursUsedThisPeriod: number;
+  /** Max concurrent running computers */
+  maxConcurrentComputers: number;
+  /** Allowed instance sizes */
+  allowedSizes: SizeKey[];
+  /** Plan tier name */
+  planTier: "free" | "starter" | "pro" | "enterprise";
+  /** Period start date for quota tracking */
+  periodStart: Date | null;
+  updatedAt: Date | null;
+}
+
+export const PLAN_LIMITS: Record<ComputeEntitlement["planTier"], {
+  creditsCents: number;
+  monthlyHours: number;
+  maxConcurrent: number;
+  allowedSizes: SizeKey[];
+}> = {
+  free:       { creditsCents: 0,     monthlyHours: 5,    maxConcurrent: 1, allowedSizes: ["small"] },
+  starter:    { creditsCents: 1000,  monthlyHours: 50,   maxConcurrent: 3, allowedSizes: ["small", "medium"] },
+  pro:        { creditsCents: 5000,  monthlyHours: 200,  maxConcurrent: 10, allowedSizes: ["small", "medium", "large"] },
+  enterprise: { creditsCents: 25000, monthlyHours: 0,    maxConcurrent: 50, allowedSizes: ["small", "medium", "large", "xl"] },
+};

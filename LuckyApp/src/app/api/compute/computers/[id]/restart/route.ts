@@ -17,7 +17,7 @@ export async function POST(
   const auth = await requireOrgMember(req, computer.orgId);
   if (!auth.ok) return Response.json({ error: auth.error }, { status: auth.status || 401 });
 
-  if (computer.status !== "running") {
+  if (computer.status !== "running" && computer.status !== "error") {
     return Response.json(
       { error: `Cannot restart computer in "${computer.status}" state` },
       { status: 409 },
@@ -26,7 +26,7 @@ export async function POST(
 
   await updateComputer(id, { status: "starting" });
 
-  const provider = getComputeProvider();
+  const provider = getComputeProvider(computer.provider);
   try {
     if (computer.providerInstanceId) {
       await provider.restartInstance(computer.providerInstanceId);

@@ -2,8 +2,8 @@
  * DELETE /api/compute/embeds/[id] — Revoke an embed token
  */
 import { NextRequest } from "next/server";
-import { getWalletAddress } from "@/lib/auth-guard";
-import { deleteEmbedToken } from "@/lib/compute/firestore";
+import { getWalletAddress, requireOrgMember } from "@/lib/auth-guard";
+import { deleteEmbedToken, validateEmbedToken, getWorkspace } from "@/lib/compute/firestore";
 
 export async function DELETE(
   req: NextRequest,
@@ -12,6 +12,20 @@ export async function DELETE(
   const { id } = await params;
   const wallet = getWalletAddress(req);
   if (!wallet) return Response.json({ error: "Authentication required" }, { status: 401 });
+
+  // Look up the embed token to verify workspace access
+  // Use a direct Firestore read since validateEmbedToken rejects expired tokens
+  const { getDoc, doc } = await import("firebase/firestore");
+  const { db } = await import("@/lib/firebase");
+  const snap = await getDoc(doc(db, "computeEmbedTokens", id));
+  if (!snap.exists()) return Response.json({ error: "Embed token not found" }, { status: 404 });
+
+  const tokenData = snap.data();
+  const workspace = await getWorkspace(tokenData.workspaceId);
+  if (!workspace) return Response.json({ error: "Workspace not found" }, { status: 404 });
+
+  const auth = await requireOrgMember(req, workspace.orgId);
+  if (!auth.ok) return Response.json({ error: auth.error }, { status: auth.status || 401 });
 
   await deleteEmbedToken(id);
   return Response.json({ ok: true });

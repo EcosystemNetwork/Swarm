@@ -8,12 +8,19 @@ import { getWalletAddress } from "@/lib/auth-guard";
 import { getTemplate, updateTemplate, deleteTemplate } from "@/lib/compute/firestore";
 
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
   const template = await getTemplate(id);
   if (!template) return Response.json({ error: "Template not found" }, { status: 404 });
+
+  // Public templates are readable by anyone; private templates require auth
+  if (!template.isPublic) {
+    const wallet = getWalletAddress(req);
+    if (!wallet) return Response.json({ error: "Authentication required" }, { status: 401 });
+  }
+
   return Response.json({ ok: true, template });
 }
 

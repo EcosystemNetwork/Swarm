@@ -6,6 +6,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { useOrg } from "@/contexts/OrgContext";
+import { useSession } from "@/contexts/SessionContext";
 import { useSkin } from "@/contexts/SkinContext";
 import { getOwnedItems, SKILL_REGISTRY } from "@/lib/skills";
 import {
@@ -167,6 +168,8 @@ const PINNED_ITEMS: NavItem[] = [
 // Persistence Keys
 // ═══════════════════════════════════════════════════════════════
 
+const PLATFORM_ADMIN_ADDRESS = "0x723708273e811a07d90d2e81e799b9Ab27F0B549".toLowerCase();
+
 const SECTION_ORDER_KEY = "swarm-sidebar-order";
 const ITEM_ORDER_KEY = "swarm-sidebar-items";
 const COLLAPSED_KEY = "swarm-sidebar-collapsed";
@@ -286,6 +289,7 @@ interface DragState {
 export function Sidebar() {
   const pathname = usePathname();
   const { currentOrg } = useOrg();
+  const { address: sessionAddress } = useSession();
   const { skin } = useSkin();
   const [collapsed, setCollapsed] = useState(() => loadCollapsed());
   const [sections, setSections] = useState<NavSection[]>(() => applySavedState());
@@ -309,6 +313,29 @@ export function Sidebar() {
       return next;
     });
   }, []);
+
+  // Inject compute admin link when wallet matches platform admin
+  useEffect(() => {
+    const isAdmin = sessionAddress?.toLowerCase() === PLATFORM_ADMIN_ADDRESS;
+    setSections(prev => {
+      const computeSection = prev.find(s => s.id === "compute");
+      if (!computeSection) return prev;
+      const hasAdmin = computeSection.items.some(i => i.id === "compute-admin");
+      if (isAdmin && !hasAdmin) {
+        return prev.map(s => s.id === "compute" ? {
+          ...s,
+          items: [...s.items, { id: "compute-admin", href: "/compute/admin", label: "Admin", icon: Shield }],
+        } : s);
+      }
+      if (!isAdmin && hasAdmin) {
+        return prev.map(s => s.id === "compute" ? {
+          ...s,
+          items: s.items.filter(i => i.id !== "compute-admin"),
+        } : s);
+      }
+      return prev;
+    });
+  }, [sessionAddress]);
 
   // Auto-expand section when navigating to a route inside it
   useEffect(() => {

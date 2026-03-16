@@ -24,11 +24,16 @@ export async function GET(
     );
   }
 
-  const provider = getComputeProvider();
+  if (!computer.providerInstanceId) {
+    return Response.json(
+      { error: "Computer has no provider instance — it may still be provisioning" },
+      { status: 409 },
+    );
+  }
+
+  const provider = getComputeProvider(computer.provider);
   try {
-    const url = computer.providerInstanceId
-      ? await provider.getTerminalUrl(computer.providerInstanceId)
-      : "";
+    const url = await provider.getTerminalUrl(computer.providerInstanceId);
     return Response.json({ ok: true, url });
   } catch (err) {
     console.error("[compute/terminal-token] Failed:", err);

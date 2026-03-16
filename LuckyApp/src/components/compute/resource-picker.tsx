@@ -1,24 +1,31 @@
 "use client";
 
-import { SIZE_PRESETS, REGION_LABELS, type SizeKey, type Region } from "@/lib/compute/types";
+import { SIZE_PRESETS, REGION_LABELS, PROVIDER_LABELS, type SizeKey, type Region, type ProviderKey } from "@/lib/compute/types";
 import { estimateHourlyCost } from "@/lib/compute/billing";
 
 interface ResourcePickerProps {
+  provider: ProviderKey;
   sizeKey: SizeKey;
   region: Region;
   autoStopMinutes: number;
   persistenceEnabled: boolean;
+  onProviderChange: (provider: ProviderKey) => void;
   onSizeChange: (size: SizeKey) => void;
   onRegionChange: (region: Region) => void;
   onAutoStopChange: (minutes: number) => void;
   onPersistenceChange: (enabled: boolean) => void;
 }
 
+/** Providers exposed in the UI (excludes stub) */
+const UI_PROVIDERS: ProviderKey[] = ["e2b", "aws", "gcp", "azure"];
+
 export function ResourcePicker({
+  provider,
   sizeKey,
   region,
   autoStopMinutes,
   persistenceEnabled,
+  onProviderChange,
   onSizeChange,
   onRegionChange,
   onAutoStopChange,
@@ -26,6 +33,31 @@ export function ResourcePicker({
 }: ResourcePickerProps) {
   return (
     <div className="space-y-6">
+      {/* Provider */}
+      <div>
+        <label className="text-sm font-medium text-muted-foreground mb-2 block">Cloud Provider</label>
+        <div className="grid grid-cols-2 gap-3">
+          {UI_PROVIDERS.map((key) => {
+            const cfg = PROVIDER_LABELS[key];
+            return (
+              <button
+                key={key}
+                type="button"
+                onClick={() => onProviderChange(key)}
+                className={`rounded-lg border p-3 text-left transition-colors ${
+                  provider === key
+                    ? "border-primary bg-primary/5"
+                    : "border-border hover:border-muted-foreground/50"
+                }`}
+              >
+                <div className="font-medium text-sm">{cfg.label}</div>
+                <p className="text-xs text-muted-foreground mt-1">{cfg.description}</p>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
       {/* Size */}
       <div>
         <label className="text-sm font-medium text-muted-foreground mb-2 block">Instance Size</label>
@@ -44,7 +76,7 @@ export function ResourcePicker({
               >
                 <div className="flex items-center justify-between">
                   <span className="font-medium text-sm">{preset.label}</span>
-                  <span className="text-xs font-medium text-primary">${(estimateHourlyCost(key) / 100).toFixed(2)}/hr</span>
+                  <span className="text-xs font-medium text-primary">${(estimateHourlyCost(key, undefined, provider) / 100).toFixed(2)}/hr</span>
                 </div>
                 <div className="text-xs text-muted-foreground mt-1">
                   {preset.disk} GB disk

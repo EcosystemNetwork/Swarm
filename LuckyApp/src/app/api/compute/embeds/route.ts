@@ -38,6 +38,15 @@ export async function POST(req: NextRequest) {
   if (!workspaceId || !computerId || !mode) {
     return Response.json({ error: "workspaceId, computerId, and mode are required" }, { status: 400 });
   }
+  if (mode !== "read_only" && mode !== "interactive") {
+    return Response.json({ error: "mode must be 'read_only' or 'interactive'" }, { status: 400 });
+  }
+  if (allowedOrigins && (!Array.isArray(allowedOrigins) || allowedOrigins.length > 20)) {
+    return Response.json({ error: "allowedOrigins must be an array with at most 20 entries" }, { status: 400 });
+  }
+  if (expiresInMs !== undefined && (typeof expiresInMs !== "number" || expiresInMs < 60000 || expiresInMs > 86400000 * 365)) {
+    return Response.json({ error: "expiresInMs must be between 60000 (1 min) and 31536000000 (1 year)" }, { status: 400 });
+  }
 
   const ws = await getWorkspace(workspaceId);
   if (!ws) return Response.json({ error: "Workspace not found" }, { status: 404 });

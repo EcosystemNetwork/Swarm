@@ -2,15 +2,32 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { ChevronLeft, DollarSign, TrendingUp, Server, Users } from "lucide-react";
+import { ChevronLeft, DollarSign, TrendingUp, Server, Users, BarChart3, MousePointer, Eye, ShieldAlert } from "lucide-react";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { useSession } from "@/contexts/SessionContext";
 import type { PricingSettings, ProfitabilitySummary } from "@/lib/compute/types";
 
+const PLATFORM_ADMIN_ADDRESS = "0x723708273e811a07d90d2e81e799b9Ab27F0B549".toLowerCase();
+
+interface AnalyticsData {
+  computeEvents: { event: string; count: number }[];
+  totalPageviews: number;
+  totalUniqueUsers: number;
+  wizardFunnel: Record<string, number>;
+  configured: boolean;
+  error?: string;
+}
+
 export default function ComputeAdminPage() {
+  const { address: sessionAddress, authenticated } = useSession();
+  const isAdmin = sessionAddress?.toLowerCase() === PLATFORM_ADMIN_ADDRESS;
+
   const [pricing, setPricing] = useState<PricingSettings | null>(null);
   const [profit, setProfit] = useState<ProfitabilitySummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
+  const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
 
   // Pricing form state
   const [defaultMarkup, setDefaultMarkup] = useState(30);
@@ -20,28 +37,17 @@ export default function ComputeAdminPage() {
   const [xlMarkup, setXlMarkup] = useState("");
   const [minFloor, setMinFloor] = useState(1);
 
-  const adminSecret = typeof window !== "undefined"
-    ? localStorage.getItem("platformAdminSecret") || ""
-    : "";
-  const [secret, setSecret] = useState(adminSecret);
-  const [authed, setAuthed] = useState(!!adminSecret);
-
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-    "x-platform-secret": secret,
-  };
-
   const fetchData = async () => {
     setError("");
     try {
-      const [pRes, profRes] = await Promise.all([
-        fetch("/api/compute/admin/pricing", { headers }),
-        fetch("/api/compute/admin/profitability", { headers }),
+      const [pRes, profRes, analyticsRes] = await Promise.all([
+        fetch("/api/compute/admin/pricing"),
+        fetch("/api/compute/admin/profitability"),
+        fetch("/api/compute/admin/analytics"),
       ]);
 
       if (pRes.status === 403) {
-        setAuthed(false);
-        setError("Invalid admin credentials");
+        setError("Access denied — admin wallet required");
         setLoading(false);
         return;
       }
@@ -59,6 +65,8 @@ export default function ComputeAdminPage() {
         setMinFloor(pData.settings.minimumPriceFloorCents);
       }
       if (profData.ok) setProfit(profData.summary);
+      const analyticsData = await analyticsRes.json().catch(() => ({ ok: false }));
+      if (analyticsData.ok) setAnalytics(analyticsData.analytics);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load admin data");
     }
@@ -66,16 +74,9 @@ export default function ComputeAdminPage() {
   };
 
   useEffect(() => {
-    if (authed) fetchData();
+    if (isAdmin) fetchData();
     else setLoading(false);
-  }, [authed]);
-
-  const handleAuth = () => {
-    if (!secret.trim()) return;
-    localStorage.setItem("platformAdminSecret", secret);
-    setAuthed(true);
-    setLoading(true);
-  };
+  }, [isAdmin]);
 
   const handleSave = async () => {
     setSaving(true);
@@ -87,7 +88,7 @@ export default function ComputeAdminPage() {
 
     await fetch("/api/compute/admin/pricing", {
       method: "POST",
-      headers,
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         defaultMarkupPercent: defaultMarkup,
         sizeOverrides,
@@ -100,25 +101,15 @@ export default function ComputeAdminPage() {
 
   const fmt = (cents: number) => `$${(cents / 100).toFixed(2)}`;
 
-  if (!authed) {
+  if (!authenticated || !isAdmin) {
     return (
       <div className="flex h-64 flex-col items-center justify-center gap-4 p-6">
-        <h1 className="text-xl font-bold">Compute Admin</h1>
-        <p className="text-sm text-muted-foreground">Enter platform admin secret to continue</p>
+        <ShieldAlert className="h-10 w-10 text-muted-foreground" />
+        <h1 className="text-xl font-bold">Access Denied</h1>
+        <p className="text-sm text-muted-foreground">
+          This page is restricted to platform administrators.
+        </p>
         {error && <p className="text-xs text-red-400">{error}</p>}
-        <div className="flex gap-2">
-          <input
-            type="password"
-            value={secret}
-            onChange={(e) => setSecret(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && handleAuth()}
-            placeholder="Admin secret"
-            className="rounded-md border border-border bg-background px-3 py-2 text-sm w-64"
-          />
-          <button onClick={handleAuth} className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90">
-            Login
-          </button>
-        </div>
       </div>
     );
   }
@@ -138,9 +129,17 @@ export default function ComputeAdminPage() {
           <ChevronLeft className="h-3 w-3" /> Compute
         </Link>
         <h1 className="text-2xl font-bold">Compute Admin</h1>
-        <p className="text-sm text-muted-foreground mt-1">Platform pricing and profitability</p>
+        <p className="text-sm text-muted-foreground mt-1">Platform pricing, profitability, and analytics</p>
       </div>
 
+      <Tabs defaultValue="profitability">
+        <TabsList>
+          <TabsTrigger value="profitability">Profitability</TabsTrigger>
+          <TabsTrigger value="pricing">Pricing</TabsTrigger>
+          <TabsTrigger value="analytics">Analytics</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="profitability" className="space-y-6">
       {/* Profitability Cards */}
       {profit && (
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
@@ -213,6 +212,16 @@ export default function ComputeAdminPage() {
         </div>
       )}
 
+      {/* No data state */}
+      {profit && profit.totalEntries === 0 && (
+        <div className="rounded-lg border border-dashed border-border p-8 text-center">
+          <p className="text-sm text-muted-foreground">No billing ledger entries yet this month.</p>
+          <p className="text-xs text-muted-foreground mt-1">Entries are recorded when computers are started with a real provider.</p>
+        </div>
+      )}
+        </TabsContent>
+
+        <TabsContent value="pricing" className="space-y-6">
       {/* Pricing Settings */}
       <div className="rounded-lg border border-border p-6 max-w-lg space-y-4">
         <h3 className="text-lg font-semibold">Pricing Settings</h3>
@@ -289,13 +298,73 @@ export default function ComputeAdminPage() {
         </button>
       </div>
 
-      {/* No data state */}
-      {profit && profit.totalEntries === 0 && (
+        </TabsContent>
+
+        <TabsContent value="analytics" className="space-y-6">
+      {/* Product Analytics */}
+      {analytics && !analytics.configured && (
         <div className="rounded-lg border border-dashed border-border p-8 text-center">
-          <p className="text-sm text-muted-foreground">No billing ledger entries yet this month.</p>
-          <p className="text-xs text-muted-foreground mt-1">Entries are recorded when computers are started with a real provider.</p>
+          <p className="text-sm text-muted-foreground">PostHog not configured.</p>
+          <p className="text-xs text-muted-foreground mt-1">
+            Set POSTHOG_PERSONAL_API_KEY and POSTHOG_PROJECT_ID env vars to enable analytics.
+          </p>
         </div>
       )}
+
+      {analytics && analytics.configured && (
+        <>
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+            <div className="rounded-xl border border-border bg-card p-4">
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <Eye className="h-4 w-4" />
+                <span className="text-xs">Compute Pageviews (30d)</span>
+              </div>
+              <p className="mt-2 text-2xl font-bold">{analytics.totalPageviews.toLocaleString()}</p>
+            </div>
+            {analytics.computeEvents.map((ev) => (
+              <div key={ev.event} className="rounded-xl border border-border bg-card p-4">
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <MousePointer className="h-4 w-4" />
+                  <span className="text-xs">{ev.event.replace("compute.", "")}</span>
+                </div>
+                <p className="mt-2 text-2xl font-bold">{ev.count}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* Wizard Funnel */}
+          <div className="rounded-lg border border-border p-4">
+            <h3 className="text-sm font-medium mb-3 flex items-center gap-2">
+              <BarChart3 className="h-4 w-4" />
+              Create Computer Wizard Funnel
+            </h3>
+            <div className="space-y-2">
+              {Object.entries(analytics.wizardFunnel).map(([step, count]) => {
+                const maxCount = Math.max(...Object.values(analytics.wizardFunnel), 1);
+                const pct = (count / maxCount) * 100;
+                return (
+                  <div key={step} className="flex items-center gap-3">
+                    <span className="w-24 text-xs text-muted-foreground capitalize">{step}</span>
+                    <div className="flex-1 h-5 bg-muted rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-primary/60 rounded-full transition-all"
+                        style={{ width: `${pct}%` }}
+                      />
+                    </div>
+                    <span className="w-12 text-xs font-medium text-right">{count}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {analytics.error && (
+            <p className="text-xs text-amber-400">{analytics.error}</p>
+          )}
+        </>
+      )}
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

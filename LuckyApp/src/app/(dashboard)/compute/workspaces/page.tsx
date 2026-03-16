@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { Plus } from "lucide-react";
 import { useOrg } from "@/contexts/OrgContext";
 import type { Workspace } from "@/lib/compute/types";
+import { trackComputeEvent } from "@/lib/posthog";
 import { WorkspaceCard } from "@/components/compute/workspace-card";
 
 export default function WorkspacesPage() {
@@ -36,6 +37,7 @@ export default function WorkspacesPage() {
         body: JSON.stringify({ orgId: currentOrg?.id, name: newName, description: newDesc }),
       });
       if (res.ok) {
+        trackComputeEvent("workspace_created", { name: newName });
         setShowCreate(false);
         setNewName("");
         setNewDesc("");

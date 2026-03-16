@@ -37,6 +37,16 @@ export async function POST(req: NextRequest) {
   if (!scopeType || !scopeId || !content) {
     return Response.json({ error: "scopeType, scopeId, and content are required" }, { status: 400 });
   }
+  const VALID_SCOPES: MemoryScopeType[] = ["workspace", "computer", "agent", "user"];
+  if (!VALID_SCOPES.includes(scopeType)) {
+    return Response.json({ error: `Invalid scopeType. Must be one of: ${VALID_SCOPES.join(", ")}` }, { status: 400 });
+  }
+  if (typeof content !== "string" || content.length > 50000) {
+    return Response.json({ error: "content must be a string with at most 50000 characters" }, { status: 400 });
+  }
+  if (tags && (!Array.isArray(tags) || tags.length > 20)) {
+    return Response.json({ error: "tags must be an array with at most 20 items" }, { status: 400 });
+  }
 
   const id = await createMemoryEntry({
     scopeType,

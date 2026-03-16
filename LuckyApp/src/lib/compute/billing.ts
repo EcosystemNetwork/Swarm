@@ -8,11 +8,13 @@
 import type {
   SizeKey,
   Region,
+  ProviderKey,
   UsageSummary,
   PricingSettings,
   ProfitabilitySummary,
   BillingLedgerEntry,
 } from "./types";
+import { PROVIDER_HOURLY_COSTS } from "./types";
 import {
   recordUsage,
   getUsage,
@@ -22,15 +24,8 @@ import {
 } from "./firestore";
 
 // ═══════════════════════════════════════════════════════════════
-// Provider Cost Constants (raw cost in cents per hour)
+// Provider Cost Lookup (raw cost in cents per hour, per provider)
 // ═══════════════════════════════════════════════════════════════
-
-const PROVIDER_HOURLY_COST_CENTS: Record<SizeKey, number> = {
-  small:  8,   // $0.08/hr raw provider cost
-  medium: 16,  // $0.16/hr
-  large:  32,  // $0.32/hr
-  xl:     64,  // $0.64/hr
-};
 
 const STORAGE_COST_PER_GB_MONTH = 5; // $0.05/GB/month raw
 
@@ -87,26 +82,27 @@ export function calculateCustomerPrice(
 // Provider Cost Estimation (raw)
 // ═══════════════════════════════════════════════════════════════
 
-export function estimateProviderHourlyCost(sizeKey: SizeKey): number {
-  return PROVIDER_HOURLY_COST_CENTS[sizeKey] || PROVIDER_HOURLY_COST_CENTS.small;
+export function estimateProviderHourlyCost(sizeKey: SizeKey, providerKey: ProviderKey = "e2b"): number {
+  const costs = PROVIDER_HOURLY_COSTS[providerKey] || PROVIDER_HOURLY_COSTS.e2b;
+  return costs[sizeKey] || costs.small;
 }
 
 /**
  * Customer-facing hourly cost (provider cost + markup).
  * Use this for UI display. Call with settings for dynamic pricing.
  */
-export function estimateHourlyCost(sizeKey: SizeKey, settings?: PricingSettings): number {
-  const providerCost = estimateProviderHourlyCost(sizeKey);
+export function estimateHourlyCost(sizeKey: SizeKey, settings?: PricingSettings, providerKey: ProviderKey = "e2b"): number {
+  const providerCost = estimateProviderHourlyCost(sizeKey, providerKey);
   if (!settings) {
     // Default 30% markup when settings not loaded
     return Math.ceil(providerCost * 1.3);
   }
-  const markup = resolveMarkupPercent(settings, sizeKey, "us-east", "stub");
+  const markup = resolveMarkupPercent(settings, sizeKey, "us-east", providerKey);
   return calculateCustomerPrice(providerCost, markup, settings.minimumPriceFloorCents).customerPriceCents;
 }
 
-export function estimateMonthlyCost(sizeKey: SizeKey, hoursPerDay: number, settings?: PricingSettings): number {
-  return estimateHourlyCost(sizeKey, settings) * hoursPerDay * 30;
+export function estimateMonthlyCost(sizeKey: SizeKey, hoursPerDay: number, settings?: PricingSettings, providerKey: ProviderKey = "e2b"): number {
+  return estimateHourlyCost(sizeKey, settings, providerKey) * hoursPerDay * 30;
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -128,7 +124,7 @@ export async function recordComputeHours(
   const settings = await getPricingSettings();
   const provider = opts?.provider || "stub";
   const region = opts?.region || "us-east";
-  const providerCostCents = Math.ceil(hours * estimateProviderHourlyCost(sizeKey));
+  const providerCostCents = Math.ceil(hours * estimateProviderHourlyCost(sizeKey, provider as ProviderKey));
   const markup = resolveMarkupPercent(settings, sizeKey, region, provider);
   const { customerPriceCents, platformProfitCents } = calculateCustomerPrice(
     providerCostCents,

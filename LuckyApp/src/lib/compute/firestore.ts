@@ -34,6 +34,7 @@ import type {
   UsageRecord,
   BillingLedgerEntry,
   PricingSettings,
+  ComputeEntitlement,
   ComputerStatus,
   TemplateCategory,
   MemoryScopeType,
@@ -59,6 +60,7 @@ const COLLECTIONS = {
   usage: "computeUsage",
   billingLedger: "computeBillingLedger",
   pricingSettings: "computePricingSettings",
+  entitlements: "computeEntitlements",
 } as const;
 
 // ═══════════════════════════════════════════════════════════════
@@ -96,6 +98,7 @@ export async function getWorkspace(id: string): Promise<Workspace | null> {
     slug: d.slug,
     description: d.description || "",
     planTier: d.planTier || "free",
+    defaultProvider: (d.defaultProvider as Workspace["defaultProvider"]) || "e2b",
     defaultAutoStopMinutes: d.defaultAutoStopMinutes ?? 30,
     allowedInstanceSizes: d.allowedInstanceSizes || ["small", "medium", "large", "xl"],
     staticIpEnabled: d.staticIpEnabled ?? false,
@@ -117,6 +120,7 @@ export async function getWorkspaces(orgId: string): Promise<Workspace[]> {
       slug: d.slug,
       description: d.description || "",
       planTier: d.planTier || "free",
+      defaultProvider: (d.defaultProvider as Workspace["defaultProvider"]) || "e2b",
       defaultAutoStopMinutes: d.defaultAutoStopMinutes ?? 30,
       allowedInstanceSizes: d.allowedInstanceSizes || ["small", "medium", "large", "xl"],
       staticIpEnabled: d.staticIpEnabled ?? false,
@@ -151,6 +155,7 @@ export function subscribeWorkspaces(orgId: string, cb: (workspaces: Workspace[])
         slug: d.slug,
         description: d.description || "",
         planTier: d.planTier || "free",
+        defaultProvider: (d.defaultProvider as Workspace["defaultProvider"]) || "e2b",
         defaultAutoStopMinutes: d.defaultAutoStopMinutes ?? 30,
         allowedInstanceSizes: d.allowedInstanceSizes || ["small", "medium", "large", "xl"],
         staticIpEnabled: d.staticIpEnabled ?? false,
@@ -173,8 +178,12 @@ function parseComputer(id: string, d: Record<string, unknown>): Computer {
     orgId: d.orgId as string,
     name: d.name as string,
     status: (d.status as ComputerStatus) || "stopped",
-    provider: (d.provider as string) || "stub",
+    provider: (d.provider as Computer["provider"]) || "e2b",
     providerInstanceId: (d.providerInstanceId as string) || null,
+    providerInstanceType: (d.providerInstanceType as string) || null,
+    providerRegion: (d.providerRegion as string) || null,
+    providerImage: (d.providerImage as string) || null,
+    providerMetadata: (d.providerMetadata as Record<string, unknown>) || {},
     templateId: (d.templateId as string) || null,
     sizeKey: (d.sizeKey as Computer["sizeKey"]) || "small",
     cpuCores: (d.cpuCores as number) || 2,
@@ -740,4 +749,74 @@ export async function updatePricingSettings(
   } else {
     await setDoc(ref, { ...DEFAULT_PRICING, ...update });
   }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Entitlements
+// ═══════════════════════════════════════════════════════════════
+
+function parseEntitlement(id: string, d: Record<string, unknown>): ComputeEntitlement {
+  return {
+    id,
+    orgId: (d.orgId as string) || "",
+    creditBalanceCents: (d.creditBalanceCents as number) || 0,
+    monthlyHourQuota: (d.monthlyHourQuota as number) || 0,
+    hoursUsedThisPeriod: (d.hoursUsedThisPeriod as number) || 0,
+    maxConcurrentComputers: (d.maxConcurrentComputers as number) || 1,
+    allowedSizes: (d.allowedSizes as SizeKey[]) || ["small"],
+    planTier: (d.planTier as ComputeEntitlement["planTier"]) || "free",
+    periodStart: toDate(d.periodStart),
+    updatedAt: toDate(d.updatedAt),
+  };
+}
+
+export async function getEntitlement(orgId: string): Promise<ComputeEntitlement | null> {
+  const ref = doc(db, COLLECTIONS.entitlements, orgId);
+  const snap = await getDoc(ref);
+  if (!snap.exists()) return null;
+  return parseEntitlement(snap.id, snap.data() as Record<string, unknown>);
+}
+
+export async function upsertEntitlement(
+  orgId: string,
+  data: Partial<Omit<ComputeEntitlement, "id" | "orgId">>,
+): Promise<void> {
+  const { setDoc } = await import("firebase/firestore");
+  const ref = doc(db, COLLECTIONS.entitlements, orgId);
+  const snap = await getDoc(ref);
+
+  if (snap.exists()) {
+    await updateDoc(ref, { ...data, updatedAt: serverTimestamp() });
+  } else {
+    await setDoc(ref, {
+      orgId,
+      creditBalanceCents: 0,
+      monthlyHourQuota: 5,
+      hoursUsedThisPeriod: 0,
+      maxConcurrentComputers: 1,
+      allowedSizes: ["small"],
+      planTier: "free",
+      periodStart: serverTimestamp(),
+      ...data,
+      updatedAt: serverTimestamp(),
+    });
+  }
+}
+
+export async function deductCredits(orgId: string, amountCents: number): Promise<boolean> {
+  const entitlement = await getEntitlement(orgId);
+  if (!entitlement) return false;
+  if (entitlement.creditBalanceCents < amountCents) return false;
+  await upsertEntitlement(orgId, {
+    creditBalanceCents: entitlement.creditBalanceCents - amountCents,
+  });
+  return true;
+}
+
+export async function addHoursUsed(orgId: string, hours: number): Promise<void> {
+  const entitlement = await getEntitlement(orgId);
+  if (!entitlement) return;
+  await upsertEntitlement(orgId, {
+    hoursUsedThisPeriod: entitlement.hoursUsedThisPeriod + hours,
+  });
 }

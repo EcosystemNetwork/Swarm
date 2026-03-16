@@ -61,7 +61,7 @@ export async function DELETE(
 
   // Stop provider instance if running
   if (computer.providerInstanceId && computer.status !== "stopped") {
-    const provider = getComputeProvider();
+    const provider = getComputeProvider(computer.provider);
     try {
       await provider.deleteInstance(computer.providerInstanceId);
     } catch (err) {

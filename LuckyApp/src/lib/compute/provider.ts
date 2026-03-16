@@ -2,7 +2,8 @@
  * Swarm Compute — Provider Abstraction
  *
  * Decouples all compute operations from any specific VM provider.
- * StubComputeProvider used for development; real providers (E2B, Fly, AWS) plugged in later.
+ * Supports E2B Desktop Sandbox as the primary real provider.
+ * StubComputeProvider used for development when no E2B_API_KEY is set.
  */
 
 import type { InstanceConfig, ProviderResult, ActionEnvelope, ActionResult } from "./types";
@@ -24,6 +25,217 @@ export interface ComputeProvider {
   getTerminalUrl(providerInstanceId: string): Promise<string>;
   createSnapshot(providerInstanceId: string, label: string): Promise<string>;
   cloneInstance(providerInstanceId: string, newName: string): Promise<string>;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// E2B Desktop Provider
+// ═══════════════════════════════════════════════════════════════
+
+export class E2BComputeProvider implements ComputeProvider {
+  readonly name = "e2b";
+
+  /** Lazy import to avoid loading E2B SDK at module level in client bundles */
+  private async sdk() {
+    const { Sandbox } = await import("@e2b/desktop");
+    return Sandbox;
+  }
+
+  async createInstance(config: InstanceConfig): Promise<ProviderResult> {
+    const Sandbox = await this.sdk();
+    const sandbox = await Sandbox.create({
+      resolution: [config.resolutionWidth, config.resolutionHeight],
+      timeoutMs: 300_000, // 5 min creation timeout
+    });
+
+    // Start VNC stream immediately so desktop viewer works
+    await sandbox.stream.start({ requireAuth: true });
+
+    return {
+      providerInstanceId: sandbox.sandboxId,
+      status: "running",
+    };
+  }
+
+  async startInstance(providerInstanceId: string): Promise<void> {
+    // E2B sandboxes are created running. "Start" means reconnect and ensure stream is up.
+    const Sandbox = await this.sdk();
+    const sandbox = await Sandbox.connect(providerInstanceId);
+    try {
+      await sandbox.stream.start({ requireAuth: true });
+    } catch {
+      // Stream may already be running
+    }
+  }
+
+  async stopInstance(providerInstanceId: string): Promise<void> {
+    const Sandbox = await this.sdk();
+    const sandbox = await Sandbox.connect(providerInstanceId);
+    await sandbox.stream.stop().catch(() => {});
+    await sandbox.kill();
+  }
+
+  async restartInstance(providerInstanceId: string): Promise<void> {
+    // E2B doesn't have restart — kill and re-create would lose state.
+    // For now, just reboot via command.
+    const Sandbox = await this.sdk();
+    const sandbox = await Sandbox.connect(providerInstanceId);
+    await sandbox.commands.run("sudo reboot").catch(() => {});
+  }
+
+  async deleteInstance(providerInstanceId: string): Promise<void> {
+    const Sandbox = await this.sdk();
+    const sandbox = await Sandbox.connect(providerInstanceId);
+    await sandbox.stream.stop().catch(() => {});
+    await sandbox.kill();
+  }
+
+  async takeScreenshot(providerInstanceId: string): Promise<{ url: string; base64?: string }> {
+    const Sandbox = await this.sdk();
+    const sandbox = await Sandbox.connect(providerInstanceId);
+    const screenshot = await sandbox.screenshot();
+    // screenshot returns a base64 PNG image
+    const base64 = typeof screenshot === "string" ? screenshot : Buffer.from(screenshot).toString("base64");
+    return {
+      url: `data:image/png;base64,${base64}`,
+      base64,
+    };
+  }
+
+  async executeAction(providerInstanceId: string, action: ActionEnvelope): Promise<ActionResult> {
+    const Sandbox = await this.sdk();
+    const sandbox = await Sandbox.connect(providerInstanceId);
+    const start = Date.now();
+
+    try {
+      switch (action.actionType) {
+        case "click": {
+          const x = action.payload.x as number;
+          const y = action.payload.y as number;
+          await sandbox.leftClick(x, y);
+          break;
+        }
+        case "double_click": {
+          const x = action.payload.x as number;
+          const y = action.payload.y as number;
+          await sandbox.doubleClick(x, y);
+          break;
+        }
+        case "type": {
+          const text = action.payload.text as string;
+          await sandbox.write(text);
+          break;
+        }
+        case "key": {
+          const key = action.payload.key as string;
+          await sandbox.press(key);
+          break;
+        }
+        case "scroll": {
+          const direction = (action.payload.direction as "up" | "down") || "down";
+          const amount = (action.payload.amount as number) || 3;
+          if (action.payload.x !== undefined && action.payload.y !== undefined) {
+            await sandbox.moveMouse(action.payload.x as number, action.payload.y as number);
+          }
+          await sandbox.scroll(direction, amount);
+          break;
+        }
+        case "drag": {
+          const from = action.payload.from as [number, number];
+          const to = action.payload.to as [number, number];
+          await sandbox.drag(from, to);
+          break;
+        }
+        case "screenshot": {
+          const screenshot = await sandbox.screenshot();
+          const base64 = typeof screenshot === "string" ? screenshot : Buffer.from(screenshot).toString("base64");
+          return {
+            success: true,
+            data: { base64, url: `data:image/png;base64,${base64}` },
+            durationMs: Date.now() - start,
+          };
+        }
+        case "wait": {
+          const ms = (action.payload.ms as number) || 1000;
+          await sandbox.wait(ms);
+          break;
+        }
+        case "bash":
+        case "exec": {
+          const command = action.payload.command as string;
+          const result = await sandbox.commands.run(command, {
+            timeoutMs: action.timeoutMs,
+          });
+          return {
+            success: result.exitCode === 0,
+            data: {
+              stdout: result.stdout,
+              stderr: result.stderr,
+              exitCode: result.exitCode,
+            },
+            durationMs: Date.now() - start,
+          };
+        }
+        default:
+          return {
+            success: false,
+            error: `Unsupported action type: ${action.actionType}`,
+            durationMs: Date.now() - start,
+          };
+      }
+
+      return {
+        success: true,
+        data: { actionType: action.actionType },
+        durationMs: Date.now() - start,
+      };
+    } catch (err) {
+      return {
+        success: false,
+        error: err instanceof Error ? err.message : "Action failed",
+        durationMs: Date.now() - start,
+      };
+    }
+  }
+
+  async getVncUrl(providerInstanceId: string): Promise<string> {
+    const Sandbox = await this.sdk();
+    const sandbox = await Sandbox.connect(providerInstanceId);
+    try {
+      const authKey = sandbox.stream.getAuthKey();
+      return sandbox.stream.getUrl({ authKey, autoConnect: true, resize: "scale" });
+    } catch {
+      // Stream not started — try to start it
+      await sandbox.stream.start({ requireAuth: true });
+      const authKey = sandbox.stream.getAuthKey();
+      return sandbox.stream.getUrl({ authKey, autoConnect: true, resize: "scale" });
+    }
+  }
+
+  async getTerminalUrl(providerInstanceId: string): Promise<string> {
+    // E2B doesn't have a separate terminal URL — use the desktop VNC
+    // Terminal access is via bash actions through the action endpoint
+    return "";
+  }
+
+  async createSnapshot(providerInstanceId: string, _label: string): Promise<string> {
+    const Sandbox = await this.sdk();
+    const sandbox = await Sandbox.connect(providerInstanceId);
+    const snapshot = await sandbox.createSnapshot();
+    return snapshot.snapshotId;
+  }
+
+  async cloneInstance(providerInstanceId: string, _newName: string): Promise<string> {
+    const Sandbox = await this.sdk();
+    const original = await Sandbox.connect(providerInstanceId);
+    // Snapshot the original, then create a new sandbox from the snapshot
+    const snapshot = await original.createSnapshot();
+    const screenSize = await original.getScreenSize();
+    const newSandbox = await Sandbox.create(snapshot.snapshotId, {
+      resolution: [screenSize.width, screenSize.height],
+    });
+    await newSandbox.stream.start({ requireAuth: true });
+    return newSandbox.sandboxId;
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -94,19 +306,53 @@ export class StubComputeProvider implements ComputeProvider {
 // Factory
 // ═══════════════════════════════════════════════════════════════
 
-let cachedProvider: ComputeProvider | null = null;
+import type { ProviderKey } from "./types";
 
-export function getComputeProvider(): ComputeProvider {
-  if (cachedProvider) return cachedProvider;
+const providerCache = new Map<string, ComputeProvider>();
 
-  const providerName = process.env.COMPUTE_PROVIDER || "stub";
+/**
+ * Get a compute provider instance by key.
+ * Providers are cached — one instance per key.
+ *
+ * @param providerKey — Explicit provider key. Falls back to env detection.
+ */
+export function getComputeProvider(providerKey?: ProviderKey | string): ComputeProvider {
+  const key = providerKey
+    || process.env.COMPUTE_PROVIDER
+    || (process.env.E2B_API_KEY ? "e2b" : "stub");
 
-  switch (providerName) {
-    // Future: case "e2b": cachedProvider = new E2BProvider(); break;
-    // Future: case "fly": cachedProvider = new FlyProvider(); break;
+  const cached = providerCache.get(key);
+  if (cached) return cached;
+
+  let provider: ComputeProvider;
+
+  switch (key) {
+    case "e2b":
+      provider = new E2BComputeProvider();
+      break;
+    case "aws": {
+      // Lazy require to avoid loading cloud SDKs when not needed
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { AwsComputeProvider } = require("./providers/aws");
+      provider = new AwsComputeProvider();
+      break;
+    }
+    case "gcp": {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { GcpComputeProvider } = require("./providers/gcp");
+      provider = new GcpComputeProvider();
+      break;
+    }
+    case "azure": {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { AzureComputeProvider } = require("./providers/azure");
+      provider = new AzureComputeProvider();
+      break;
+    }
     default:
-      cachedProvider = new StubComputeProvider();
+      provider = new StubComputeProvider();
   }
 
-  return cachedProvider;
+  providerCache.set(key, provider);
+  return provider;
 }

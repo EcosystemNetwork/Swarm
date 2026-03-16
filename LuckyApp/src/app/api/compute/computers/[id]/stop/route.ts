@@ -27,16 +27,16 @@ export async function POST(
 
   await updateComputer(id, { status: "stopping" });
 
-  const provider = getComputeProvider();
+  const provider = getComputeProvider(computer.provider);
   try {
     if (computer.providerInstanceId) {
       await provider.stopInstance(computer.providerInstanceId);
     }
 
-    // End all active sessions for this computer
+    // End all active sessions — use allSettled so one failure doesn't block the stop
     const sessions = await getSessions({ computerId: id, limit: 50 });
     const activeSessions = sessions.filter((s) => !s.endedAt);
-    await Promise.all(activeSessions.map((s) => endComputeSession(s.id)));
+    await Promise.allSettled(activeSessions.map((s) => endComputeSession(s.id)));
 
     await updateComputer(id, { status: "stopped" });
     return Response.json({ ok: true });

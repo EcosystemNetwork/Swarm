@@ -36,8 +36,15 @@ export async function POST(
     sessionId: string;
   };
 
+  const VALID_ACTIONS: ActionType[] = [
+    "screenshot", "click", "double_click", "drag", "type",
+    "key", "scroll", "wait", "bash", "exec",
+  ];
   if (!actionType || !sessionId) {
     return Response.json({ error: "actionType and sessionId are required" }, { status: 400 });
+  }
+  if (!VALID_ACTIONS.includes(actionType)) {
+    return Response.json({ error: `Invalid actionType. Must be one of: ${VALID_ACTIONS.join(", ")}` }, { status: 400 });
   }
 
   const envelope = buildActionEnvelope(
