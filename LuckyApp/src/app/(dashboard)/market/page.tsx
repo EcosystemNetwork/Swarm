@@ -592,13 +592,47 @@ export default function MarketPage() {
         } finally { setBusyId(null); }
     };
 
-    const handleSubscribe = async (itemId: string, plan: SubscriptionPlan) => {
-        if (!currentOrg || !account) return;
+    const handleSubscribe = async (itemId: string, plan: SubscriptionPlan, paymentMethod: "stripe" | "crypto" = "stripe") => {
+        if (!currentOrg || (!account && !authenticated)) return;
         setBusyId(itemId);
         try {
-            await subscribeToItem(currentOrg.id, itemId, plan, userAddress);
-            await loadSubscriptions();
-            setSubscribeTarget(null);
+            if (paymentMethod === "stripe") {
+                // Create Stripe Checkout Session and redirect
+                const res = await fetch("/api/v1/marketplace/checkout", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "x-wallet-address": userAddress,
+                    },
+                    body: JSON.stringify({ modId: itemId, plan, orgId: currentOrg.id }),
+                });
+                const data = await res.json();
+                if (data.url) {
+                    window.location.href = data.url;
+                    return;
+                }
+                // Fallback to direct subscription if Stripe not configured
+                if (data.error?.includes("not configured")) {
+                    await subscribeToItem(currentOrg.id, itemId, plan, userAddress);
+                    await loadSubscriptions();
+                    setSubscribeTarget(null);
+                }
+            } else {
+                // Crypto: create payment intent (user handles tx in wallet)
+                const res = await fetch("/api/v1/marketplace/crypto-checkout", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "x-wallet-address": userAddress,
+                    },
+                    body: JSON.stringify({ modId: itemId, plan, orgId: currentOrg.id, chain: "hedera" }),
+                });
+                const data = await res.json();
+                if (data.ok) {
+                    // Store payment intent ID for later verification
+                    alert(`Send ${data.amount} ${data.currency} to ${data.recipientAddress}\nPayment ID: ${data.paymentId}`);
+                }
+            }
         } finally { setBusyId(null); }
     };
 
@@ -1161,41 +1195,50 @@ export default function MarketPage() {
                                 Choose a plan to access this {subscribeTarget.type}. The creator controls pricing and access.
                             </p>
                             <div className="grid gap-2">
-                                {subscribeTarget.pricing.tiers.map((tier) => (
-                                    <button
-                                        key={tier.plan}
-                                        onClick={() => {
-                                            const subKey = subscribeTarget.id.startsWith("community-") ? subscribeTarget.id.slice(10) : subscribeTarget.id;
-                                            handleSubscribe(subKey, tier.plan);
-                                        }}
-                                        disabled={!!busyId}
-                                        className="flex items-center justify-between p-4 rounded-lg border border-border hover:border-purple-500/30 hover:bg-purple-500/5 transition-all text-left"
-                                    >
-                                        <div className="flex items-center gap-3">
-                                            {tier.plan === "monthly" && <Calendar className="h-5 w-5 text-purple-400" />}
-                                            {tier.plan === "yearly" && <Crown className="h-5 w-5 text-amber-400" />}
-                                            {tier.plan === "lifetime" && <Infinity className="h-5 w-5 text-emerald-400" />}
-                                            <div>
-                                                <div className="font-semibold text-sm capitalize">{tier.plan}</div>
-                                                <div className="text-xs text-muted-foreground">
-                                                    {tier.plan === "monthly" && "Billed monthly, cancel anytime"}
-                                                    {tier.plan === "yearly" && "Billed annually, best value"}
-                                                    {tier.plan === "lifetime" && "One-time payment, forever access"}
+                                {subscribeTarget.pricing.tiers.map((tier) => {
+                                    const subKey = subscribeTarget.id.startsWith("community-") ? subscribeTarget.id.slice(10) : subscribeTarget.id;
+                                    return (
+                                    <div key={tier.plan} className="rounded-lg border border-border p-4 space-y-2">
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center gap-3">
+                                                {tier.plan === "monthly" && <Calendar className="h-5 w-5 text-purple-400" />}
+                                                {tier.plan === "yearly" && <Crown className="h-5 w-5 text-amber-400" />}
+                                                {tier.plan === "lifetime" && <Infinity className="h-5 w-5 text-emerald-400" />}
+                                                <div>
+                                                    <div className="font-semibold text-sm capitalize">{tier.plan}</div>
+                                                    <div className="text-xs text-muted-foreground">
+                                                        {tier.plan === "monthly" && "Billed monthly, cancel anytime"}
+                                                        {tier.plan === "yearly" && "Billed annually, best value"}
+                                                        {tier.plan === "lifetime" && "One-time payment, forever access"}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div className="text-right">
+                                                <div className="font-bold text-sm">{formatPrice(tier.price)}</div>
+                                                <div className="text-[10px] text-muted-foreground">
+                                                    {tier.plan === "monthly" ? "/month" : tier.plan === "yearly" ? "/year" : "once"}
                                                 </div>
                                             </div>
                                         </div>
-                                        <div className="text-right">
-                                            <div className="font-bold text-sm">
-                                                {formatPrice(tier.price)}
-                                            </div>
-                                            <div className="text-[10px] text-muted-foreground">
-                                                {tier.plan === "monthly" && "/month"}
-                                                {tier.plan === "yearly" && "/year"}
-                                                {tier.plan === "lifetime" && "once"}
-                                            </div>
+                                        <div className="flex gap-2">
+                                            <button
+                                                onClick={() => handleSubscribe(subKey, tier.plan, "stripe")}
+                                                disabled={!!busyId}
+                                                className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-md bg-purple-600 hover:bg-purple-700 text-white text-xs font-medium transition-colors disabled:opacity-50"
+                                            >
+                                                <CreditCard className="h-3.5 w-3.5" /> Pay with Card
+                                            </button>
+                                            <button
+                                                onClick={() => handleSubscribe(subKey, tier.plan, "crypto")}
+                                                disabled={!!busyId}
+                                                className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-md border border-border hover:bg-muted/50 text-xs font-medium transition-colors disabled:opacity-50"
+                                            >
+                                                <Zap className="h-3.5 w-3.5" /> Pay with Crypto
+                                            </button>
                                         </div>
-                                    </button>
-                                ))}
+                                    </div>
+                                    );
+                                })}
                             </div>
                             {busyId && (
                                 <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground py-2">

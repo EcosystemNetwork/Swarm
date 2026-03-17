@@ -810,6 +810,46 @@ export const SKILL_REGISTRY: Skill[] = [
 
 ];
 
+/**
+ * Load remote mod services from the gateway registry and merge
+ * them with the static SKILL_REGISTRY. Returns Skill entries
+ * for remote mods that aren't already in the static registry.
+ */
+export async function loadRemoteModRegistry(): Promise<Skill[]> {
+    try {
+        const { listActiveModServices } = await import("@/lib/mod-gateway/registry");
+        const services = await listActiveModServices();
+
+        const staticIds = new Set(SKILL_REGISTRY.map((s) => s.id));
+        const remoteSkills: Skill[] = [];
+
+        for (const svc of services) {
+            // Skip mods already in static registry
+            if (staticIds.has(svc.slug) || staticIds.has(svc.modId)) continue;
+
+            remoteSkills.push({
+                id: svc.slug,
+                name: svc.name,
+                description: svc.description,
+                type: "mod",
+                source: "verified",
+                category: svc.category,
+                icon: svc.icon,
+                version: svc.version,
+                author: svc.vendor,
+                requiredKeys: svc.requiredKeys,
+                tags: svc.tags,
+                pricing: svc.pricing,
+                sidebarConfig: svc.sidebarConfig,
+            });
+        }
+
+        return remoteSkills;
+    } catch {
+        return [];
+    }
+}
+
 export const SKILL_BUNDLES: SkillBundle[] = [
     {
         id: "developer-bundle",

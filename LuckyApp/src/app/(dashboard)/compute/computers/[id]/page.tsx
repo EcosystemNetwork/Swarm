@@ -200,8 +200,10 @@ export default function ComputerDetailPage({ params }: { params: Promise<{ id: s
   const totalCostCents = sessions.reduce((sum, s) => sum + s.estimatedCostCents, 0);
   const totalHours = sessions.reduce((sum, s) => {
     if (!s.startedAt) return sum;
-    const end = s.endedAt ? s.endedAt.getTime() : Date.now();
-    return sum + (end - s.startedAt.getTime()) / 3600000;
+    const start = new Date(s.startedAt).getTime();
+    if (isNaN(start)) return sum;
+    const end = s.endedAt ? new Date(s.endedAt).getTime() : Date.now();
+    return sum + (end - start) / 3600000;
   }, 0);
 
   return (

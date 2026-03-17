@@ -415,6 +415,53 @@ export function Sidebar() {
         });
       }
 
+      // Merge remote mod services from the gateway registry
+      try {
+        const { listActiveModServices } = await import("@/lib/mod-gateway/registry");
+        const remoteServices = await listActiveModServices();
+        for (const svc of remoteServices) {
+          // Skip if already handled via static registry
+          if (handled.has(svc.slug) || handled.has(svc.modId)) continue;
+          // Only show remote mods the org has subscribed to
+          if (!ownedIds.has(svc.slug) && !ownedIds.has(svc.modId)) continue;
+
+          if (svc.sidebarConfig) {
+            const icon = ICON_MAP[svc.sidebarConfig.iconName] as typeof LayoutDashboard | undefined;
+            const navItem: NavItem = {
+              id: `mod-${svc.slug}`,
+              href: svc.sidebarConfig.href,
+              label: svc.sidebarConfig.label,
+              icon: icon || Globe,
+            };
+            if (svc.sidebarConfig.parentModId) {
+              childItems.push({
+                parentModId: svc.sidebarConfig.parentModId,
+                sectionId: svc.sidebarConfig.sectionId,
+                item: navItem,
+              });
+            } else {
+              parentItems.push({
+                sectionId: svc.sidebarConfig.sectionId,
+                item: navItem,
+              });
+            }
+          } else {
+            // Remote mod without sidebarConfig — auto-generate entry
+            parentItems.push({
+              sectionId: "modifications",
+              item: {
+                id: `mod-${svc.slug}`,
+                href: `/mods/${svc.slug}`,
+                label: svc.name,
+                icon: Globe,
+              },
+            });
+          }
+        }
+      } catch {
+        // Remote registry unavailable — continue with static entries only
+      }
+
       const base = DEFAULT_SECTIONS.map(s => ({ ...s, items: [...s.items] }));
 
       // Add parent items first
