@@ -334,6 +334,22 @@ export interface SecurityScanResult {
     severity: "none" | "low" | "medium" | "high" | "critical";
 }
 
+/** Calculate Shannon entropy (bits per character) for a string. */
+function shannonEntropy(s: string): number {
+    if (s.length === 0) return 0;
+    const freq: Record<string, number> = {};
+    for (const c of s) freq[c] = (freq[c] || 0) + 1;
+    let entropy = 0;
+    for (const count of Object.values(freq)) {
+        const p = count / s.length;
+        entropy -= p * Math.log2(p);
+    }
+    return entropy;
+}
+
+// Suspicious TLDs commonly used for phishing/malware
+const SUSPICIOUS_TLDS = [".tk", ".ml", ".cf", ".ga", ".gq", ".top", ".buzz", ".loan"];
+
 /** Run automated security scan on submission content. */
 export function runSecurityScan(
     description: string,
@@ -386,6 +402,76 @@ export function runSecurityScan(
         if (hasSensitive) {
             findings.push("Requests sensitive_data_access — requires manual review");
             if (severityRank("medium") > severityRank(maxSeverity)) maxSeverity = "medium";
+        }
+    }
+
+    // 4. URL validation — suspicious links in description
+    const urlMatches = description.match(/https?:\/\/[^\s)">]+/gi) || [];
+    for (const url of urlMatches) {
+        const lower = url.toLowerCase();
+        if (SUSPICIOUS_TLDS.some(tld => lower.includes(tld))) {
+            findings.push(`URL with suspicious TLD: ${url.slice(0, 60)}`);
+            if (severityRank("medium") > severityRank(maxSeverity)) maxSeverity = "medium";
+        }
+        if (/https?:\/\/\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}/.test(url)) {
+            findings.push(`URL uses IP address instead of domain: ${url.slice(0, 60)}`);
+            if (severityRank("medium") > severityRank(maxSeverity)) maxSeverity = "medium";
+        }
+    }
+    if (/data:[^;]+;base64,[A-Za-z0-9+/=]+/i.test(description)) {
+        findings.push("Data URI detected in description (potential payload injection)");
+        if (severityRank("high") > severityRank(maxSeverity)) maxSeverity = "high";
+    }
+
+    // 5. Obfuscation detection
+    const allTextContent = [
+        description,
+        ...(manifest?.tools || []),
+        ...(manifest?.workflows || []),
+        ...(manifest?.agentSkills || []),
+    ].join(" ");
+
+    if (/[A-Za-z0-9+/]{50,}={0,2}/.test(allTextContent)) {
+        findings.push("Suspicious base64 block detected — may contain obfuscated content");
+        if (severityRank("medium") > severityRank(maxSeverity)) maxSeverity = "medium";
+    }
+    if (/(?:0x)?[0-9a-fA-F]{40,}/.test(allTextContent)) {
+        findings.push("Long hex-encoded string detected");
+        if (severityRank("low") > severityRank(maxSeverity)) maxSeverity = "low";
+    }
+    const unicodeEscapes = allTextContent.match(/\\u[0-9a-fA-F]{4}/g);
+    if (unicodeEscapes && unicodeEscapes.length > 5) {
+        findings.push(`Excessive Unicode escape sequences (${unicodeEscapes.length}) — possible obfuscation`);
+        if (severityRank("medium") > severityRank(maxSeverity)) maxSeverity = "medium";
+    }
+
+    // 6. Manifest tool/workflow name validation
+    if (manifest) {
+        const suspiciousPattern = /\b(eval|exec|rm\s|curl\s|wget\s|shell|system|spawn|child_process|require\(|import\(|__proto__|constructor\[|Function\()/i;
+        const allNames = [
+            ...(manifest.tools || []),
+            ...(manifest.workflows || []),
+            ...(manifest.agentSkills || []),
+        ];
+        for (const entry of allNames) {
+            if (suspiciousPattern.test(entry)) {
+                findings.push(`Suspicious pattern in manifest entry: "${entry.slice(0, 80)}"`);
+                if (severityRank("high") > severityRank(maxSeverity)) maxSeverity = "high";
+            }
+        }
+    }
+
+    // 7. Entropy analysis — detect high-entropy strings that may be hardcoded secrets
+    const entropyRegex = /[A-Za-z0-9+/=_-]{20,}/g;
+    let entropyMatch;
+    while ((entropyMatch = entropyRegex.exec(allTextContent)) !== null) {
+        const candidate = entropyMatch[0];
+        if (candidate.length >= 20 && shannonEntropy(candidate) > 4.5) {
+            if (!/^(https?|version|description|community|marketplace|submittedBy|publisherWallet)/i.test(candidate)) {
+                findings.push(`High-entropy string detected (${candidate.length} chars, ${shannonEntropy(candidate).toFixed(1)} bits/char) — possible hardcoded secret`);
+                if (severityRank("medium") > severityRank(maxSeverity)) maxSeverity = "medium";
+                break; // Report only first occurrence
+            }
         }
     }
 

@@ -25,12 +25,13 @@ import {
     SKILL_REGISTRY, SKILL_BUNDLES, MOD_REGISTRY,
     MOD_CATEGORIES, PLUGIN_CATEGORIES, SKILL_ONLY_CATEGORIES, SKIN_CATEGORIES, AGENT_ITEM_CATEGORIES,
     acquireItem, removeFromInventory, toggleInventoryItem, getOwnedItems, acquireBundle,
-    getCommunityItems, getUserSubmissions, deleteCommunityItem,
+    getCommunityItems, getUserSubmissions,
     getOrgSubscriptions, subscribeToItem, cancelSubscription,
     getAgentInstalls, uninstallMarketplaceAgent,
     getFeaturedItems,
 } from "@/lib/skills";
 import { computeRankingScore } from "@/lib/submission-protocol";
+import { trackMarketplaceEvent } from "@/lib/posthog";
 import { type Agent, getAgentsByOrg } from "@/lib/firestore";
 import { SubmitMarketItemDialog } from "@/components/market/submit-dialog";
 import {
@@ -567,7 +568,15 @@ export default function MarketPage() {
     const handleDeleteSubmission = async (docId: string) => {
         setDeletingId(docId);
         try {
-            await deleteCommunityItem(docId);
+            const res = await fetch(`/api/v1/marketplace/items/${docId}`, {
+                method: "DELETE",
+                headers: { "x-wallet-address": userAddress },
+            });
+            if (!res.ok) {
+                const data = await res.json().catch(() => ({}));
+                console.error("Delete failed:", data.error);
+            }
+            trackMarketplaceEvent("submission_deleted", { itemId: docId });
             await loadUserSubmissions();
             await loadCommunityItems();
         } finally {
@@ -577,9 +586,12 @@ export default function MarketPage() {
 
     // Debounce search input
     useEffect(() => {
-        const timer = setTimeout(() => setDebouncedSearch(search), 300);
+        const timer = setTimeout(() => {
+            setDebouncedSearch(search);
+            if (search) trackMarketplaceEvent("search", { query: search, tab });
+        }, 300);
         return () => clearTimeout(timer);
-    }, [search]);
+    }, [search, tab]);
 
     // Reset filters when switching tabs
     useEffect(() => { setCategory("All"); setSearch(""); setSortBy("name"); }, [tab]);
@@ -600,6 +612,7 @@ export default function MarketPage() {
                 }
             }
             await acquireItem(currentOrg.id, skillId, userAddress);
+            trackMarketplaceEvent("item_installed", { skillId, type: skill?.type });
             await loadInventory();
             window.dispatchEvent(new Event("swarm-inventory-changed"));
         } finally { setBusyId(null); }
@@ -617,6 +630,7 @@ export default function MarketPage() {
                 if (depOwned) await removeFromInventory(depOwned.id);
             }
             await removeFromInventory(item.id);
+            trackMarketplaceEvent("item_removed", { skillId: item.skillId });
             await loadInventory();
             window.dispatchEvent(new Event("swarm-inventory-changed"));
         } finally { setBusyId(null); }
@@ -639,6 +653,7 @@ export default function MarketPage() {
 
     const handleSubscribe = async (itemId: string, plan: SubscriptionPlan, paymentMethod: "stripe" | "crypto" = "stripe") => {
         if (!currentOrg || (!account && !authenticated)) return;
+        trackMarketplaceEvent("checkout_started", { itemId, plan, paymentMethod });
         setBusyId(itemId);
         try {
             if (paymentMethod === "stripe") {
@@ -846,7 +861,7 @@ export default function MarketPage() {
                 {TABS.map(({ key, label, icon: Icon }) => (
                     <button
                         key={key}
-                        onClick={() => setTab(key)}
+                        onClick={() => { setTab(key); trackMarketplaceEvent("tab_changed", { tab: key }); }}
                         className={`flex items-center gap-1.5 px-3 sm:px-4 py-2.5 text-sm font-medium border-b-2 transition-all -mb-px whitespace-nowrap ${tab === key
                                 ? "border-amber-500 text-amber-500"
                                 : "border-transparent text-muted-foreground hover:text-foreground"
@@ -941,7 +956,7 @@ export default function MarketPage() {
                                 className="pl-9"
                             />
                         </div>
-                        <Select value={sortBy} onValueChange={(v) => setSortBy(v as typeof sortBy)}>
+                        <Select value={sortBy} onValueChange={(v) => { setSortBy(v as typeof sortBy); trackMarketplaceEvent("sort_changed", { sort: v }); }}>
                             <SelectTrigger className="w-[150px] shrink-0">
                                 <SelectValue placeholder="Sort by" />
                             </SelectTrigger>
@@ -1155,7 +1170,7 @@ export default function MarketPage() {
                             {/* Publisher Tier Badge */}
                             <PublisherTierBadge walletAddress={account?.address} />
                             <Button
-                                onClick={() => setSubmitOpen(true)}
+                                onClick={() => { setSubmitOpen(true); trackMarketplaceEvent("submission_started"); }}
                                 className="bg-amber-600 hover:bg-amber-700 text-black gap-1.5"
                             >
                                 <Plus className="h-4 w-4" />
@@ -1239,7 +1254,7 @@ export default function MarketPage() {
                                 Share your custom mods, plugins, and skills with the community.
                             </p>
                             <Button
-                                onClick={() => setSubmitOpen(true)}
+                                onClick={() => { setSubmitOpen(true); trackMarketplaceEvent("submission_started"); }}
                                 className="bg-amber-600 hover:bg-amber-700 text-black gap-2"
                             >
                                 <Plus className="h-4 w-4" /> Submit Your First Item
@@ -1438,6 +1453,7 @@ export default function MarketPage() {
                                     orgId: currentOrg.id,
                                 }),
                             });
+                            trackMarketplaceEvent("rating_submitted", { itemId: ratingDialogItem.id, itemType: ratingDialogItem.type, rating });
                             setRatingDialogItem(null);
                             loadCommunityItems();
                             loadMarketplaceAgents();

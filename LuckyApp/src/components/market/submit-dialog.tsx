@@ -19,7 +19,8 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import { Loader2 } from "lucide-react";
-import { type MarketItemType, type PricingModel, type MarketPricing, submitMarketItem, publishAgentPackage, AGENT_CATEGORIES } from "@/lib/skills";
+import { type MarketItemType, type PricingModel, type MarketPricing, AGENT_CATEGORIES } from "@/lib/skills";
+import { trackMarketplaceEvent } from "@/lib/posthog";
 
 interface SubmitMarketItemDialogProps {
     open: boolean;
@@ -48,6 +49,7 @@ export function SubmitMarketItemDialog({
     const [lifetimePrice, setLifetimePrice] = useState("");
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [errorDetails, setErrorDetails] = useState<string[] | null>(null);
     // Agent-specific fields
     const [agentType, setAgentType] = useState("");
     const [persona, setPersona] = useState("");
@@ -132,97 +134,72 @@ export function SubmitMarketItemDialog({
 
         setSubmitting(true);
         setError(null);
+        setErrorDetails(null);
         try {
-            const tags = tagsInput
-                .split(",")
-                .map((t) => t.trim())
-                .filter(Boolean);
-            const requiredKeys = requiredKeysInput
-                .split(",")
-                .map((k) => k.trim())
-                .filter(Boolean);
+            const tags = tagsInput.split(",").map((t) => t.trim()).filter(Boolean);
+            const requiredKeys = requiredKeysInput.split(",").map((k) => k.trim()).filter(Boolean);
+
+            // Build the request body for the publish API
+            const body: Record<string, unknown> = {
+                name: name.trim(),
+                type,
+                category: type === "agent"
+                    ? (agentCategory.toLowerCase().replace(/\s+/g, "-") || "general")
+                    : category.trim(),
+                icon: icon.trim(),
+                description: description.trim(),
+                version: version.trim() || "1.0.0",
+                tags,
+                requiredKeys: requiredKeys.length > 0 ? requiredKeys : undefined,
+                submissionType,
+                submissionTrack: submissionType === "build" && submissionTrack ? submissionTrack : undefined,
+                repoUrl: repoUrl.trim() || undefined,
+                demoUrl: demoUrl.trim() || undefined,
+                permissionsRequired: selectedPermissions.length > 0 ? selectedPermissions : undefined,
+            };
 
             if (type === "agent") {
-                // Agent publishing flow
-                const distributions: ("config" | "rental" | "hire")[] = [];
+                // Agent-specific fields
+                const distributions: string[] = [];
                 if (configPrice) distributions.push("config");
                 if (rentalMonthly || rentalUsage || performanceShare) distributions.push("rental");
                 if (hirePerTask) distributions.push("hire");
                 if (distributions.length === 0) distributions.push("config");
 
-                // Build soulTemplate from SOUL fields if any are set
-                const hasSoulFields = commStyle || decisionMaking || riskTolerance || humor || greeting || systemPrompt;
-                const personalityTraits = personality ? personality.split(",").map(p => p.trim()).filter(Boolean) : ["helpful"];
-                const soulTemplate: import("@/lib/soul").SOULConfig | undefined = hasSoulFields ? {
-                    version: "1.0",
-                    identity: {
-                        name: name.trim(),
-                        role: agentType || "General",
-                        purpose: persona || description.trim(),
-                    },
-                    personality: {
-                        traits: personalityTraits,
-                        communicationStyle: (commStyle || "casual") as "casual",
-                        emotionalRange: "balanced",
-                        humor: (humor || "subtle") as "subtle",
-                    },
-                    behavior: {
-                        decisionMaking: (decisionMaking || "collaborative") as "collaborative",
-                        riskTolerance: (riskTolerance || "moderate") as "moderate",
-                        learningStyle: "interactive",
-                        responseSpeed: "considered",
-                    },
-                    capabilities: {
-                        skills: personalityTraits,
-                    },
-                    ethics: {
-                        principles: ["Act in the user's best interest"],
-                        boundaries: ["Stay within defined scope"],
-                        priorities: ["Accuracy", "Helpfulness"],
-                    },
-                    interactions: {
-                        greetingStyle: greeting || `Hello! I'm ${name.trim()}.`,
-                        farewellStyle: "Goodbye! Feel free to reach out anytime.",
-                        errorHandling: "solution-focused",
-                        feedbackPreference: "adaptive",
-                    },
-                    ...(systemPrompt ? { customFields: { systemPrompt } } : {}),
-                } : undefined;
+                body.distributions = distributions;
+                body.identity = {
+                    agentType: agentType || "General",
+                    persona: persona || description.trim(),
+                    personality: personality ? personality.split(",").map(p => p.trim()).filter(Boolean) : undefined,
+                    rules: rules ? rules.split("\n").map(r => r.trim()).filter(Boolean) : undefined,
+                    systemPrompt: systemPrompt || undefined,
+                };
+                body.agentPricing = {
+                    configPurchase: configPrice ? parseFloat(configPrice) : undefined,
+                    rentalMonthly: rentalMonthly ? parseFloat(rentalMonthly) : undefined,
+                    rentalUsage: rentalUsage ? parseFloat(rentalUsage) : undefined,
+                    rentalPerformance: performanceShare ? parseFloat(performanceShare) : undefined,
+                    hirePerTask: hirePerTask ? parseFloat(hirePerTask) : undefined,
+                    currency: "USD",
+                };
 
-                await publishAgentPackage({
-                    slug: name.trim().toLowerCase().replace(/\s+/g, "-"),
-                    name: name.trim(),
-                    version: version.trim() || "1.0.0",
-                    description: description.trim(),
-                    author: submitterAddress.slice(0, 8) + "...",
-                    authorWallet: submitterAddress,
-                    icon: icon.trim(),
-                    category: (agentCategory.toLowerCase().replace(/\s+/g, "-") || "general") as "general",
-                    tags,
-                    distributions,
-                    pricing: {
-                        configPurchase: configPrice ? parseFloat(configPrice) : undefined,
-                        rentalMonthly: rentalMonthly ? parseFloat(rentalMonthly) : undefined,
-                        rentalUsage: rentalUsage ? parseFloat(rentalUsage) : undefined,
-                        rentalPerformance: performanceShare ? parseFloat(performanceShare) : undefined,
-                        hirePerTask: hirePerTask ? parseFloat(hirePerTask) : undefined,
-                        currency: "USD",
-                    },
-                    identity: {
-                        agentType: agentType || "General",
-                        persona: persona || description.trim(),
-                        personality: personality ? personality.split(",").map(p => p.trim()).filter(Boolean) : undefined,
-                        rules: rules ? rules.split("\n").map(r => r.trim()).filter(Boolean) : undefined,
-                        systemPrompt: systemPrompt || undefined,
-                    },
-                    requiredSkills: [],
-                    requiredKeys: requiredKeys.length > 0 ? requiredKeys : undefined,
-                    soulTemplate,
-                    source: "community",
-                    creatorRevShare: 0.85,
-                });
+                // SOUL template
+                const hasSoulFields = commStyle || decisionMaking || riskTolerance || humor || greeting || systemPrompt;
+                if (hasSoulFields) {
+                    const personalityTraits = personality ? personality.split(",").map(p => p.trim()).filter(Boolean) : ["helpful"];
+                    body.soulTemplate = {
+                        version: "1.0",
+                        identity: { name: name.trim(), role: agentType || "General", purpose: persona || description.trim() },
+                        personality: { traits: personalityTraits, communicationStyle: commStyle || "casual", emotionalRange: "balanced", humor: humor || "subtle" },
+                        behavior: { decisionMaking: decisionMaking || "collaborative", riskTolerance: riskTolerance || "moderate", learningStyle: "interactive", responseSpeed: "considered" },
+                        capabilities: { skills: personalityTraits },
+                        ethics: { principles: ["Act in the user's best interest"], boundaries: ["Stay within defined scope"], priorities: ["Accuracy", "Helpfulness"] },
+                        interactions: { greetingStyle: greeting || `Hello! I'm ${name.trim()}.`, farewellStyle: "Goodbye! Feel free to reach out anytime.", errorHandling: "solution-focused", feedbackPreference: "adaptive" },
+                        ...(systemPrompt ? { customFields: { systemPrompt } } : {}),
+                    };
+                }
             } else {
-                // Standard market item submission
+                // Standard item: pricing, skinConfig, modManifest
                 const pricing: MarketPricing = { model: pricingModel };
                 if (pricingModel === "subscription") {
                     pricing.tiers = [];
@@ -230,48 +207,49 @@ export function SubmitMarketItemDialog({
                     if (yearlyPrice) pricing.tiers.push({ plan: "yearly", price: parseFloat(yearlyPrice), currency: "USD" });
                     if (lifetimePrice) pricing.tiers.push({ plan: "lifetime", price: parseFloat(lifetimePrice), currency: "USD" });
                 }
+                body.pricing = pricing;
 
-                // Build optional skin config
-                const skinConfig = type === "skin" && (skinPrimary || skinAccent || skinBg || skinFeatures) ? {
-                    colors: {
-                        ...(skinPrimary ? { primary: skinPrimary.trim() } : {}),
-                        ...(skinAccent ? { accent: skinAccent.trim() } : {}),
-                        ...(skinBg ? { background: skinBg.trim() } : {}),
-                    },
-                    features: skinFeatures ? skinFeatures.split("\n").map(f => f.trim()).filter(Boolean) : [],
-                } : undefined;
+                if (type === "skin" && (skinPrimary || skinAccent || skinBg || skinFeatures)) {
+                    body.skinConfig = {
+                        colors: {
+                            ...(skinPrimary ? { primary: skinPrimary.trim() } : {}),
+                            ...(skinAccent ? { accent: skinAccent.trim() } : {}),
+                            ...(skinBg ? { background: skinBg.trim() } : {}),
+                        },
+                        features: skinFeatures ? skinFeatures.split("\n").map(f => f.trim()).filter(Boolean) : [],
+                    };
+                }
 
-                // Build optional mod manifest
-                const modManifest = type === "mod" && (modTools || modWorkflows || modAgentSkills) ? {
-                    tools: modTools ? modTools.split("\n").map(t => t.trim()).filter(Boolean) : [],
-                    workflows: modWorkflows ? modWorkflows.split("\n").map(w => w.trim()).filter(Boolean) : [],
-                    agentSkills: modAgentSkills ? modAgentSkills.split("\n").map(s => s.trim()).filter(Boolean) : [],
-                } : undefined;
-
-                await submitMarketItem({
-                    name: name.trim(),
-                    type: type as MarketItemType,
-                    category: category.trim(),
-                    icon: icon.trim(),
-                    description: description.trim(),
-                    version: version.trim() || "1.0.0",
-                    tags,
-                    requiredKeys: requiredKeys.length > 0 ? requiredKeys : undefined,
-                    pricing,
-                    submittedBy: submitterAddress,
-                    skinConfig,
-                    modManifest,
-                    // Submission Protocol v1 fields
-                    submissionType,
-                    submissionTrack: submissionTrack as "prd_only" | "open_repo" | "private_repo" | "managed_partner" | undefined || undefined,
-                    repoUrl: repoUrl.trim() || undefined,
-                    demoUrl: demoUrl.trim() || undefined,
-                    permissionsRequired: selectedPermissions.length > 0
-                        ? selectedPermissions as import("@/lib/skills").PermissionScope[]
-                        : undefined,
-                });
+                if (type === "mod" && (modTools || modWorkflows || modAgentSkills)) {
+                    body.modManifest = {
+                        tools: modTools ? modTools.split("\n").map(t => t.trim()).filter(Boolean) : [],
+                        workflows: modWorkflows ? modWorkflows.split("\n").map(w => w.trim()).filter(Boolean) : [],
+                        agentSkills: modAgentSkills ? modAgentSkills.split("\n").map(s => s.trim()).filter(Boolean) : [],
+                    };
+                }
             }
 
+            // POST to the publish API — enforces intake validation, security scan, settings
+            const res = await fetch("/api/v1/marketplace/publish", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "x-wallet-address": submitterAddress,
+                },
+                body: JSON.stringify(body),
+            });
+
+            const data = await res.json();
+
+            if (!res.ok) {
+                setError(data.error || "Submission failed");
+                if (data.reasons) setErrorDetails(data.reasons);
+                else if (data.findings) setErrorDetails(data.findings);
+                trackMarketplaceEvent("submission_failed", { type, errorType: res.status === 429 ? "intake" : res.status === 400 ? "validation" : "server" });
+                return;
+            }
+
+            trackMarketplaceEvent("submission_completed", { type, name: name.trim(), itemId: data.id, stage: data.stage });
             resetForm();
             onOpenChange(false);
             onSubmitted();
@@ -815,8 +793,13 @@ export function SubmitMarketItemDialog({
                     </div>
 
                     {error && (
-                        <div className="p-2 rounded bg-red-50 dark:bg-red-950/30 text-sm text-red-600 dark:text-red-400">
-                            {error}
+                        <div className="p-3 rounded-lg bg-red-50 dark:bg-red-950/30 text-sm text-red-600 dark:text-red-400 space-y-1">
+                            <p className="font-medium">{error}</p>
+                            {errorDetails && errorDetails.length > 0 && (
+                                <ul className="text-xs space-y-0.5 ml-4 list-disc">
+                                    {errorDetails.map((d, i) => <li key={i}>{d}</li>)}
+                                </ul>
+                            )}
                         </div>
                     )}
 

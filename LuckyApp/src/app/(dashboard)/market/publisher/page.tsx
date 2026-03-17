@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/dialog";
 import { useSession } from "@/contexts/SessionContext";
 import { useActiveAccount } from "thirdweb/react";
+import { trackMarketplaceEvent } from "@/lib/posthog";
 
 const TIER_STYLES: Record<number, { label: string; color: string; icon: typeof Shield }> = {
     0: { label: "New Publisher", color: "border-zinc-500/30 text-zinc-400 bg-zinc-500/5", icon: Shield },
@@ -108,7 +109,10 @@ export default function PublisherPage() {
     }, [address, statusFilter]);
 
     useEffect(() => {
-        if (address) fetchData();
+        if (address) {
+            fetchData();
+            trackMarketplaceEvent("publisher_viewed");
+        }
     }, [address, fetchData]);
 
     async function submitAppeal() {
@@ -127,6 +131,7 @@ export default function PublisherPage() {
                     collection: appealItem.collection,
                 }),
             });
+            trackMarketplaceEvent("appeal_submitted", { itemId: appealItem.id });
             setAppealItem(null);
             setAppealComment("");
             fetchData();

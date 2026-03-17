@@ -64,3 +64,14 @@ export function trackComputeEvent(
 ) {
   trackEvent(`compute.${action}`, properties);
 }
+
+// ═══════════════════════════════════════════════════════════════
+// Marketplace-specific events
+// ═══════════════════════════════════════════════════════════════
+
+export function trackMarketplaceEvent(
+  action: string,
+  properties?: Record<string, unknown>,
+) {
+  trackEvent(`marketplace.${action}`, properties);
+}
