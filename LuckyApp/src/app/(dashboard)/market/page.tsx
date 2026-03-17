@@ -28,7 +28,9 @@ import {
     getCommunityItems, getUserSubmissions, deleteCommunityItem,
     getOrgSubscriptions, subscribeToItem, cancelSubscription,
     getAgentInstalls, uninstallMarketplaceAgent,
+    getFeaturedItems,
 } from "@/lib/skills";
+import { computeRankingScore } from "@/lib/submission-protocol";
 import { type Agent, getAgentsByOrg } from "@/lib/firestore";
 import { SubmitMarketItemDialog } from "@/components/market/submit-dialog";
 import {
@@ -265,15 +267,18 @@ function AgentMarketCard({
 }
 
 function MarketItemCard({
-    item, owned, subscription, onGet, onRemove, onSubscribe, onCancelSub, busy,
+    item, owned, subscription, avgRating, ratingCount, onGet, onRemove, onSubscribe, onCancelSub, onRate, busy,
 }: {
     item: Skill;
     owned?: OwnedItem;
     subscription?: MarketSubscription;
+    avgRating?: number;
+    ratingCount?: number;
     onGet: () => void;
     onRemove: () => void;
     onSubscribe: () => void;
     onCancelSub: () => void;
+    onRate?: () => void;
     busy: boolean;
 }) {
     const isPaid = item.pricing.model === "subscription";
@@ -331,6 +336,13 @@ function MarketItemCard({
                                     <Shield className="h-2.5 w-2.5 mr-0.5" />{k}
                                 </Badge>
                             ))}
+                            {avgRating != null && avgRating > 0 && (
+                                <span className="flex items-center gap-0.5 text-[10px] text-muted-foreground ml-auto">
+                                    <Star className="h-2.5 w-2.5 text-amber-400 fill-amber-400" />
+                                    {avgRating.toFixed(1)}
+                                    <span className="text-muted-foreground/50">({ratingCount ?? 0})</span>
+                                </span>
+                            )}
                         </div>
                     </div>
                 </Link>
@@ -340,6 +352,15 @@ function MarketItemCard({
                             <Badge className="bg-emerald-500/10 text-emerald-400 border-emerald-500/20 text-[10px]">
                                 <Check className="h-2.5 w-2.5 mr-0.5" />Owned
                             </Badge>
+                            {onRate && (
+                                <button
+                                    onClick={onRate}
+                                    className="p-1 rounded text-amber-400 hover:bg-amber-500/10 transition-colors"
+                                    title="Rate this item"
+                                >
+                                    <Star className="h-3.5 w-3.5" />
+                                </button>
+                            )}
                             <button
                                 onClick={onRemove}
                                 disabled={busy}
@@ -405,7 +426,7 @@ export default function MarketPage() {
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState("");
     const [debouncedSearch, setDebouncedSearch] = useState("");
-    const [sortBy, setSortBy] = useState<"name" | "type">("name");
+    const [sortBy, setSortBy] = useState<"name" | "type" | "rating" | "installs" | "trending">("name");
     const [category, setCategory] = useState("All");
     const [sourceFilter, setSourceFilter] = useState<"all" | "verified" | "community">("all");
     const [busyId, setBusyId] = useState<string | null>(null);
@@ -419,6 +440,9 @@ export default function MarketPage() {
     const [selectedPersona, setSelectedPersona] = useState<AgentPackage | null>(null);
     const [applyPersona, setApplyPersona] = useState<AgentPackage | null>(null);
     const [marketplaceAgents, setMarketplaceAgents] = useState<AgentPackage[]>([]);
+    const [featuredCommunity, setFeaturedCommunity] = useState<CommunityMarketItem[]>([]);
+    const [featuredAgents, setFeaturedAgents] = useState<AgentPackage[]>([]);
+    const [ratingDialogItem, setRatingDialogItem] = useState<{ id: string; type: "agent" | "community"; name: string } | null>(null);
 
     const loadInventory = useCallback(async () => {
         if (!currentOrg) return;
@@ -441,6 +465,26 @@ export default function MarketPage() {
             console.error("Failed to load community items:", err);
         }
     }, []);
+
+    const loadFeatured = useCallback(async () => {
+        try {
+            const { communityItems: fc, agents: fa } = await getFeaturedItems();
+            setFeaturedCommunity(fc);
+            setFeaturedAgents(fa);
+        } catch {
+            // silent
+        }
+    }, []);
+
+    // Map for O(1) community item lookups (by both raw ID and "community-<id>" key)
+    const communityItemMap = useMemo(() => {
+        const map = new Map<string, CommunityMarketItem>();
+        for (const c of communityItems) {
+            map.set(`community-${c.id}`, c);
+            map.set(c.id, c);
+        }
+        return map;
+    }, [communityItems]);
 
     const loadUserSubmissions = useCallback(async () => {
         if (!account) return;
@@ -498,6 +542,7 @@ export default function MarketPage() {
     useEffect(() => { loadOrgAgents(); }, [loadOrgAgents]);
     useEffect(() => { loadAgentInstalls(); }, [loadAgentInstalls]);
     useEffect(() => { loadMarketplaceAgents(); }, [loadMarketplaceAgents]);
+    useEffect(() => { loadFeatured(); }, [loadFeatured]);
 
     // Merge community items with registry
     const allItems: Skill[] = useMemo(() => {
@@ -686,11 +731,35 @@ export default function MarketPage() {
         items = [...items].sort((a, b) => {
             if (sortBy === "name") return a.name.localeCompare(b.name);
             if (sortBy === "type") return a.type.localeCompare(b.type);
+            if (sortBy === "rating") {
+                const aR = communityItemMap.get(a.id)?.avgRating ?? 0;
+                const bR = communityItemMap.get(b.id)?.avgRating ?? 0;
+                return bR - aR;
+            }
+            if (sortBy === "installs") {
+                const aI = communityItemMap.get(a.id)?.installCount ?? 0;
+                const bI = communityItemMap.get(b.id)?.installCount ?? 0;
+                return bI - aI;
+            }
+            if (sortBy === "trending") {
+                const score = (id: string) => {
+                    const c = communityItemMap.get(id);
+                    if (!c) return 0;
+                    return computeRankingScore({
+                        installCount: c.installCount ?? 0,
+                        avgRating: c.avgRating ?? 0,
+                        ratingCount: c.ratingCount ?? 0,
+                        publishedAt: c.submittedAt,
+                        publisherTier: 0,
+                    });
+                };
+                return score(b.id) - score(a.id);
+            }
             return 0;
         });
 
         return items;
-    }, [allItems, activeType, tab, debouncedSearch, category, sourceFilter, sortBy, inventoryMap]);
+    }, [allItems, activeType, tab, debouncedSearch, category, sourceFilter, sortBy, inventoryMap, communityItemMap]);
 
     // Categories for active tab (include community categories dynamically)
     const categories = useMemo(() => {
@@ -792,6 +861,73 @@ export default function MarketPage() {
                 ))}
             </div>
 
+            {/* Featured Items Hero */}
+            {tab !== "submit" && tab !== "inventory" && (featuredCommunity.length > 0 || featuredAgents.length > 0) && (
+                <div className="mb-6">
+                    <div className="flex items-center gap-2 mb-3">
+                        <div className="p-1.5 rounded-lg bg-amber-500/10 border border-amber-500/20">
+                            <Star className="h-4 w-4 text-amber-500 fill-amber-500" />
+                        </div>
+                        <h2 className="text-sm font-semibold">Featured</h2>
+                    </div>
+                    <div className="flex gap-3 overflow-x-auto pb-2">
+                        {featuredAgents.map((agent) => (
+                            <Card
+                                key={`feat-agent-${agent.id}`}
+                                className="min-w-[260px] max-w-[300px] p-4 bg-gradient-to-br from-amber-500/5 to-purple-500/5 border-amber-500/20 cursor-pointer hover:border-amber-500/40 transition-all shrink-0"
+                                onClick={() => setSelectedPersona(agent)}
+                            >
+                                <div className="flex items-center gap-3 mb-2">
+                                    <span className="text-2xl">{agent.icon}</span>
+                                    <div className="min-w-0">
+                                        <h3 className="font-bold text-sm truncate">{agent.name}</h3>
+                                        <p className="text-[10px] text-amber-400">Agent</p>
+                                    </div>
+                                </div>
+                                <p className="text-xs text-muted-foreground line-clamp-2 mb-2">{agent.description}</p>
+                                <div className="flex items-center justify-between text-[10px] text-muted-foreground">
+                                    <span className="flex items-center gap-0.5">
+                                        <Download className="h-2.5 w-2.5" /> {agent.installCount ?? 0}
+                                    </span>
+                                    {(agent.avgRating ?? 0) > 0 && (
+                                        <span className="flex items-center gap-0.5">
+                                            <Star className="h-2.5 w-2.5 text-amber-400 fill-amber-400" />
+                                            {agent.avgRating.toFixed(1)} ({agent.ratingCount})
+                                        </span>
+                                    )}
+                                </div>
+                            </Card>
+                        ))}
+                        {featuredCommunity.map((item) => (
+                            <Card
+                                key={`feat-community-${item.id}`}
+                                className="min-w-[260px] max-w-[300px] p-4 bg-gradient-to-br from-amber-500/5 to-cyan-500/5 border-amber-500/20 hover:border-amber-500/40 transition-all shrink-0"
+                            >
+                                <div className="flex items-center gap-3 mb-2">
+                                    <span className="text-2xl">{item.icon}</span>
+                                    <div className="min-w-0">
+                                        <h3 className="font-bold text-sm truncate">{item.name}</h3>
+                                        <p className="text-[10px] text-amber-400 capitalize">{item.type}</p>
+                                    </div>
+                                </div>
+                                <p className="text-xs text-muted-foreground line-clamp-2 mb-2">{item.description}</p>
+                                <div className="flex items-center justify-between text-[10px] text-muted-foreground">
+                                    <span className="flex items-center gap-0.5">
+                                        <Download className="h-2.5 w-2.5" /> {item.installCount ?? 0}
+                                    </span>
+                                    {(item.avgRating ?? 0) > 0 && (
+                                        <span className="flex items-center gap-0.5">
+                                            <Star className="h-2.5 w-2.5 text-amber-400 fill-amber-400" />
+                                            {item.avgRating!.toFixed(1)} ({item.ratingCount ?? 0})
+                                        </span>
+                                    )}
+                                </div>
+                            </Card>
+                        ))}
+                    </div>
+                </div>
+            )}
+
             {/* Search + Filters (hidden on agents, bundles & submit tabs) */}
             {tab !== "agents" && tab !== "bundles" && tab !== "submit" && (
                 <>
@@ -805,13 +941,16 @@ export default function MarketPage() {
                                 className="pl-9"
                             />
                         </div>
-                        <Select value={sortBy} onValueChange={(v) => setSortBy(v as "name" | "type")}>
-                            <SelectTrigger className="w-[130px] shrink-0">
+                        <Select value={sortBy} onValueChange={(v) => setSortBy(v as typeof sortBy)}>
+                            <SelectTrigger className="w-[150px] shrink-0">
                                 <SelectValue placeholder="Sort by" />
                             </SelectTrigger>
                             <SelectContent>
                                 <SelectItem value="name">Name</SelectItem>
                                 <SelectItem value="type">Type</SelectItem>
+                                <SelectItem value="rating">Top Rated</SelectItem>
+                                <SelectItem value="installs">Most Installed</SelectItem>
+                                <SelectItem value="trending">Trending</SelectItem>
                             </SelectContent>
                         </Select>
                         <div className="flex items-center gap-1 shrink-0">
@@ -879,10 +1018,16 @@ export default function MarketPage() {
                                         item={item}
                                         owned={inventoryMap.get(item.id)}
                                         subscription={sub}
+                                        avgRating={communityItemMap.get(item.id)?.avgRating}
+                                        ratingCount={communityItemMap.get(item.id)?.ratingCount}
                                         onGet={() => handleGet(item.id)}
                                         onRemove={() => { const own = inventoryMap.get(item.id); if (own) handleRemove(own); }}
                                         onSubscribe={() => setSubscribeTarget(item)}
                                         onCancelSub={() => { if (sub) handleCancelSubscription(sub); }}
+                                        onRate={() => {
+                                            const cId = item.id.startsWith("community-") ? item.id.slice(10) : item.id;
+                                            setRatingDialogItem({ id: cId, type: "community", name: item.name });
+                                        }}
                                         busy={busyId === item.id}
                                     />
                                 );
@@ -1269,6 +1414,90 @@ export default function MarketPage() {
                 installerAddress={userAddress}
                 onApplied={() => { setApplyPersona(null); loadOrgAgents(); loadAgentInstalls(); }}
             />
+
+            {/* Rating Dialog */}
+            <Dialog open={!!ratingDialogItem} onOpenChange={(open) => { if (!open) setRatingDialogItem(null); }}>
+                <DialogContent className="max-w-sm">
+                    <DialogHeader>
+                        <DialogTitle>Rate {ratingDialogItem?.name}</DialogTitle>
+                    </DialogHeader>
+                    <RatingInput
+                        onSubmit={async (rating, review) => {
+                            if (!ratingDialogItem || !currentOrg) return;
+                            await fetch("/api/v1/marketplace/rate", {
+                                method: "POST",
+                                headers: {
+                                    "Content-Type": "application/json",
+                                    "x-wallet-address": userAddress,
+                                },
+                                body: JSON.stringify({
+                                    itemId: ratingDialogItem.id,
+                                    itemType: ratingDialogItem.type,
+                                    rating,
+                                    review,
+                                    orgId: currentOrg.id,
+                                }),
+                            });
+                            setRatingDialogItem(null);
+                            loadCommunityItems();
+                            loadMarketplaceAgents();
+                        }}
+                    />
+                </DialogContent>
+            </Dialog>
+        </div>
+    );
+}
+
+function RatingInput({ onSubmit }: { onSubmit: (rating: number, review: string) => Promise<void> }) {
+    const [rating, setRating] = useState(0);
+    const [hover, setHover] = useState(0);
+    const [review, setReview] = useState("");
+    const [submitting, setSubmitting] = useState(false);
+
+    return (
+        <div className="space-y-4">
+            <div className="flex items-center gap-1 justify-center">
+                {Array.from({ length: 5 }, (_, i) => (
+                    <button
+                        key={i}
+                        onMouseEnter={() => setHover(i + 1)}
+                        onMouseLeave={() => setHover(0)}
+                        onClick={() => setRating(i + 1)}
+                        className="p-1 transition-transform hover:scale-110"
+                    >
+                        <Star
+                            className={`h-6 w-6 ${
+                                (hover || rating) > i
+                                    ? "text-amber-400 fill-amber-400"
+                                    : "text-muted-foreground/30"
+                            }`}
+                        />
+                    </button>
+                ))}
+            </div>
+            <p className="text-center text-xs text-muted-foreground">
+                {rating === 0 ? "Select a rating" : `${rating} star${rating > 1 ? "s" : ""}`}
+            </p>
+            <textarea
+                placeholder="Write a review (optional, max 500 chars)"
+                value={review}
+                onChange={(e) => setReview(e.target.value.slice(0, 500))}
+                className="w-full h-20 rounded-lg border border-border bg-muted/30 p-3 text-sm resize-none"
+            />
+            <Button
+                onClick={async () => {
+                    if (rating === 0) return;
+                    setSubmitting(true);
+                    await onSubmit(rating, review);
+                    setSubmitting(false);
+                }}
+                disabled={rating === 0 || submitting}
+                className="w-full bg-amber-600 hover:bg-amber-700 text-black gap-2"
+            >
+                {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Star className="h-4 w-4" />}
+                Submit Rating
+            </Button>
         </div>
     );
 }

@@ -11,9 +11,9 @@ import { doc, getDoc, updateDoc, addDoc, collection, serverTimestamp, increment 
 import { db } from "@/lib/firebase";
 import { getWalletAddress } from "@/lib/auth-guard";
 import { checkRateLimit } from "@/lib/rate-limit-firestore";
+import { getMarketplaceSettings } from "@/lib/marketplace-settings";
 
 const REPORTS_COLLECTION = "marketplaceReports";
-const AUTO_SUSPEND_THRESHOLD = 3;
 const VALID_REASONS = ["spam", "malicious", "broken", "inappropriate"] as const;
 
 const COLLECTIONS = {
@@ -91,9 +91,10 @@ export async function POST(req: NextRequest) {
         reportCount: increment(1),
     };
 
-    // Auto-suspend if threshold reached
+    // Auto-suspend if threshold reached (reads from platform settings)
+    const settings = await getMarketplaceSettings();
     let autoSuspended = false;
-    if (currentReportCount >= AUTO_SUSPEND_THRESHOLD && itemData.publicationStatus !== "suspended") {
+    if (currentReportCount >= settings.autoSuspendReportCount && itemData.publicationStatus !== "suspended") {
         updates.publicationStatus = "suspended";
         updates.stage = "product_review"; // Flag for re-review
         autoSuspended = true;

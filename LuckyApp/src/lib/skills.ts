@@ -1219,6 +1219,16 @@ export interface CommunityMarketItem {
     reportCount?: number;
     /** Last install or update date */
     lastActiveAt?: Date | null;
+    /** Number of installs */
+    installCount?: number;
+    /** Average user rating */
+    avgRating?: number;
+    /** Number of ratings received */
+    ratingCount?: number;
+    /** Whether this item is currently featured */
+    featured?: boolean;
+    /** When the item was featured */
+    featuredAt?: Date | null;
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -1331,6 +1341,8 @@ export async function getCommunityItems(): Promise<CommunityMarketItem[]> {
             ...data,
             pricing: data.pricing ?? { model: "free" },
             submittedAt: data.submittedAt instanceof Timestamp ? data.submittedAt.toDate() : null,
+            featuredAt: data.featuredAt instanceof Timestamp ? data.featuredAt.toDate() : null,
+            lastActiveAt: data.lastActiveAt instanceof Timestamp ? data.lastActiveAt.toDate() : null,
         } as CommunityMarketItem;
     });
 }
@@ -1745,6 +1757,7 @@ export async function submitAgentRating(
         review: review?.slice(0, 500) || null,
         createdAt: serverTimestamp(),
     });
+    await recalcAgentRating(packageId);
     return ref.id;
 }
 
@@ -1763,4 +1776,114 @@ export async function getAgentRatings(packageId: string): Promise<AgentRating[]>
             createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate() : null,
         } as AgentRating;
     });
+}
+
+/** Recalculate avgRating and ratingCount on an agent package */
+export async function recalcAgentRating(packageId: string): Promise<void> {
+    const ratings = await getAgentRatings(packageId);
+    const count = ratings.length;
+    const avg = count > 0 ? ratings.reduce((s, r) => s + r.rating, 0) / count : 0;
+    await updateDoc(doc(db, MARKETPLACE_AGENTS_COLLECTION, packageId), {
+        avgRating: Math.round(avg * 10) / 10,
+        ratingCount: count,
+    });
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Firestore CRUD — Community Item Ratings
+// ═══════════════════════════════════════════════════════════════
+
+const COMMUNITY_RATINGS_COLLECTION = "communityItemRatings";
+
+export interface CommunityItemRating {
+    id: string;
+    itemId: string;
+    orgId: string;
+    reviewerWallet: string;
+    rating: number;
+    review?: string | null;
+    createdAt: Date | null;
+}
+
+/** Submit a rating for a community marketplace item */
+export async function submitCommunityItemRating(
+    itemId: string,
+    orgId: string,
+    reviewerWallet: string,
+    rating: number,
+    review?: string,
+): Promise<string> {
+    const ref = await addDoc(collection(db, COMMUNITY_RATINGS_COLLECTION), {
+        itemId,
+        orgId,
+        reviewerWallet,
+        rating: Math.max(1, Math.min(5, rating)),
+        review: review?.slice(0, 500) || null,
+        createdAt: serverTimestamp(),
+    });
+    await recalcCommunityItemRating(itemId);
+    return ref.id;
+}
+
+/** Get ratings for a community marketplace item */
+export async function getCommunityItemRatings(itemId: string): Promise<CommunityItemRating[]> {
+    const q = query(
+        collection(db, COMMUNITY_RATINGS_COLLECTION),
+        where("itemId", "==", itemId),
+    );
+    const snap = await getDocs(q);
+    return snap.docs.map(d => {
+        const data = d.data();
+        return {
+            id: d.id,
+            ...data,
+            createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate() : null,
+        } as CommunityItemRating;
+    });
+}
+
+/** Recalculate avgRating and ratingCount on a community item */
+async function recalcCommunityItemRating(itemId: string): Promise<void> {
+    const ratings = await getCommunityItemRatings(itemId);
+    const count = ratings.length;
+    const avg = count > 0 ? ratings.reduce((s, r) => s + r.rating, 0) / count : 0;
+    await updateDoc(doc(db, COMMUNITY_COLLECTION, itemId), {
+        avgRating: Math.round(avg * 10) / 10,
+        ratingCount: count,
+    });
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Firestore CRUD — Featured Items
+// ═══════════════════════════════════════════════════════════════
+
+/** Get all currently featured marketplace items (both community + agents) */
+export async function getFeaturedItems(): Promise<{
+    communityItems: CommunityMarketItem[];
+    agents: AgentPackage[];
+}> {
+    const [communitySnap, agentSnap] = await Promise.all([
+        getDocs(query(collection(db, COMMUNITY_COLLECTION), where("featured", "==", true))),
+        getDocs(query(collection(db, MARKETPLACE_AGENTS_COLLECTION), where("featured", "==", true))),
+    ]);
+    const communityItems = communitySnap.docs.map(d => {
+        const data = d.data();
+        return {
+            id: d.id,
+            ...data,
+            pricing: data.pricing ?? { model: "free" },
+            submittedAt: data.submittedAt instanceof Timestamp ? data.submittedAt.toDate() : null,
+            featuredAt: data.featuredAt instanceof Timestamp ? data.featuredAt.toDate() : null,
+        } as CommunityMarketItem;
+    });
+    const agents = agentSnap.docs.map(d => {
+        const data = d.data();
+        return {
+            id: d.id,
+            ...data,
+            publishedAt: data.publishedAt instanceof Timestamp ? data.publishedAt.toDate() : null,
+            updatedAt: data.updatedAt instanceof Timestamp ? data.updatedAt.toDate() : null,
+        } as AgentPackage;
+    });
+    return { communityItems, agents };
 }

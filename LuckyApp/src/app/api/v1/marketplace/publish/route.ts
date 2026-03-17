@@ -24,6 +24,7 @@ import {
     getStartingStage,
     type ReviewEntry,
 } from "@/lib/submission-protocol";
+import { getMarketplaceSettings } from "@/lib/marketplace-settings";
 
 const VALID_TYPES: MarketItemType[] = ["mod", "plugin", "skill", "skin", "agent"];
 const VALID_TRACKS = ["prd_only", "open_repo", "private_repo", "managed_partner"] as const;
@@ -106,6 +107,52 @@ export async function POST(req: NextRequest) {
         );
     }
 
+    // ── Settings enforcement ──
+    const settings = await getMarketplaceSettings();
+
+    if (!admin.ok) {
+        // Blocked keywords check
+        if (settings.blockedKeywords.length > 0) {
+            const lowerName = name.toLowerCase();
+            const lowerDesc = description.toLowerCase();
+            const matched = settings.blockedKeywords.find(
+                (kw) => lowerName.includes(kw.toLowerCase()) || lowerDesc.includes(kw.toLowerCase()),
+            );
+            if (matched) {
+                return Response.json(
+                    { error: `Submission contains a blocked keyword: "${matched}"` },
+                    { status: 400 },
+                );
+            }
+        }
+
+        // Require demo URL
+        const demoUrlRaw = (body.demoUrl as string)?.trim();
+        if (settings.requireDemoUrl && !demoUrlRaw) {
+            return Response.json(
+                { error: "A demo URL is required for submissions" },
+                { status: 400 },
+            );
+        }
+
+        // Require screenshots
+        const screenshotUrls = Array.isArray(body.screenshotUrls) ? body.screenshotUrls : [];
+        if (settings.requireScreenshots && screenshotUrls.length === 0) {
+            return Response.json(
+                { error: "At least one screenshot is required for submissions" },
+                { status: 400 },
+            );
+        }
+
+        // Allowed categories enforcement
+        if (settings.allowedCategories.length > 0 && !settings.allowedCategories.includes(category)) {
+            return Response.json(
+                { error: `Category "${category}" is not allowed. Allowed: ${settings.allowedCategories.join(", ")}` },
+                { status: 400 },
+            );
+        }
+    }
+
     // ── Submission Protocol v1: Parse new fields ──
     const submissionType = body.submissionType === "concept" ? "concept" as const : "build" as const;
     const rawTrack = body.submissionTrack as string | undefined;
@@ -182,8 +229,11 @@ export async function POST(req: NextRequest) {
             const pricing: MarketPricing = (body.pricing as MarketPricing) || { model: "free" as const };
 
             // Determine starting stage based on publisher tier (admin = auto-approve)
-            const startStage = admin.ok ? "decision" : getStartingStage(0); // tier looked up during intake
-            const itemStatus = admin.ok ? "approved" : "pending";
+            // Intake validation already looked up the publisher tier; use it with settings threshold
+            const publisherTier = 0; // Default; intake enriches this during validation
+            const effectiveStage = getStartingStage(publisherTier >= settings.autoApproveForTier ? 3 : publisherTier);
+            const startStage = admin.ok ? "decision" : effectiveStage;
+            const itemStatus = admin.ok ? "approved" : (startStage === "decision" ? "approved" : "pending");
 
             id = await submitMarketItem({
                 name,

@@ -14,10 +14,11 @@
  *   customer.subscription.deleted — subscription cancelled
  */
 import { NextRequest } from "next/server";
-import { doc, updateDoc, serverTimestamp, getDocs, query, collection, where } from "firebase/firestore";
+import { doc, updateDoc, getDoc, addDoc, serverTimestamp, getDocs, query, collection, where, increment } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { subscribeToItem } from "@/lib/skills";
+import { subscribeToItem, SKILL_REGISTRY } from "@/lib/skills";
 import type { SubscriptionPlan } from "@/lib/skills";
+import { getMarketplaceSettings } from "@/lib/marketplace-settings";
 
 // ── Stripe SDK lazy import ──────────────────────────────────────
 // Only loaded if STRIPE_SECRET_KEY is configured. This avoids hard
@@ -126,6 +127,74 @@ async function cancelSubscription(stripeSubscriptionId: string) {
     }
 }
 
+// ── Transaction recording ──────────────────────────────────────
+
+async function recordTransaction(
+    itemId: string,
+    buyerWallet: string,
+    plan: SubscriptionPlan,
+    stripeObject: Record<string, unknown>,
+) {
+    // Resolve item name + publisher wallet
+    let itemName = itemId;
+    let publisherWallet = "";
+    let itemColName = "";
+
+    // Check static registry first
+    const staticMod = SKILL_REGISTRY.find((s) => s.id === itemId);
+    if (staticMod) {
+        itemName = staticMod.name;
+    }
+
+    // Check Firestore collections for publisher info
+    const communityRef = doc(db, "communityMarketItems", itemId);
+    const communitySnap = await getDoc(communityRef);
+    if (communitySnap.exists()) {
+        const data = communitySnap.data();
+        itemName = (data.name as string) || itemName;
+        publisherWallet = (data.submittedBy as string) || "";
+        itemColName = "communityMarketItems";
+    } else {
+        const agentRef = doc(db, "marketplaceAgents", itemId);
+        const agentSnap = await getDoc(agentRef);
+        if (agentSnap.exists()) {
+            const data = agentSnap.data();
+            itemName = (data.name as string) || itemName;
+            publisherWallet = (data.authorWallet as string) || "";
+            itemColName = "marketplaceAgents";
+        }
+    }
+
+    // Calculate amount + platform fee
+    const rawAmount = ((stripeObject.amount_total as number) || (stripeObject.amount_paid as number) || 0) / 100;
+    const settings = await getMarketplaceSettings();
+    const platformFee = Math.round(rawAmount * (settings.platformFeePercent / 100) * 100) / 100;
+
+    // Write transaction record
+    await addDoc(collection(db, "marketplaceTransactions"), {
+        itemId,
+        itemName,
+        buyerWallet,
+        publisherWallet,
+        amount: rawAmount,
+        platformFee,
+        type: "subscription",
+        status: "completed",
+        paymentMethod: "stripe",
+        stripeSessionId: (stripeObject.id as string) || "",
+        plan,
+        createdAt: serverTimestamp(),
+    });
+
+    // Increment install count on the item (only on first checkout, not renewals)
+    if (itemColName && stripeObject.mode === "subscription") {
+        await updateDoc(doc(db, itemColName, itemId), {
+            installCount: increment(1),
+            lastActiveAt: serverTimestamp(),
+        }).catch(() => {});
+    }
+}
+
 // ── Webhook handler ─────────────────────────────────────────────
 
 export async function POST(req: NextRequest) {
@@ -149,6 +218,9 @@ export async function POST(req: NextRequest) {
 
                 if (orgId && itemId) {
                     await activateSubscription(orgId, itemId, plan, subscribedBy, stripeSubId);
+
+                    // Record transaction + increment install count
+                    await recordTransaction(itemId, subscribedBy, plan, session).catch(() => {});
                 }
                 break;
             }
@@ -164,11 +236,23 @@ export async function POST(req: NextRequest) {
                     );
                     const snap = await getDocs(q);
                     for (const d of snap.docs) {
-                        if (d.data().status !== "active") {
+                        const subData = d.data();
+                        if (subData.status !== "active") {
                             await updateDoc(doc(db, SUBSCRIPTION_COLLECTION, d.id), {
                                 status: "active",
                                 renewedAt: serverTimestamp(),
                             });
+                        }
+
+                        // Record renewal transaction
+                        const amount = ((invoice.amount_paid as number) || 0) / 100;
+                        if (amount > 0 && subData.itemId) {
+                            await recordTransaction(
+                                subData.itemId as string,
+                                (subData.subscribedBy as string) || "",
+                                (subData.plan as SubscriptionPlan) || "monthly",
+                                invoice,
+                            ).catch(() => {});
                         }
                     }
                 }

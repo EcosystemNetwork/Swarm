@@ -15,7 +15,8 @@ import {
   Map, FileText, ChevronLeft, ChevronRight, ChevronDown, GripVertical,
   Command, Coins, Stethoscope, Brain, UserCog, Network, HardDrive, BookOpen, Store, Building2,
   Link as LinkIcon, Zap, Palette, Megaphone, Wrench, Plug, Puzzle, Sparkles,
-  Monitor, Globe, Code as CodeIcon, Bot, ShieldAlert,
+  Monitor, Globe, Code as CodeIcon, Bot, ShieldAlert, Flag, Package, History,
+  TrendingUp, DollarSign, Settings2,
 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
@@ -110,6 +111,7 @@ const DEFAULT_SECTIONS: NavSection[] = [
       { id: "operators", href: "/operators", label: "Operators", icon: UserCog },
       { id: "cron", href: "/cron", label: "Scheduler", icon: Clock },
       { id: "market", href: "/market", label: "Market", icon: Store },
+      { id: "publisher", href: "/market/publisher", label: "Publisher", icon: TrendingUp },
     ],
   },
   {
@@ -349,6 +351,22 @@ export function Sidebar() {
           collapsible: true,
           items: [
             { id: "admin-dashboard", href: "/admin", label: "Dashboard", icon: ShieldAlert },
+            {
+              id: "admin-marketplace", href: "/admin/marketplace", label: "Marketplace", icon: Store,
+              children: [
+                { id: "admin-mkt-overview", href: "/admin/marketplace", label: "Overview", icon: BarChart3 },
+                { id: "admin-mkt-queue", href: "/admin/marketplace/queue", label: "Queue", icon: Clock },
+                { id: "admin-mkt-listings", href: "/admin/marketplace/listings", label: "Listings", icon: Package },
+                { id: "admin-mkt-publishers", href: "/admin/marketplace/publishers", label: "Publishers", icon: Users },
+                { id: "admin-mkt-reports", href: "/admin/marketplace/reports", label: "Reports", icon: Flag },
+                { id: "admin-mkt-versions", href: "/admin/marketplace/versions", label: "Versions", icon: History },
+                { id: "admin-mkt-security", href: "/admin/marketplace/security", label: "Security", icon: Shield },
+                { id: "admin-mkt-rankings", href: "/admin/marketplace/rankings", label: "Rankings", icon: TrendingUp },
+                { id: "admin-mkt-revenue", href: "/admin/marketplace/revenue", label: "Revenue", icon: DollarSign },
+                { id: "admin-mkt-settings", href: "/admin/marketplace/settings", label: "Settings", icon: Settings2 },
+                { id: "admin-mkt-audit", href: "/admin/marketplace/audit", label: "Audit Log", icon: FileText },
+              ],
+            },
             { id: "admin-compute", href: "/compute/admin", label: "Compute", icon: HardDrive },
           ],
         }];

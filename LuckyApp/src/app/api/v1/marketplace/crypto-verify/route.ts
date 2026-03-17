@@ -9,9 +9,10 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { doc, getDoc, updateDoc, serverTimestamp, Timestamp } from "firebase/firestore";
+import { doc, getDoc, updateDoc, addDoc, collection, serverTimestamp, Timestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { subscribeToItem, type SubscriptionPlan } from "@/lib/skills";
+import { getMarketplaceSettings } from "@/lib/marketplace-settings";
 
 const CRYPTO_PAYMENTS_COLLECTION = "cryptoPayments";
 
@@ -176,6 +177,48 @@ export async function POST(req: NextRequest) {
       txHash,
       verifiedAt: serverTimestamp(),
     });
+
+    // Record crypto transaction to marketplaceTransactions for revenue tracking
+    try {
+      let itemName = payment.modId as string;
+      let publisherWallet = (payment.publisherWallet as string) || "";
+
+      if (!publisherWallet) {
+        const communitySnap = await getDoc(doc(db, "communityMarketItems", payment.modId));
+        if (communitySnap.exists()) {
+          itemName = (communitySnap.data().name as string) || itemName;
+          publisherWallet = (communitySnap.data().submittedBy as string) || "";
+        } else {
+          const agentSnap = await getDoc(doc(db, "marketplaceAgents", payment.modId));
+          if (agentSnap.exists()) {
+            itemName = (agentSnap.data().name as string) || itemName;
+            publisherWallet = (agentSnap.data().authorWallet as string) || "";
+          }
+        }
+      }
+
+      const settings = await getMarketplaceSettings();
+      const amount = (payment.amount as number) || 0;
+      const platformFee = Math.round(amount * (settings.platformFeePercent / 100) * 100) / 100;
+
+      await addDoc(collection(db, "marketplaceTransactions"), {
+        itemId: payment.modId,
+        itemName,
+        buyerWallet: wallet,
+        publisherWallet,
+        amount,
+        platformFee,
+        type: "subscription",
+        status: "completed",
+        paymentMethod: "crypto",
+        chain: payment.chain,
+        txHash,
+        plan: payment.plan,
+        createdAt: serverTimestamp(),
+      });
+    } catch {
+      // Non-blocking — subscription is already active
+    }
 
     return NextResponse.json({ ok: true, verified: true });
   } catch (err) {

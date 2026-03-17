@@ -14,10 +14,7 @@ import { getDocs, query, collection, where, updateDoc, doc, Timestamp } from "fi
 import { db } from "@/lib/firebase";
 import { requirePlatformAdmin, requireInternalService } from "@/lib/auth-guard";
 import { updatePublisherStats } from "@/lib/submission-protocol";
-
-const DEAD_PRODUCT_DAYS = 90;
-const LOW_QUALITY_RATING = 2.0;
-const MIN_RATINGS_FOR_QUALITY_CHECK = 50;
+import { getMarketplaceSettings } from "@/lib/marketplace-settings";
 
 export async function POST(req: NextRequest) {
     // Auth: platform admin or internal service
@@ -31,11 +28,14 @@ export async function POST(req: NextRequest) {
         deadProductsUnlisted: 0,
         lowQualitySuspended: 0,
         tiersRecalculated: 0,
+        featuredExpired: 0,
     };
 
     try {
-        // 1. Dead product cleanup — approved items with 0 installs older than 90 days
-        const cutoff = Timestamp.fromMillis(Date.now() - DEAD_PRODUCT_DAYS * 24 * 60 * 60 * 1000);
+        const settings = await getMarketplaceSettings();
+
+        // 1. Dead product cleanup — approved items with 0 installs older than N days
+        const cutoff = Timestamp.fromMillis(Date.now() - settings.deadProductDays * 24 * 60 * 60 * 1000);
         const approvedSnap = await getDocs(
             query(collection(db, "communityMarketItems"), where("status", "==", "approved")),
         );
@@ -71,8 +71,8 @@ export async function POST(req: NextRequest) {
             const ratingCount = data.ratingCount || 0;
 
             if (
-                ratingCount >= MIN_RATINGS_FOR_QUALITY_CHECK &&
-                avgRating < LOW_QUALITY_RATING &&
+                ratingCount >= settings.minRatingsForQualityCheck &&
+                avgRating < settings.lowQualityRating &&
                 data.publicationStatus !== "suspended"
             ) {
                 await updateDoc(doc(db, "marketplaceAgents", d.id), {
@@ -100,6 +100,28 @@ export async function POST(req: NextRequest) {
                 results.tiersRecalculated++;
             } catch {
                 // Skip individual failures
+            }
+        }
+
+        // 4. Featured rotation — un-feature items older than featuredRotationDays
+        const featuredCutoff = Timestamp.fromMillis(
+            Date.now() - settings.featuredRotationDays * 24 * 60 * 60 * 1000,
+        );
+        for (const [colName, snap] of [
+            ["communityMarketItems", approvedSnap] as const,
+            ["marketplaceAgents", agentSnap] as const,
+        ]) {
+            for (const d of snap.docs) {
+                const data = d.data();
+                if (!data.featured) continue;
+                const featuredAt = data.featuredAt as Timestamp | undefined;
+                if (featuredAt && featuredAt.toMillis() < featuredCutoff.toMillis()) {
+                    await updateDoc(doc(db, colName, d.id), {
+                        featured: false,
+                        featuredAt: null,
+                    });
+                    results.featuredExpired++;
+                }
             }
         }
 

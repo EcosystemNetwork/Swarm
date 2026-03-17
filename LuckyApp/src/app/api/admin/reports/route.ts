@@ -15,6 +15,7 @@ import {
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { requirePlatformAdmin } from "@/lib/auth-guard";
+import { recordAuditEntry } from "@/lib/audit-log";
 
 export async function GET(req: NextRequest) {
   const auth = requirePlatformAdmin(req);
@@ -79,6 +80,14 @@ export async function POST(req: NextRequest) {
         suspendReason: `Report ${reportId}: ${report.reason}`,
       });
     }
+
+    await recordAuditEntry({
+      action: `report.${action}`,
+      performedBy: req.headers.get("x-wallet-address") || "admin",
+      targetType: "report",
+      targetId: reportId,
+      metadata: { suspendItem, itemId: report.itemId, reason: report.reason },
+    }).catch(() => {}); // non-blocking
 
     return Response.json({ ok: true });
   } catch (err) {

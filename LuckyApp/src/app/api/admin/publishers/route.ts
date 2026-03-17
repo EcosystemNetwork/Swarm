@@ -16,6 +16,7 @@ import {
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { requirePlatformAdmin } from "@/lib/auth-guard";
+import { recordAuditEntry } from "@/lib/audit-log";
 
 export async function GET(req: NextRequest) {
   const auth = requirePlatformAdmin(req);
@@ -92,6 +93,14 @@ export async function POST(req: NextRequest) {
       default:
         return Response.json({ error: "Invalid action" }, { status: 400 });
     }
+
+    await recordAuditEntry({
+      action: `publisher.${action}`,
+      performedBy: "platform-admin",
+      targetType: "publisher",
+      targetId: wallet,
+      metadata: { reason, tier },
+    }).catch(() => {}); // non-blocking
 
     return Response.json({ ok: true });
   } catch (err) {

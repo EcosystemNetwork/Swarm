@@ -19,6 +19,7 @@ import {
     type ReviewEntry,
     type SubmissionStage,
 } from "@/lib/submission-protocol";
+import { recordAuditEntry } from "@/lib/audit-log";
 
 const COLLECTIONS = {
     community: "communityMarketItems",
@@ -188,6 +189,14 @@ export async function POST(req: NextRequest) {
         reviewedAt: serverTimestamp(),
         reviewComment,
     });
+
+    await recordAuditEntry({
+        action: `submission.${action}`,
+        performedBy: "platform-admin",
+        targetType: "submission",
+        targetId: itemId,
+        metadata: { collection: col, stage: newStage, comment: reviewComment },
+    }).catch(() => {}); // non-blocking
 
     return Response.json({
         reviewed: true,

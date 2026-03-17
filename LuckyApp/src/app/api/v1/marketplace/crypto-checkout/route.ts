@@ -9,7 +9,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { collection, addDoc, serverTimestamp, doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { SKILL_REGISTRY, type SubscriptionPlan } from "@/lib/skills";
 import { getModService } from "@/lib/mod-gateway/registry";
@@ -73,6 +73,18 @@ export async function POST(req: NextRequest) {
   // For now, use the USD price directly — in production, convert via oracle
   const amount = tier.price;
 
+  // Resolve publisherWallet for revenue attribution
+  let publisherWallet = "";
+  const communitySnap = await getDoc(doc(db, "communityMarketItems", modId));
+  if (communitySnap.exists()) {
+    publisherWallet = (communitySnap.data().submittedBy as string) || "";
+  } else {
+    const agentSnap = await getDoc(doc(db, "marketplaceAgents", modId));
+    if (agentSnap.exists()) {
+      publisherWallet = (agentSnap.data().authorWallet as string) || "";
+    }
+  }
+
   // Create payment intent in Firestore
   const expiresAt = new Date(Date.now() + 30 * 60 * 1000); // 30 min expiry
 
@@ -86,6 +98,7 @@ export async function POST(req: NextRequest) {
       recipientAddress,
       amount,
       currency,
+      publisherWallet,
       status: "pending",
       expiresAt,
       createdAt: serverTimestamp(),
