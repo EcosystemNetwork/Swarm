@@ -15,7 +15,7 @@ import {
   Map, FileText, ChevronLeft, ChevronRight, ChevronDown, GripVertical,
   Command, Coins, Stethoscope, Brain, UserCog, Network, HardDrive, BookOpen, Store, Building2,
   Link as LinkIcon, Zap, Palette, Megaphone, Wrench, Plug, Puzzle, Sparkles,
-  Monitor, Globe, Code as CodeIcon, Bot,
+  Monitor, Globe, Code as CodeIcon, Bot, ShieldAlert,
 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
@@ -315,26 +315,49 @@ export function Sidebar() {
     });
   }, []);
 
-  // Inject compute admin link when wallet matches platform admin
+  // Inject admin-only sections when wallet matches platform admin
   useEffect(() => {
     const isAdmin = sessionAddress?.toLowerCase() === PLATFORM_ADMIN_ADDRESS;
     setSections(prev => {
-      const computeSection = prev.find(s => s.id === "compute");
-      if (!computeSection) return prev;
-      const hasAdmin = computeSection.items.some(i => i.id === "compute-admin");
-      if (isAdmin && !hasAdmin) {
-        return prev.map(s => s.id === "compute" ? {
-          ...s,
-          items: [...s.items, { id: "compute-admin", href: "/compute/admin", label: "Admin", icon: Shield }],
-        } : s);
+      let next = prev;
+
+      // Compute admin link
+      const computeSection = next.find(s => s.id === "compute");
+      if (computeSection) {
+        const hasComputeAdmin = computeSection.items.some(i => i.id === "compute-admin");
+        if (isAdmin && !hasComputeAdmin) {
+          next = next.map(s => s.id === "compute" ? {
+            ...s,
+            items: [...s.items, { id: "compute-admin", href: "/compute/admin", label: "Admin", icon: Shield }],
+          } : s);
+        }
+        if (!isAdmin && hasComputeAdmin) {
+          next = next.map(s => s.id === "compute" ? {
+            ...s,
+            items: s.items.filter(i => i.id !== "compute-admin"),
+          } : s);
+        }
       }
-      if (!isAdmin && hasAdmin) {
-        return prev.map(s => s.id === "compute" ? {
-          ...s,
-          items: s.items.filter(i => i.id !== "compute-admin"),
-        } : s);
+
+      // Platform admin section
+      const hasAdminSection = next.some(s => s.id === "admin");
+      if (isAdmin && !hasAdminSection) {
+        next = [...next, {
+          id: "admin",
+          label: "Admin",
+          accentColor: "amber" as const,
+          collapsible: true,
+          items: [
+            { id: "admin-dashboard", href: "/admin", label: "Dashboard", icon: ShieldAlert },
+            { id: "admin-compute", href: "/compute/admin", label: "Compute", icon: HardDrive },
+          ],
+        }];
       }
-      return prev;
+      if (!isAdmin && hasAdminSection) {
+        next = next.filter(s => s.id !== "admin");
+      }
+
+      return next === prev ? prev : next;
     });
   }, [sessionAddress]);
 
