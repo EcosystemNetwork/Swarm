@@ -13,6 +13,29 @@ import { jwtVerify } from "jose";
 
 const SESSION_COOKIE = "swarm_session";
 
+// ── Security Headers ──────────────────────────────────────
+// Applied to all SSR responses. Netlify [[headers]] only cover
+// static assets — SSR pages served by serverless functions need
+// these set here in the middleware.
+const SECURITY_HEADERS: Record<string, string> = {
+  "X-Frame-Options": "SAMEORIGIN",
+  "X-Content-Type-Options": "nosniff",
+  "Referrer-Policy": "strict-origin-when-cross-origin",
+  "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
+  "Content-Security-Policy": [
+    "default-src 'self'",
+    "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://*.thirdweb.com https://*.thirdwebcdn.com https://*.google.com https://*.gstatic.com",
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+    "font-src 'self' https://fonts.gstatic.com data:",
+    "img-src 'self' data: blob: https: http:",
+    "connect-src 'self' https: wss:",
+    "frame-src 'self' https://*.thirdweb.com https://accounts.google.com https://embedded-wallet.thirdweb.com",
+    "worker-src 'self' blob:",
+    "object-src 'none'",
+    "base-uri 'self'",
+  ].join("; "),
+};
+
 function getSecret(): Uint8Array {
   const raw = process.env.SESSION_SECRET;
   if (!raw || raw.length < 32) {
@@ -92,6 +115,14 @@ async function verifyToken(token: string): Promise<SessionPayload | null> {
   }
 }
 
+/** Apply security headers to a response */
+function withSecurityHeaders(res: NextResponse): NextResponse {
+  for (const [key, value] of Object.entries(SECURITY_HEADERS)) {
+    res.headers.set(key, value);
+  }
+  return res;
+}
+
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
@@ -101,12 +132,12 @@ export async function middleware(req: NextRequest) {
     pathname.startsWith("/favicon") ||
     pathname.includes(".")
   ) {
-    return NextResponse.next();
+    return withSecurityHeaders(NextResponse.next());
   }
 
   // Check if this is a public API route — pass through
   if (PUBLIC_API_PREFIXES.some((p) => pathname.startsWith(p))) {
-    return NextResponse.next();
+    return withSecurityHeaders(NextResponse.next());
   }
 
   // Read session cookie
@@ -141,7 +172,7 @@ export async function middleware(req: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
-  return response;
+  return withSecurityHeaders(response);
 }
 
 export const config = {
