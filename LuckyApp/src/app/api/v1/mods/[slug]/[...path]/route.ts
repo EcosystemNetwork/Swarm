@@ -1,10 +1,10 @@
 /**
  * Catch-all proxy route for mod service APIs.
  *
- * /api/v1/mods/:modSlug/* → proxied to the mod's registered serviceUrl
+ * /api/v1/mods/:slug/* → proxied to the mod's registered serviceUrl
  *
  * Flow:
- * 1. Extract modSlug + path segments
+ * 1. Extract slug + path segments
  * 2. Verify auth (wallet address)
  * 3. Look up mod service in registry
  * 4. Check subscription access
@@ -24,9 +24,9 @@ function getOrgId(req: NextRequest): string | null {
 
 async function handleProxy(
   req: NextRequest,
-  { params }: { params: Promise<{ modSlug: string; path: string[] }> },
+  { params }: { params: Promise<{ slug: string; path: string[] }> },
 ) {
-  const { modSlug, path } = await params;
+  const { slug, path } = await params;
   const wallet = getWallet(req);
   const orgId = getOrgId(req);
 
@@ -38,7 +38,7 @@ async function handleProxy(
     return Response.json({ error: "Org ID required (x-org-id header or orgId query param)" }, { status: 400 });
   }
 
-  return proxyToMod(req, modSlug, path, { orgId, wallet });
+  return proxyToMod(req, slug, path, { orgId, wallet });
 }
 
 export const GET = handleProxy;
