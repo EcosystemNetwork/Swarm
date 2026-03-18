@@ -41,7 +41,15 @@ export type ActivityEventType =
     | "member.left"
     | "agent_hierarchy_child_added"
     | "agent_hierarchy_child_removed"
-    | "agent_hierarchy_task_delegated";
+    | "agent_hierarchy_task_delegated"
+    | "storacha.memory_written"
+    | "storacha.memory_restored"
+    | "storacha.artifact_uploaded"
+    | "storacha.pro_space_created"
+    | "storacha.pro_space_deleted"
+    | "storacha.pro_member_added"
+    | "storacha.pro_member_removed"
+    | "storacha.pro_retrieval";
 
 export type ActivityActor = "agent" | "user" | "system" | "cron";
 
@@ -88,6 +96,14 @@ export const EVENT_TYPE_CONFIG: Record<string, { label: string; icon: string; co
     "config.changed": { label: "Config Changed", icon: "⚙️", color: "text-cyan-400" },
     "member.joined": { label: "Member Joined", icon: "👋", color: "text-emerald-400" },
     "member.left": { label: "Member Left", icon: "👤", color: "text-muted-foreground" },
+    "storacha.memory_written": { label: "Memory Written", icon: "💾", color: "text-purple-400" },
+    "storacha.memory_restored": { label: "Memory Restored", icon: "📥", color: "text-purple-400" },
+    "storacha.artifact_uploaded": { label: "Artifact Uploaded", icon: "📎", color: "text-purple-400" },
+    "storacha.pro_space_created": { label: "Space Created", icon: "📦", color: "text-purple-400" },
+    "storacha.pro_space_deleted": { label: "Space Deleted", icon: "🗑️", color: "text-red-400" },
+    "storacha.pro_member_added": { label: "Member Added", icon: "👤", color: "text-emerald-400" },
+    "storacha.pro_member_removed": { label: "Member Removed", icon: "👤", color: "text-muted-foreground" },
+    "storacha.pro_retrieval": { label: "Smart Retrieve", icon: "🔍", color: "text-purple-400" },
 };
 
 export const ACTOR_ICONS: Record<ActivityActor, string> = {

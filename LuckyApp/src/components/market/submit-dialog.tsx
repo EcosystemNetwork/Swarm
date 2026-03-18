@@ -18,14 +18,22 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
-import { Loader2 } from "lucide-react";
+import { Loader2, Upload, X, Image as ImageIcon } from "lucide-react";
 import { type MarketItemType, type PricingModel, type MarketPricing, AGENT_CATEGORIES } from "@/lib/skills";
 import { trackMarketplaceEvent } from "@/lib/posthog";
+import { uploadArtifact } from "@/lib/storacha/api";
+
+interface UploadedScreenshot {
+    cid: string;
+    filename: string;
+    gatewayUrl: string;
+}
 
 interface SubmitMarketItemDialogProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     submitterAddress: string;
+    orgId?: string;
     onSubmitted: () => void;
 }
 
@@ -33,6 +41,7 @@ export function SubmitMarketItemDialog({
     open,
     onOpenChange,
     submitterAddress,
+    orgId,
     onSubmitted,
 }: SubmitMarketItemDialogProps) {
     const [name, setName] = useState("");
@@ -83,6 +92,9 @@ export function SubmitMarketItemDialog({
     const [repoUrl, setRepoUrl] = useState("");
     const [demoUrl, setDemoUrl] = useState("");
     const [selectedPermissions, setSelectedPermissions] = useState<string[]>([]);
+    // Screenshot artifacts (Storacha)
+    const [screenshots, setScreenshots] = useState<UploadedScreenshot[]>([]);
+    const [uploadingScreenshot, setUploadingScreenshot] = useState(false);
 
     const resetForm = () => {
         setName("");
@@ -126,6 +138,7 @@ export function SubmitMarketItemDialog({
         setRepoUrl("");
         setDemoUrl("");
         setSelectedPermissions([]);
+        setScreenshots([]);
     };
 
     const handleSubmit = async () => {
@@ -156,6 +169,7 @@ export function SubmitMarketItemDialog({
                 repoUrl: repoUrl.trim() || undefined,
                 demoUrl: demoUrl.trim() || undefined,
                 permissionsRequired: selectedPermissions.length > 0 ? selectedPermissions : undefined,
+                screenshotUrls: screenshots.length > 0 ? screenshots.map(s => s.gatewayUrl) : undefined,
             };
 
             if (type === "agent") {
@@ -698,6 +712,65 @@ export function SubmitMarketItemDialog({
                             value={demoUrl}
                             onChange={(e) => setDemoUrl(e.target.value)}
                         />
+                    </div>
+
+                    {/* Screenshots (Storacha) */}
+                    <div className="space-y-2">
+                        <label className="text-sm font-medium mb-1 block">Screenshots (optional)</label>
+                        {screenshots.length > 0 && (
+                            <div className="flex flex-wrap gap-2">
+                                {screenshots.map(s => (
+                                    <div key={s.cid} className="relative group">
+                                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                                        <img
+                                            src={s.gatewayUrl}
+                                            alt={s.filename}
+                                            className="h-16 w-16 rounded-lg object-cover border border-border"
+                                        />
+                                        <button
+                                            onClick={() => setScreenshots(screenshots.filter(x => x.cid !== s.cid))}
+                                            className="absolute -top-1.5 -right-1.5 bg-red-500 rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                                        >
+                                            <X className="h-2.5 w-2.5 text-white" />
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                        <label className={`flex items-center gap-2 px-3 py-2 rounded-lg border border-dashed cursor-pointer transition-colors ${
+                            uploadingScreenshot ? "border-purple-500/30 bg-purple-500/5" : "border-border hover:border-muted-foreground/30"
+                        }`}>
+                            <input
+                                type="file"
+                                accept="image/*"
+                                className="hidden"
+                                disabled={uploadingScreenshot || !orgId}
+                                onChange={async (e) => {
+                                    const file = e.target.files?.[0];
+                                    if (!file || !orgId) return;
+                                    e.target.value = "";
+                                    setUploadingScreenshot(true);
+                                    try {
+                                        const result = await uploadArtifact(file, orgId, "screenshot", submitterAddress);
+                                        setScreenshots(prev => [...prev, {
+                                            cid: result.cid,
+                                            filename: result.filename,
+                                            gatewayUrl: result.gatewayUrl,
+                                        }]);
+                                    } catch (err) {
+                                        setError(err instanceof Error ? err.message : "Screenshot upload failed");
+                                    } finally {
+                                        setUploadingScreenshot(false);
+                                    }
+                                }}
+                            />
+                            {uploadingScreenshot ? (
+                                <><Loader2 className="h-3.5 w-3.5 animate-spin text-purple-400" /><span className="text-xs text-muted-foreground">Uploading to IPFS...</span></>
+                            ) : (
+                                <><ImageIcon className="h-3.5 w-3.5 text-muted-foreground" /><span className="text-xs text-muted-foreground">{orgId ? "Add screenshot" : "Select an org to upload"}</span></>
+                            )}
+                        </label>
+                        <p className="text-[10px] text-muted-foreground">Stored on IPFS via Storacha. Images help reviewers evaluate your submission.</p>
                     </div>
 
                     <div className="grid grid-cols-2 gap-3">

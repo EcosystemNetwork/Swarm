@@ -1266,6 +1266,7 @@ export default function MarketPage() {
                         open={submitOpen}
                         onOpenChange={setSubmitOpen}
                         submitterAddress={account?.address ?? ""}
+                        orgId={currentOrg?.id}
                         onSubmitted={() => {
                             loadUserSubmissions();
                             loadCommunityItems();

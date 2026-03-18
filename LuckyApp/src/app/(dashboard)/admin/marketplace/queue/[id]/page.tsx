@@ -64,6 +64,7 @@ interface ReviewEntry {
   reviewedAt: string;
   comment?: string;
   findings?: string[];
+  artifactCids?: string[];
 }
 
 interface DetailItem {
@@ -397,6 +398,22 @@ export default function SubmissionDetailPage() {
                       ))}
                     </ul>
                   )}
+                  {entry.artifactCids && entry.artifactCids.length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {entry.artifactCids.map((cid) => (
+                        <a
+                          key={cid}
+                          href={`https://${cid}.ipfs.storacha.link/`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-[10px] px-2 py-1 rounded bg-purple-500/10 text-purple-400 hover:bg-purple-500/20 flex items-center gap-1 font-mono"
+                        >
+                          <ExternalLink className="h-2.5 w-2.5" />
+                          {cid.slice(0, 8)}...{cid.slice(-4)}
+                        </a>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             ))}
@@ -463,7 +480,26 @@ export default function SubmissionDetailPage() {
       )}
 
       {/* Metadata */}
-      {(item.repoUrl || item.demoUrl || item.screenshotUrls?.length || item.submissionType || item.requiredKeys?.length) && (
+      {/* Screenshots */}
+      {item.screenshotUrls && item.screenshotUrls.length > 0 && (
+        <div className="rounded-xl border border-border bg-card/50 p-4">
+          <h3 className="text-sm font-medium mb-3">Screenshots ({item.screenshotUrls.length})</h3>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+            {item.screenshotUrls.map((url, idx) => (
+              <a key={idx} href={url} target="_blank" rel="noopener noreferrer" className="group">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={url}
+                  alt={`Screenshot ${idx + 1}`}
+                  className="rounded-lg border border-border object-cover w-full h-32 group-hover:border-purple-500/40 transition-colors"
+                />
+              </a>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {(item.repoUrl || item.demoUrl || item.submissionType || item.requiredKeys?.length) && (
         <div className="rounded-xl border border-border bg-card/50 p-4">
           <h3 className="text-sm font-medium mb-3">Metadata</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">

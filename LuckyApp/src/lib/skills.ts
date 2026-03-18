@@ -534,6 +534,31 @@ export const SKILL_REGISTRY: Skill[] = [
         modManifest: BITTENSOR_MANIFEST,
     },
     {
+        id: "memory-pro",
+        name: "Memory Pro",
+        description: "Premium memory management — smart retrieval with confidence scoring, named memory spaces with permissions, and retrieval analytics dashboard.",
+        type: "mod",
+        source: "verified",
+        category: "AI",
+        icon: "🧠",
+        version: "1.0.0",
+        author: "Swarm Core",
+        tags: ["memory", "retrieval", "spaces", "analytics", "premium"],
+        pricing: {
+            model: "subscription",
+            tiers: [
+                { plan: "monthly", price: 9.99, currency: "USD" },
+                { plan: "yearly", price: 99.99, currency: "USD" },
+            ],
+        },
+        sidebarConfig: {
+            sectionId: "platform",
+            label: "Memory Pro",
+            href: "/memory/pro",
+            iconName: "Brain",
+        },
+    },
+    {
         id: "gemini-live-agent",
         name: "Gemini Live Agent",
         description: "Multimodal UI analysis and action planning — upload a screenshot, get AI-powered element detection, and generate executable action plans using Google Gemini.",

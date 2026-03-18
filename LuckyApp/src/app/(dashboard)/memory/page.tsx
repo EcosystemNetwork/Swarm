@@ -1,14 +1,16 @@
 /** Memory Browser — Browse and search agent memory files (journal, long-term, workspace, vector). */
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { Brain, Search, FileText, Loader2 } from "lucide-react";
+import { useState, useEffect, useCallback, useMemo } from "react";
+import { useSearchParams } from "next/navigation";
+import { Brain, Search, FileText, Loader2, HardDrive } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { useOrg } from "@/contexts/OrgContext";
 import { useAuthAddress } from "@/hooks/useAuthAddress";
 import { FileManager } from "@/components/file-manager";
+import { ArtifactBrowser } from "@/components/storacha/artifact-browser";
 import {
     type MemoryEntry,
     type MemoryType,
@@ -27,15 +29,23 @@ function timeAgo(d: Date | null): string {
     return `${Math.floor(sec / 86400)}d ago`;
 }
 
+type TabId = "memory" | "workspace" | "artifacts";
+const VALID_TABS: TabId[] = ["memory", "workspace", "artifacts"];
+
 export default function MemoryPage() {
     const { currentOrg } = useOrg();
     const authAddress = useAuthAddress();
+    const searchParams = useSearchParams();
+    const initialTab = useMemo(() => {
+        const t = searchParams.get("tab");
+        return t && VALID_TABS.includes(t as TabId) ? (t as TabId) : "memory";
+    }, [searchParams]);
     const [entries, setEntries] = useState<MemoryEntry[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState("");
     const [typeFilter, setTypeFilter] = useState<MemoryType | "all">("all");
     const [expandedId, setExpandedId] = useState<string | null>(null);
-    const [activeTab, setActiveTab] = useState<"memory" | "workspace">("memory");
+    const [activeTab, setActiveTab] = useState<TabId>(initialTab);
 
     const load = useCallback(async () => {
         if (!currentOrg) return;
@@ -68,7 +78,7 @@ export default function MemoryPage() {
                     </div>
                     Memory
                 </h1>
-                <p className="text-sm text-muted-foreground mt-2">Browse agent memory files and run semantic search</p>
+                <p className="text-sm text-muted-foreground mt-2">Browse agent memory files, artifacts, and run semantic search</p>
             </div>
 
             <div className="flex gap-2 mb-6 border-b border-border pb-2">
@@ -90,10 +100,24 @@ export default function MemoryPage() {
                 >
                     Workspace Files
                 </button>
+                <button
+                    onClick={() => setActiveTab("artifacts")}
+                    className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${activeTab === "artifacts"
+                            ? "bg-purple-500/10 text-purple-400 border-b-2 border-purple-500"
+                            : "text-muted-foreground hover:text-foreground"
+                        }`}
+                >
+                    <span className="flex items-center gap-1.5">
+                        <HardDrive className="h-3.5 w-3.5" />
+                        Artifacts
+                    </span>
+                </button>
             </div>
 
 // Bottom of file:
-            {activeTab === "memory" ? (
+            {activeTab === "artifacts" ? (
+                <ArtifactBrowser />
+            ) : activeTab === "memory" ? (
                 <>
                     <div className="flex items-center gap-3 mb-4">
                         <div className="relative flex-1">

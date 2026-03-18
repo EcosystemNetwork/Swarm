@@ -247,6 +247,8 @@ export interface ReviewEntry {
     reviewedAt: string; // ISO string for Firestore compatibility
     comment?: string;
     findings?: string[];
+    /** CIDs of evidence artifacts attached by reviewer (screenshots, logs, etc.) */
+    artifactCids?: string[];
 }
 
 // ═══════════════════════════════════════════════════════════════
