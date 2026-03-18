@@ -62,7 +62,7 @@
     "uuid": "^13.0.0"
   },
   "devDependencies": {
-    "@netlify/plugin-nextjs": "^5.15.7",
+    "@netlify/plugin-nextjs": "^5.15.9",
     "@tailwindcss/postcss": "^4",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",

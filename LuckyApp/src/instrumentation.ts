@@ -22,14 +22,17 @@ export async function register() {
   if (process.env.NEXT_RUNTIME === "nodejs") {
     console.log("🚀 Swarm server starting...\n");
 
-    // Validate environment variables — throws if critical vars missing
+    // Validate environment variables — log warnings for missing vars
     try {
       requireValidEnv();
       printEnvSummary();
-    } catch (err) {
-      console.error("\n❌ Server startup failed due to environment validation errors");
-      console.error("Fix the issues above and restart the server.\n");
-      process.exit(1); // Hard exit — prevent server from starting with invalid config
+    } catch {
+      // In serverless environments (e.g. Netlify), process.exit(1) is fatal
+      // and prevents the function from ever handling requests. Log the errors
+      // but allow the server to start — routes needing missing vars will
+      // return proper error responses individually.
+      console.warn("\n⚠️  Server starting with environment validation errors.");
+      console.warn("Some features may be unavailable until missing vars are configured.\n");
     }
 
     console.log("\n✅ Server instrumentation complete\n");
