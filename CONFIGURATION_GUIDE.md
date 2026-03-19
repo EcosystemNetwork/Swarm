@@ -16,7 +16,7 @@ Complete guide to configuring environment variables for production deployment.
 
 ### `.env.local` File
 
-Create `/home/god/Desktop/Swarm/Swarm/LuckyApp/.env.local`:
+Create `/home/god/Desktop/Swarm/Swarm/SwarmApp/.env.local`:
 
 ```bash
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

@@ -316,7 +316,7 @@ When a mod is installed, it appears in the **Modifications** section of the side
 
 ### 2. Submit via the Marketplace
 
-1. Go to the **Market** page in LuckyApp
+1. Go to the **Market** page in SwarmApp
 2. Click the **Submit** tab
 3. Fill out the submission form:
    - Select type: **Mod**

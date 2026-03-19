@@ -364,7 +364,7 @@ All components already have debug logging enabled. Check browser console for:
 
 **Check Server Logs:**
 ```bash
-cd LuckyApp
+cd SwarmApp
 npm run dev
 # Watch for POST /api/auth/verify and GET /api/auth/session
 ```

@@ -20,13 +20,13 @@ Status of production-readiness for the Swarm hub and API backend.
 - Documented the in-memory limitation inline.
 
 ### 3. Rate limiting for REST API routes
-- Created `LuckyApp/src/app/api/v1/rate-limit.ts` — a sliding-window rate limiter (60 req/min per identifier).
+- Created `SwarmApp/src/app/api/v1/rate-limit.ts` — a sliding-window rate limiter (60 req/min per identifier).
 - Wired into `/api/v1/send`, `/api/v1/messages`, `/api/v1/agents`, `/api/v1/platform`.
 - Includes periodic sweep to prevent unbounded Map growth.
 - Returns proper `429` with `Retry-After` header.
 
 ### 4. Env var schema
-- Updated `LuckyApp/.env.example` with all 27 env vars across the app, grouped and annotated.
+- Updated `SwarmApp/.env.example` with all 27 env vars across the app, grouped and annotated.
 - Created `hub/.env.example` with hub-specific vars.
 
 ---
@@ -59,7 +59,7 @@ These patterns work correctly for a **single-process deployment** but will break
 3. **`wsState`** (Map) — per-connection metadata (agentId, orgId, channels, Firestore unsub handles)
 4. **`rateLimits`** (Map) — sliding-window rate limit timestamps per agent
 
-### API (`LuckyApp/src/app/api/v1/`)
+### API (`SwarmApp/src/app/api/v1/`)
 5. **`usedNonces`** (Map in `send/route.ts`) — replay protection nonce store
 6. **`store`** (Map in `rate-limit.ts`) — REST API rate limit state
 
@@ -96,12 +96,12 @@ These patterns work correctly for a **single-process deployment** but will break
 | `hub/index.mjs` | Replaced hardcoded Firebase config with env vars, added `requireEnv`/`optionalEnv` helpers, added `dotenv/config` |
 | `hub/.env.example` | **New** — hub env var schema |
 | `hub/package.json` | Added `dotenv` dependency |
-| `LuckyApp/src/app/api/v1/send/route.ts` | Upgraded nonce store from `Set` to `Map` with TTL sweep, added rate limiting |
-| `LuckyApp/src/app/api/v1/rate-limit.ts` | **New** — shared sliding-window rate limiter |
-| `LuckyApp/src/app/api/v1/messages/route.ts` | Added rate limiting |
-| `LuckyApp/src/app/api/v1/agents/route.ts` | Added rate limiting |
-| `LuckyApp/src/app/api/v1/platform/route.ts` | Added rate limiting |
-| `LuckyApp/.env.example` | Expanded to full 27-var schema with grouping |
+| `SwarmApp/src/app/api/v1/send/route.ts` | Upgraded nonce store from `Set` to `Map` with TTL sweep, added rate limiting |
+| `SwarmApp/src/app/api/v1/rate-limit.ts` | **New** — shared sliding-window rate limiter |
+| `SwarmApp/src/app/api/v1/messages/route.ts` | Added rate limiting |
+| `SwarmApp/src/app/api/v1/agents/route.ts` | Added rate limiting |
+| `SwarmApp/src/app/api/v1/platform/route.ts` | Added rate limiting |
+| `SwarmApp/.env.example` | Expanded to full 27-var schema with grouping |
 | `HARDENING.md` | **New** — this document |
 
 ---
@@ -164,7 +164,7 @@ These patterns work correctly for a **single-process deployment** but will break
 
 ### New Auth Infrastructure
 
-**New file: `LuckyApp/src/lib/auth-guard.ts`** — Shared authorization module with:
+**New file: `SwarmApp/src/lib/auth-guard.ts`** — Shared authorization module with:
 - `requirePlatformAdmin(req)` — validates `PLATFORM_ADMIN_SECRET` via Bearer token or `x-platform-secret` header
 - `requireInternalService(req)` — validates `INTERNAL_SERVICE_SECRET` via Bearer token or `x-service-secret` header
 - `requireOrgMember(req, orgId)` — validates `x-wallet-address` is org member or owner
@@ -178,25 +178,25 @@ These patterns work correctly for a **single-process deployment** but will break
 
 | File | Change |
 |---|---|
-| `LuckyApp/src/lib/auth-guard.ts` | **New** — shared auth guard module |
-| `LuckyApp/src/app/api/v1/credit/route.ts` | Added platform admin auth |
-| `LuckyApp/src/app/api/v1/credit/task-complete/route.ts` | Added agent/admin auth + self-only enforcement |
-| `LuckyApp/src/app/api/v1/mods/[slug]/install/route.ts` | Added org membership auth |
-| `LuckyApp/src/app/api/v1/mods/[slug]/uninstall/route.ts` | Added org membership auth, required orgId |
-| `LuckyApp/src/app/api/v1/mod-installations/route.ts` | Added org membership auth |
-| `LuckyApp/src/app/api/v1/agents/link-register/route.ts` | Added org membership auth |
-| `LuckyApp/src/app/api/v1/register/route.ts` | Added org validation + private org gate |
-| `LuckyApp/src/app/api/github/auth.ts` | Added org membership to `resolveGitHubOrg()` |
-| `LuckyApp/src/app/api/github/disconnect/route.ts` | Added org admin auth |
-| `LuckyApp/src/app/api/github/callback/route.ts` | Added installation validation |
-| `LuckyApp/src/app/api/github/repos/route.ts` | Passes req for auth |
-| `LuckyApp/src/app/api/github/[owner]/[repo]/commits/route.ts` | Passes req for auth |
-| `LuckyApp/src/app/api/github/[owner]/[repo]/branches/route.ts` | Passes req for auth |
-| `LuckyApp/src/app/api/github/[owner]/[repo]/issues/route.ts` | Passes req for auth |
-| `LuckyApp/src/app/api/github/[owner]/[repo]/pulls/route.ts` | Passes req for auth |
-| `LuckyApp/src/app/api/github/[owner]/[repo]/comments/route.ts` | Passes req for auth |
-| `LuckyApp/src/app/api/cron-jobs/route.ts` | Added internal service / localhost auth |
-| `LuckyApp/src/app/api/workspace-files/route.ts` | Added internal service / localhost auth + path traversal guard |
+| `SwarmApp/src/lib/auth-guard.ts` | **New** — shared auth guard module |
+| `SwarmApp/src/app/api/v1/credit/route.ts` | Added platform admin auth |
+| `SwarmApp/src/app/api/v1/credit/task-complete/route.ts` | Added agent/admin auth + self-only enforcement |
+| `SwarmApp/src/app/api/v1/mods/[slug]/install/route.ts` | Added org membership auth |
+| `SwarmApp/src/app/api/v1/mods/[slug]/uninstall/route.ts` | Added org membership auth, required orgId |
+| `SwarmApp/src/app/api/v1/mod-installations/route.ts` | Added org membership auth |
+| `SwarmApp/src/app/api/v1/agents/link-register/route.ts` | Added org membership auth |
+| `SwarmApp/src/app/api/v1/register/route.ts` | Added org validation + private org gate |
+| `SwarmApp/src/app/api/github/auth.ts` | Added org membership to `resolveGitHubOrg()` |
+| `SwarmApp/src/app/api/github/disconnect/route.ts` | Added org admin auth |
+| `SwarmApp/src/app/api/github/callback/route.ts` | Added installation validation |
+| `SwarmApp/src/app/api/github/repos/route.ts` | Passes req for auth |
+| `SwarmApp/src/app/api/github/[owner]/[repo]/commits/route.ts` | Passes req for auth |
+| `SwarmApp/src/app/api/github/[owner]/[repo]/branches/route.ts` | Passes req for auth |
+| `SwarmApp/src/app/api/github/[owner]/[repo]/issues/route.ts` | Passes req for auth |
+| `SwarmApp/src/app/api/github/[owner]/[repo]/pulls/route.ts` | Passes req for auth |
+| `SwarmApp/src/app/api/github/[owner]/[repo]/comments/route.ts` | Passes req for auth |
+| `SwarmApp/src/app/api/cron-jobs/route.ts` | Added internal service / localhost auth |
+| `SwarmApp/src/app/api/workspace-files/route.ts` | Added internal service / localhost auth + path traversal guard |
 
 ### Required Environment Variables (new)
 

@@ -137,7 +137,7 @@ Documentation promises features not fully implemented:
 
 **Files to Modify:**
 - `README.md` - Rewrite features section
-- `LuckyApp/src/app/page.tsx` - Update landing page claims
+- `SwarmApp/src/app/page.tsx` - Update landing page claims
 - `ROADMAP.md` - New file
 
 ---
@@ -215,9 +215,9 @@ async function verifyHederaOwnership(orgId, accountId) {
 - [ ] Add migration path for existing Hedera orgs
 
 **Files to Modify:**
-- `LuckyApp/src/lib/hedera-ownership.ts` - New file
-- `LuckyApp/src/app/api/register-org/route.ts` - Add Hedera HCS creation
-- `LuckyApp/src/app/api/verify-ownership/route.ts` - Add HCS verification
+- `SwarmApp/src/lib/hedera-ownership.ts` - New file
+- `SwarmApp/src/app/api/register-org/route.ts` - Add Hedera HCS creation
+- `SwarmApp/src/app/api/verify-ownership/route.ts` - Add HCS verification
 - `HEDERA_ARCHITECTURE.md` - Document design
 
 ---
@@ -329,7 +329,7 @@ Using Thirdweb for wallet auth but haven't verified:
 
 **Current Auth Flow (Needs Audit):**
 ```typescript
-// LuckyApp/src/app/api/auth/verify/route.ts
+// SwarmApp/src/app/api/auth/verify/route.ts
 export async function POST(req: NextRequest) {
   const { message, signature } = await req.json();
 
@@ -363,9 +363,9 @@ export async function POST(req: NextRequest) {
 - [ ] Document auth flow with diagrams
 
 **Files to Review:**
-- `LuckyApp/src/app/api/auth/verify/route.ts`
-- `LuckyApp/src/lib/dynamic.tsx`
-- `LuckyApp/src/contexts/SessionContext.tsx`
+- `SwarmApp/src/app/api/auth/verify/route.ts`
+- `SwarmApp/src/lib/dynamic.tsx`
+- `SwarmApp/src/contexts/SessionContext.tsx`
 
 **Test Cases to Write:**
 ```typescript

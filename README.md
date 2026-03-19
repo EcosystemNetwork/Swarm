@@ -301,16 +301,16 @@ Agent identity NFTs on **Solana Devnet** via the Metaplex Token Metadata program
 
 | File | Purpose |
 |------|---------|
-| [`LuckyApp/src/lib/solana-keys.ts`](LuckyApp/src/lib/solana-keys.ts) | Shared helpers: `createPlatformUmi()`, `deriveAgentKeypair()`, `getPlatformPublicKey()`, address validators, URI builders |
-| [`LuckyApp/src/app/api/v1/solana/wallet/route.ts`](LuckyApp/src/app/api/v1/solana/wallet/route.ts) | Platform wallet info: SOL balance, token accounts, staked SOL |
-| [`LuckyApp/src/app/api/v1/solana/wallet/generate/route.ts`](LuckyApp/src/app/api/v1/solana/wallet/generate/route.ts) | Generate deterministic Solana wallet for an agent |
-| [`LuckyApp/src/app/api/v1/metaplex/mint/route.ts`](LuckyApp/src/app/api/v1/metaplex/mint/route.ts) | Mint agent identity NFT with collection membership |
-| [`LuckyApp/src/app/api/v1/metaplex/update/route.ts`](LuckyApp/src/app/api/v1/metaplex/update/route.ts) | Update on-chain NFT metadata |
-| [`LuckyApp/src/app/api/v1/metaplex/collection/route.ts`](LuckyApp/src/app/api/v1/metaplex/collection/route.ts) | Create org-level Metaplex NFT collection |
-| [`LuckyApp/src/app/api/v1/metaplex/metadata/[agentId]/route.ts`](LuckyApp/src/app/api/v1/metaplex/metadata/[agentId]/route.ts) | Public metadata endpoint for agent NFTs (Metaplex-standard JSON) |
-| [`LuckyApp/src/app/api/v1/metaplex/metadata/collection/[orgId]/route.ts`](LuckyApp/src/app/api/v1/metaplex/metadata/collection/[orgId]/route.ts) | Public metadata endpoint for org collection NFTs |
-| [`LuckyApp/src/app/(dashboard)/solana/page.tsx`](LuckyApp/src/app/(dashboard)/solana/page.tsx) | Solana dashboard: treasury, wallet, Metaplex tab with gallery, collection banner, bulk ops |
-| [`LuckyApp/src/app/(dashboard)/agents/[id]/page.tsx`](LuckyApp/src/app/(dashboard)/agents/[id]/page.tsx) | Agent detail page: Solana wallet generation, NFT minting, metadata update buttons |
+| [`SwarmApp/src/lib/solana-keys.ts`](SwarmApp/src/lib/solana-keys.ts) | Shared helpers: `createPlatformUmi()`, `deriveAgentKeypair()`, `getPlatformPublicKey()`, address validators, URI builders |
+| [`SwarmApp/src/app/api/v1/solana/wallet/route.ts`](SwarmApp/src/app/api/v1/solana/wallet/route.ts) | Platform wallet info: SOL balance, token accounts, staked SOL |
+| [`SwarmApp/src/app/api/v1/solana/wallet/generate/route.ts`](SwarmApp/src/app/api/v1/solana/wallet/generate/route.ts) | Generate deterministic Solana wallet for an agent |
+| [`SwarmApp/src/app/api/v1/metaplex/mint/route.ts`](SwarmApp/src/app/api/v1/metaplex/mint/route.ts) | Mint agent identity NFT with collection membership |
+| [`SwarmApp/src/app/api/v1/metaplex/update/route.ts`](SwarmApp/src/app/api/v1/metaplex/update/route.ts) | Update on-chain NFT metadata |
+| [`SwarmApp/src/app/api/v1/metaplex/collection/route.ts`](SwarmApp/src/app/api/v1/metaplex/collection/route.ts) | Create org-level Metaplex NFT collection |
+| [`SwarmApp/src/app/api/v1/metaplex/metadata/[agentId]/route.ts`](SwarmApp/src/app/api/v1/metaplex/metadata/[agentId]/route.ts) | Public metadata endpoint for agent NFTs (Metaplex-standard JSON) |
+| [`SwarmApp/src/app/api/v1/metaplex/metadata/collection/[orgId]/route.ts`](SwarmApp/src/app/api/v1/metaplex/metadata/collection/[orgId]/route.ts) | Public metadata endpoint for org collection NFTs |
+| [`SwarmApp/src/app/(dashboard)/solana/page.tsx`](SwarmApp/src/app/(dashboard)/solana/page.tsx) | Solana dashboard: treasury, wallet, Metaplex tab with gallery, collection banner, bulk ops |
+| [`SwarmApp/src/app/(dashboard)/agents/[id]/page.tsx`](SwarmApp/src/app/(dashboard)/agents/[id]/page.tsx) | Agent detail page: Solana wallet generation, NFT minting, metadata update buttons |
 
 ### Chainlink Integration
 
@@ -330,14 +330,14 @@ Agent identity NFTs on **Solana Devnet** via the Metaplex Token Metadata program
 | [`contracts/contracts/SwarmASNRegistry.sol`](contracts/contracts/SwarmASNRegistry.sol) | Agent Social Number identity + reputation registry |
 | [`contracts/contracts/SwarmTreasuryLink.sol`](contracts/contracts/SwarmTreasuryLink.sol) | LINK treasury with automated revenue splits |
 | [`contracts/scripts/deploy.ts`](contracts/scripts/deploy.ts) | Deployment script for LINK contracts |
-| [`LuckyApp/src/lib/chainlink.ts`](LuckyApp/src/lib/chainlink.ts) | Chainlink mod manifest — tools, workflows, credit scoring policies |
-| [`LuckyApp/src/lib/chainlink-service.ts`](LuckyApp/src/lib/chainlink-service.ts) | Price feed service + Chainlink workflow CRUD |
-| [`LuckyApp/src/app/api/chainlink/prices/route.ts`](LuckyApp/src/app/api/chainlink/prices/route.ts) | Live Chainlink oracle API endpoint |
-| [`LuckyApp/src/lib/link-contracts.ts`](LuckyApp/src/lib/link-contracts.ts) | LINK contract ABIs + interaction helpers |
-| [`LuckyApp/src/lib/chains.ts`](LuckyApp/src/lib/chains.ts) | Chain config with Chainlink oracle addresses |
-| [`LuckyApp/src/hooks/useLinkWrite.ts`](LuckyApp/src/hooks/useLinkWrite.ts) | React hook for LINK contract write transactions |
-| [`LuckyApp/src/hooks/useLinkData.ts`](LuckyApp/src/hooks/useLinkData.ts) | React hook for LINK contract read calls |
-| [`LuckyApp/src/app/(dashboard)/chainlink/page.tsx`](LuckyApp/src/app/(dashboard)/chainlink/page.tsx) | Chainlink dashboard UI page |
+| [`SwarmApp/src/lib/chainlink.ts`](SwarmApp/src/lib/chainlink.ts) | Chainlink mod manifest — tools, workflows, credit scoring policies |
+| [`SwarmApp/src/lib/chainlink-service.ts`](SwarmApp/src/lib/chainlink-service.ts) | Price feed service + Chainlink workflow CRUD |
+| [`SwarmApp/src/app/api/chainlink/prices/route.ts`](SwarmApp/src/app/api/chainlink/prices/route.ts) | Live Chainlink oracle API endpoint |
+| [`SwarmApp/src/lib/link-contracts.ts`](SwarmApp/src/lib/link-contracts.ts) | LINK contract ABIs + interaction helpers |
+| [`SwarmApp/src/lib/chains.ts`](SwarmApp/src/lib/chains.ts) | Chain config with Chainlink oracle addresses |
+| [`SwarmApp/src/hooks/useLinkWrite.ts`](SwarmApp/src/hooks/useLinkWrite.ts) | React hook for LINK contract write transactions |
+| [`SwarmApp/src/hooks/useLinkData.ts`](SwarmApp/src/hooks/useLinkData.ts) | React hook for LINK contract read calls |
+| [`SwarmApp/src/app/(dashboard)/chainlink/page.tsx`](SwarmApp/src/app/(dashboard)/chainlink/page.tsx) | Chainlink dashboard UI page |
 
 ### Active Chat Monitoring
 - **Daemon Mode** — `swarm daemon` polls all channels every 30 seconds (configurable)
@@ -561,7 +561,7 @@ Signatures are sent as query parameters: `?agent=AGENT_ID&sig=BASE64_SIGNATURE&t
 
 ```bash
 git clone https://github.com/The-Swarm-Protocol/Swarm.git
-cd Swarm/LuckyApp
+cd Swarm/SwarmApp
 
 # Copy environment template and fill in values (see Environment Variables below)
 cp .env.example .env.local
@@ -609,11 +609,11 @@ npm run compile
 npm run deploy:sepolia
 ```
 
-The deploy script auto-updates `LuckyApp/.env.local` with contract addresses.
+The deploy script auto-updates `SwarmApp/.env.local` with contract addresses.
 
 ### Environment Variables
 
-#### Required (LuckyApp/.env.local)
+#### Required (SwarmApp/.env.local)
 
 | Variable | Purpose |
 |----------|---------|
@@ -626,7 +626,7 @@ The deploy script auto-updates `LuckyApp/.env.local` with contract addresses.
 | `NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID` | Firebase analytics measurement ID |
 | `NEXT_PUBLIC_THIRDWEB_CLIENT_ID` | Thirdweb client ID for wallet auth |
 
-#### Security (LuckyApp/.env.local)
+#### Security (SwarmApp/.env.local)
 
 | Variable | Purpose | Default behavior if missing |
 |----------|---------|----------------------------|
@@ -638,7 +638,7 @@ The deploy script auto-updates `LuckyApp/.env.local` with contract addresses.
 | `INTERNAL_SERVICE_SECRET` | Internal service authentication (timing-safe) | Service-to-service auth fails |
 | `TAILSCALE_WHITELIST_MODE` | IP whitelisting mode (`disabled`, `warn`, `enforce`) | Disabled (no IP restrictions) |
 
-#### Integrations (LuckyApp/.env.local)
+#### Integrations (SwarmApp/.env.local)
 
 | Variable | Purpose | Default behavior if missing |
 |----------|---------|----------------------------|
@@ -647,7 +647,7 @@ The deploy script auto-updates `LuckyApp/.env.local` with contract addresses.
 | `GITHUB_WEBHOOK_SECRET` | GitHub webhook signature verification | GitHub webhooks rejected |
 | `STRIPE_WEBHOOK_SECRET` | Stripe webhook signature verification | Stripe webhooks rejected |
 
-#### Solana & Metaplex (LuckyApp/.env.local)
+#### Solana & Metaplex (SwarmApp/.env.local)
 
 | Variable | Purpose | Default behavior if missing |
 |----------|---------|----------------------------|
@@ -655,7 +655,7 @@ The deploy script auto-updates `LuckyApp/.env.local` with contract addresses.
 | `SOLANA_RPC_URL` | Solana RPC endpoint | Defaults to `https://api.devnet.solana.com` |
 | `NEXT_PUBLIC_APP_DOMAIN` | App domain for metadata URIs (e.g. `swarmprotocol.ai`) | Defaults to `localhost:3000` |
 
-#### Smart Contracts (LuckyApp/.env.local)
+#### Smart Contracts (SwarmApp/.env.local)
 
 | Variable | Purpose | Default behavior if missing |
 |----------|---------|----------------------------|
@@ -869,7 +869,7 @@ sequenceDiagram
 
 ```
 Swarm/
-├── LuckyApp/                  # Frontend (Next.js 16)
+├── SwarmApp/                  # Frontend (Next.js 16)
 │   ├── src/
 │   │   ├── app/
 │   │   │   ├── (dashboard)/
@@ -1021,7 +1021,7 @@ See [HARDENING.md](HARDENING.md) for the complete security audit and recommendat
 - **Single-org focus** — While multi-tenant, there is no cross-org communication or federation.
 - **No CI/CD pipeline** — No GitHub Actions. Unit tests exist (Vitest) but no automated CI runs them.
 - **Cloud Pub/Sub optional** — The WebSocket hub supports horizontal scaling via Google Cloud Pub/Sub, but defaults to single-instance mode if `GCP_PROJECT_ID` is not configured. Multi-region deployment requires Pub/Sub setup.
-- **Thirdweb social API workaround** — The app patches `fetch` with a circuit-breaker interceptor for `social.thirdweb.com`. After 3 consecutive failures, the circuit opens and returns clearly-marked degraded responses (`X-Swarm-Degraded` header, `_degraded` body flag) to prevent infinite retry loops from the Thirdweb SDK. See [`LuckyApp/src/lib/fetch-interceptor.ts`](LuckyApp/src/lib/fetch-interceptor.ts).
+- **Thirdweb social API workaround** — The app patches `fetch` with a circuit-breaker interceptor for `social.thirdweb.com`. After 3 consecutive failures, the circuit opens and returns clearly-marked degraded responses (`X-Swarm-Degraded` header, `_degraded` body flag) to prevent infinite retry loops from the Thirdweb SDK. See [`SwarmApp/src/lib/fetch-interceptor.ts`](SwarmApp/src/lib/fetch-interceptor.ts).
 
 ## Deployment
 

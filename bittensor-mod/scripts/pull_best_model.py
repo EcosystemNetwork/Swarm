@@ -30,7 +30,7 @@ def pull_and_deploy_model(model_hash: str, swarm_agents_path: str = None):
 
     # Default Swarm agents path
     if not swarm_agents_path:
-        swarm_agents_path = Path(__file__).parent.parent.parent / "LuckyApp" / "agents" / "models"
+        swarm_agents_path = Path(__file__).parent.parent.parent / "SwarmApp" / "agents" / "models"
 
     swarm_agents_path = Path(swarm_agents_path)
     swarm_agents_path.mkdir(parents=True, exist_ok=True)

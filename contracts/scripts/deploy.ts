@@ -76,11 +76,11 @@ async function main() {
     "",
   ].join("\n");
 
-  console.log("\n=== Add to LuckyApp/.env.local ===");
+  console.log("\n=== Add to SwarmApp/.env.local ===");
   console.log(envSnippet);
 
   // Auto-append to .env.local if it exists
-  const envLocalPath = path.join(__dirname, "..", "..", "LuckyApp", ".env.local");
+  const envLocalPath = path.join(__dirname, "..", "..", "SwarmApp", ".env.local");
   if (fs.existsSync(envLocalPath)) {
     const existing = fs.readFileSync(envLocalPath, "utf-8");
     // Remove old LINK contract vars if present
@@ -91,7 +91,7 @@ async function main() {
     fs.writeFileSync(envLocalPath, cleaned.trimEnd() + "\n" + envSnippet);
     console.log("Auto-appended to", envLocalPath);
   } else {
-    console.log("(Create LuckyApp/.env.local and paste the snippet above)");
+    console.log("(Create SwarmApp/.env.local and paste the snippet above)");
   }
 }
 
