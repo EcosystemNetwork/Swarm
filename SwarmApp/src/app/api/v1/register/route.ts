@@ -206,17 +206,13 @@ export async function POST(request: NextRequest) {
         );
     }
 
-    // Validate the target org exists and is not private (prevents rogue agent registration)
+    // Validate the target org exists
     const org = await getOrganization(orgId);
     if (!org) {
         return Response.json({ error: "Organization not found" }, { status: 404 });
     }
-    if (org.isPrivate) {
-        return Response.json(
-            { error: "Cannot register agents to a private organization without membership" },
-            { status: 403 }
-        );
-    }
+    // Note: agents can register to both public and private orgs.
+    // The isPrivate flag controls public directory visibility, not agent connectivity.
 
     // Validate PEM format
     if (!publicKey.includes("BEGIN PUBLIC KEY")) {
