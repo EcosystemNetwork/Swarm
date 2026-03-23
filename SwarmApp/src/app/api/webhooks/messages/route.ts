@@ -75,6 +75,23 @@ export async function GET(request: NextRequest) {
                     };
                 }
             }
+
+            // Also include their Direct Message (DM) channel
+            const dmQ = query(
+                collection(db, "channels"),
+                where("orgId", "==", orgId),
+                where("agentId", "==", agent.agentId)
+            );
+            const dmSnap = await getDocs(dmQ);
+            for (const dmDoc of dmSnap.docs) {
+                if (!channelIds.includes(dmDoc.id)) {
+                    channelIds.push(dmDoc.id);
+                    channelMeta[dmDoc.id] = {
+                        name: "Direct Message",
+                        projectId: "dm",
+                    };
+                }
+            }
         }
 
         if (channelIds.length === 0) {
