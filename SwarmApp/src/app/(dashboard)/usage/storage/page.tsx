@@ -2,11 +2,12 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { HardDrive, Database, Image, FileText, FileCode, FileBarChart, Lock, Loader2, AlertTriangle } from "lucide-react";
+import { HardDrive, Database, Image, FileText, FileCode, FileBarChart, Lock, Loader2, AlertTriangle, Sparkles, Brain } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useOrg } from "@/contexts/OrgContext";
 import { useAuthAddress } from "@/hooks/useAuthAddress";
+import Link from "next/link";
 
 interface UsageData {
     usage: {
@@ -138,11 +139,33 @@ export default function StorageUsagePage() {
                     <div className="p-2 rounded-xl bg-purple-500/10 border border-purple-500/20">
                         <HardDrive className="h-6 w-6 text-purple-500" />
                     </div>
-                    Storage
+                    Storacha Storage
                 </h1>
                 <p className="text-sm text-muted-foreground mt-2">
-                    Storacha decentralized storage usage and quota tracking
+                    Decentralized storage powered by Protocol Labs — IPFS, encrypted artifacts, and agent memory
                 </p>
+
+                {/* Feature Tabs */}
+                <div className="flex gap-2 mt-4">
+                    <div className="px-4 py-2 rounded-lg bg-purple-500/20 border border-purple-500/30 text-sm font-medium">
+                        Overview
+                    </div>
+                    <Link
+                        href="/memory"
+                        className="px-4 py-2 rounded-lg bg-card/50 border border-border hover:bg-card hover:border-purple-500/30 text-sm font-medium transition-all flex items-center gap-2"
+                    >
+                        <Database className="h-3.5 w-3.5" />
+                        Memory Browser
+                    </Link>
+                    <Link
+                        href="/memory/pro"
+                        className="px-4 py-2 rounded-lg bg-card/50 border border-border hover:bg-card hover:border-amber-500/30 text-sm font-medium transition-all flex items-center gap-2"
+                    >
+                        <Sparkles className="h-3.5 w-3.5 text-amber-400" />
+                        Premium Features
+                        <Badge className="ml-1 bg-amber-500/20 text-amber-400 text-[10px] px-1.5 py-0">Free for Hackathon</Badge>
+                    </Link>
+                </div>
             </div>
 
             {loading ? (

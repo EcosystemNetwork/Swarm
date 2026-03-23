@@ -208,9 +208,12 @@ export default function MemoryProDashboard() {
                         <Brain className="h-6 w-6 text-purple-500" />
                     </div>
                     Memory Pro
+                    <Badge className="bg-amber-500/20 text-amber-400 border-amber-500/30">
+                        Free for Hackathon
+                    </Badge>
                 </h1>
                 <p className="text-sm text-muted-foreground mt-2">
-                    Premium memory management — smart retrieval, spaces, and analytics
+                    Premium memory management — smart retrieval, spaces, and analytics powered by Storacha
                 </p>
             </div>
 
