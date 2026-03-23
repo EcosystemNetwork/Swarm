@@ -629,6 +629,40 @@ export default function AgentsPage() {
                             {agent.status}
                           </span>
                         </div>
+                        {/* 🔄 RESTORED BADGE — Shows if agent was restored from ASN backup */}
+                        {agent.restoredFromBackup && (
+                          <div className="mt-1.5">
+                            <Badge className="text-[10px] px-1.5 py-0.5 border bg-blue-100 text-blue-700 border-blue-300 dark:bg-blue-950/40 dark:text-blue-400 dark:border-blue-700" title="Agent restored from ASN backup">
+                              🔄 Restored
+                            </Badge>
+                          </div>
+                        )}
+                        {/* 🏆 HEDERA REPUTATION BADGES — Credit Score (300-900) + Trust Score (0-100) */}
+                        <div className="flex items-center gap-1.5 mt-2">
+                          {(() => {
+                            const creditScore = agent.creditScore ?? 680;
+                            const trustScore = agent.trustScore ?? 50;
+                            // Credit tier colors
+                            const creditTier = creditScore >= 850 ? { label: "Platinum", color: "bg-cyan-100 text-cyan-700 border-cyan-300 dark:bg-cyan-950/40 dark:text-cyan-400 dark:border-cyan-700", icon: "💎" }
+                              : creditScore >= 700 ? { label: "Gold", color: "bg-yellow-100 text-yellow-700 border-yellow-300 dark:bg-yellow-950/40 dark:text-yellow-400 dark:border-yellow-700", icon: "🥇" }
+                              : creditScore >= 550 ? { label: "Silver", color: "bg-slate-100 text-slate-700 border-slate-300 dark:bg-slate-800/40 dark:text-slate-300 dark:border-slate-600", icon: "🥈" }
+                              : { label: "Bronze", color: "bg-orange-100 text-orange-700 border-orange-300 dark:bg-orange-950/40 dark:text-orange-400 dark:border-orange-700", icon: "🥉" };
+                            // Trust score colors
+                            const trustColor = trustScore >= 70 ? "bg-emerald-100 text-emerald-700 border-emerald-300 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-700"
+                              : trustScore >= 40 ? "bg-amber-100 text-amber-700 border-amber-300 dark:bg-amber-950/40 dark:text-amber-400 dark:border-amber-700"
+                              : "bg-red-100 text-red-700 border-red-300 dark:bg-red-950/40 dark:text-red-400 dark:border-red-700";
+                            return (
+                              <>
+                                <Badge className={`text-[10px] px-1.5 py-0.5 border ${creditTier.color}`} title={`${creditTier.label} tier (300-900 scale)`}>
+                                  {creditTier.icon} {creditScore}
+                                </Badge>
+                                <Badge className={`text-[10px] px-1.5 py-0.5 border ${trustColor}`} title="Trust Score (0-100)">
+                                  ⭐ {trustScore}
+                                </Badge>
+                              </>
+                            );
+                          })()}
+                        </div>
                       </div>
                     </div>
                   </div>

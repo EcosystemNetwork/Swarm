@@ -34,6 +34,8 @@ import {
     where,
     serverTimestamp,
 } from "firebase/firestore";
+import { checkAndRestoreASN } from "@/lib/asn-auto-restore";
+import { emitSkillReport } from "@/lib/hedera-score-emitter";
 
 const HEDERA_TESTNET_RPC = "https://testnet.hashio.io/api";
 
@@ -258,9 +260,26 @@ export async function POST(request: NextRequest) {
             }
             await updateDoc(doc(db, "agents", existingDoc.id), updates);
 
+            // Check for ASN backup and auto-restore
+            const restoreResult = await checkAndRestoreASN(existingAsn);
+            if (restoreResult.restored && restoreResult.reputation) {
+                // Update credit scores from restored backup
+                await updateDoc(doc(db, "agents", existingDoc.id), {
+                    creditScore: restoreResult.reputation.creditScore,
+                    trustScore: restoreResult.reputation.trustScore,
+                    restoredFromBackup: true,
+                    restoredAt: serverTimestamp(),
+                });
+            }
+
             // Post check-in greeting to Agent Hub
             const agent = { id: existingDoc.id, ...existingData } as Agent;
             agentCheckIn(agent, agent.orgId || orgId, skills.length > 0 ? skills : undefined, bio).catch(() => {});
+
+            // Emit skill report score event to HCS (if skills were reported)
+            if (skills.length > 0 && existingAsn && agentAddress) {
+                emitSkillReport(existingAsn, agentAddress, skills.map(s => s.name)).catch(() => {});
+            }
 
             return Response.json({
                 agentId: existingDoc.id,
@@ -271,6 +290,12 @@ export async function POST(request: NextRequest) {
                 existing: true,
                 reportedSkills: skills.length,
                 briefing: PLATFORM_BRIEFING,
+                ...(restoreResult.restored ? {
+                    restored: true,
+                    backup: restoreResult.backup,
+                    reputation: restoreResult.reputation,
+                    restoreMessage: restoreResult.message,
+                } : {}),
             });
         }
 
@@ -310,9 +335,26 @@ export async function POST(request: NextRequest) {
             }
             await updateDoc(doc(db, "agents", matchedDoc.id), nameUpdates);
 
+            // Check for ASN backup and auto-restore
+            const restoreResult = await checkAndRestoreASN(matchedAsn);
+            if (restoreResult.restored && restoreResult.reputation) {
+                // Update credit scores from restored backup
+                await updateDoc(doc(db, "agents", matchedDoc.id), {
+                    creditScore: restoreResult.reputation.creditScore,
+                    trustScore: restoreResult.reputation.trustScore,
+                    restoredFromBackup: true,
+                    restoredAt: serverTimestamp(),
+                });
+            }
+
             // Post check-in greeting to Agent Hub
             const agent = { id: matchedDoc.id, ...matchedData } as Agent;
             agentCheckIn(agent, agent.orgId || orgId, skills.length > 0 ? skills : undefined, bio).catch(() => {});
+
+            // Emit skill report score event to HCS (if skills were reported)
+            if (skills.length > 0 && matchedAsn && agentAddress) {
+                emitSkillReport(matchedAsn, agentAddress, skills.map(s => s.name)).catch(() => {});
+            }
 
             return Response.json({
                 agentId: matchedDoc.id,
@@ -323,6 +365,12 @@ export async function POST(request: NextRequest) {
                 existing: true,
                 reportedSkills: skills.length,
                 briefing: PLATFORM_BRIEFING,
+                ...(restoreResult.restored ? {
+                    restored: true,
+                    backup: restoreResult.backup,
+                    reputation: restoreResult.reputation,
+                    restoreMessage: restoreResult.message,
+                } : {}),
             });
         }
 
@@ -332,6 +380,15 @@ export async function POST(request: NextRequest) {
 
         // Derive unique on-chain address from public key
         const agentAddress = deriveAgentAddress(publicKey);
+
+        // Check for ASN backup before creating new agent (in case ASN collision or manual ASN reuse)
+        const preRestoreResult = await checkAndRestoreASN(asn);
+        const initialCreditScore = preRestoreResult.restored && preRestoreResult.reputation
+            ? preRestoreResult.reputation.creditScore
+            : 680;
+        const initialTrustScore = preRestoreResult.restored && preRestoreResult.reputation
+            ? preRestoreResult.reputation.trustScore
+            : 50;
 
         const ref = await addDoc(collection(db, "agents"), {
             name: agentName,
@@ -349,9 +406,11 @@ export async function POST(request: NextRequest) {
             avatarUrl: getAgentAvatarUrl(agentName, agentType || "agent"),
             description: `${agentType || "Agent"} connected via Ed25519`,
             asn,
-            creditScore: 680,
-            trustScore: 50,
+            creditScore: initialCreditScore,
+            trustScore: initialTrustScore,
             onChainRegistered: false,
+            restoredFromBackup: preRestoreResult.restored,
+            ...(preRestoreResult.restored ? { restoredAt: serverTimestamp() } : {}),
             lastSeen: serverTimestamp(),
             createdAt: serverTimestamp(),
         });
@@ -390,6 +449,11 @@ export async function POST(request: NextRequest) {
         const newAgent = { id: ref.id, name: agentName, type: agentType || "agent", orgId } as Agent;
         agentCheckIn(newAgent, orgId, skills.length > 0 ? skills : undefined, bio).catch(() => {});
 
+        // Emit skill report score event to HCS (if skills were reported)
+        if (skills.length > 0 && asn && agentAddress) {
+            emitSkillReport(asn, agentAddress, skills.map(s => s.name)).catch(() => {});
+        }
+
         return Response.json({
             agentId: ref.id,
             agentName,
@@ -403,6 +467,12 @@ export async function POST(request: NextRequest) {
                 sepolia: { registered: !!LINK_CONTRACTS.AGENT_REGISTRY },
             },
             briefing: PLATFORM_BRIEFING,
+            ...(preRestoreResult.restored ? {
+                restored: true,
+                backup: preRestoreResult.backup,
+                reputation: preRestoreResult.reputation,
+                restoreMessage: preRestoreResult.message,
+            } : {}),
         });
     } catch (err) {
         console.error("v1/register error:", err);

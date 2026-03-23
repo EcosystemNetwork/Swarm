@@ -3,14 +3,24 @@
 import { useState, useEffect, useCallback } from "react";
 import {
     Store, Star, Download, Shield, Crown, Loader2, Clock,
-    CheckCircle2, XCircle, AlertTriangle, MessageSquare, RefreshCw,
+    CheckCircle2, XCircle, AlertTriangle, MessageSquare, RefreshCw, Plus, Upload,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
-    Dialog, DialogContent, DialogHeader, DialogTitle,
+    Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
 import { useSession } from "@/contexts/SessionContext";
 import { useActiveAccount } from "thirdweb/react";
 import { trackMarketplaceEvent } from "@/lib/posthog";
@@ -81,6 +91,21 @@ export default function PublisherPage() {
     const [appealComment, setAppealComment] = useState("");
     const [appealLoading, setAppealLoading] = useState(false);
 
+    // Submission dialog state
+    const [showSubmitDialog, setShowSubmitDialog] = useState(false);
+    const [submitting, setSubmitting] = useState(false);
+    const [submitForm, setSubmitForm] = useState({
+        name: "",
+        type: "mod" as const,
+        category: "",
+        icon: "📦",
+        description: "",
+        version: "1.0.0",
+        tags: "",
+        demoUrl: "",
+        repoUrl: "",
+    });
+
     const fetchData = useCallback(async () => {
         if (!address) return;
         setLoading(true);
@@ -140,6 +165,68 @@ export default function PublisherPage() {
         }
     }
 
+    async function handleSubmitToMarketplace() {
+        if (!submitForm.name.trim() || !submitForm.description.trim() || !submitForm.category.trim()) {
+            return;
+        }
+
+        setSubmitting(true);
+        try {
+            const tags = submitForm.tags.split(",").map(t => t.trim()).filter(Boolean);
+            const res = await fetch("/api/v1/marketplace/publish", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "x-wallet-address": address,
+                },
+                body: JSON.stringify({
+                    name: submitForm.name.trim(),
+                    type: submitForm.type,
+                    category: submitForm.category.trim(),
+                    icon: submitForm.icon,
+                    description: submitForm.description.trim(),
+                    version: submitForm.version.trim() || "1.0.0",
+                    tags,
+                    demoUrl: submitForm.demoUrl.trim() || undefined,
+                    repoUrl: submitForm.repoUrl.trim() || undefined,
+                    submissionType: "build",
+                    submissionTrack: submitForm.repoUrl.trim() ? "open_repo" : "prd_only",
+                }),
+            });
+
+            const data = await res.json();
+
+            if (res.ok) {
+                trackMarketplaceEvent("item_submitted", {
+                    itemId: data.id,
+                    type: submitForm.type,
+                    status: data.status,
+                });
+                // Reset form
+                setSubmitForm({
+                    name: "",
+                    type: "mod",
+                    category: "",
+                    icon: "📦",
+                    description: "",
+                    version: "1.0.0",
+                    tags: "",
+                    demoUrl: "",
+                    repoUrl: "",
+                });
+                setShowSubmitDialog(false);
+                // Refresh items list
+                fetchData();
+            } else {
+                alert(`Submission failed: ${data.error || "Unknown error"}`);
+            }
+        } catch (err) {
+            alert(`Submission failed: ${err instanceof Error ? err.message : "Network error"}`);
+        } finally {
+            setSubmitting(false);
+        }
+    }
+
     if (!authenticated) {
         return (
             <div className="flex items-center justify-center h-[60vh]">
@@ -156,10 +243,21 @@ export default function PublisherPage() {
                     <Store className="h-6 w-6 text-amber-400" />
                     <h1 className="text-2xl font-bold">Publisher Dashboard</h1>
                 </div>
-                <Button variant="outline" size="sm" onClick={fetchData} disabled={loading}>
-                    <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />
-                    Refresh
-                </Button>
+                <div className="flex items-center gap-2">
+                    <Button
+                        variant="default"
+                        size="sm"
+                        onClick={() => setShowSubmitDialog(true)}
+                        className="bg-amber-600 hover:bg-amber-700 text-black"
+                    >
+                        <Upload className="h-4 w-4 mr-2" />
+                        Submit to Marketplace
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={fetchData} disabled={loading}>
+                        <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />
+                        Refresh
+                    </Button>
+                </div>
             </div>
 
             {loading && !profile ? (
@@ -363,6 +461,166 @@ export default function PublisherPage() {
                             >
                                 {appealLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <MessageSquare className="h-3 w-3" />}
                                 Submit Appeal
+                            </Button>
+                        </div>
+                    </div>
+                </DialogContent>
+            </Dialog>
+
+            {/* Submit to Marketplace Dialog */}
+            <Dialog open={showSubmitDialog} onOpenChange={setShowSubmitDialog}>
+                <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                    <DialogHeader>
+                        <DialogTitle>Submit to Marketplace</DialogTitle>
+                        <DialogDescription>
+                            Submit a new mod, plugin, skill, skin, or agent to the Swarm marketplace.
+                            All submissions are reviewed before approval.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                        {/* Name */}
+                        <div className="space-y-2">
+                            <Label htmlFor="name">Name *</Label>
+                            <Input
+                                id="name"
+                                placeholder="My Awesome Mod"
+                                value={submitForm.name}
+                                onChange={(e) => setSubmitForm({ ...submitForm, name: e.target.value.slice(0, 100) })}
+                                maxLength={100}
+                            />
+                        </div>
+
+                        {/* Type & Category */}
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <Label htmlFor="type">Type *</Label>
+                                <Select
+                                    value={submitForm.type}
+                                    onValueChange={(value) => setSubmitForm({ ...submitForm, type: value as typeof submitForm.type })}
+                                >
+                                    <SelectTrigger id="type">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="mod">Mod</SelectItem>
+                                        <SelectItem value="plugin">Plugin</SelectItem>
+                                        <SelectItem value="skill">Skill</SelectItem>
+                                        <SelectItem value="skin">Skin</SelectItem>
+                                        <SelectItem value="agent">Agent</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label htmlFor="category">Category *</Label>
+                                <Input
+                                    id="category"
+                                    placeholder="Productivity, Security, etc."
+                                    value={submitForm.category}
+                                    onChange={(e) => setSubmitForm({ ...submitForm, category: e.target.value.slice(0, 50) })}
+                                    maxLength={50}
+                                />
+                            </div>
+                        </div>
+
+                        {/* Icon & Version */}
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <Label htmlFor="icon">Icon (emoji)</Label>
+                                <Input
+                                    id="icon"
+                                    placeholder="📦"
+                                    value={submitForm.icon}
+                                    onChange={(e) => setSubmitForm({ ...submitForm, icon: e.target.value.slice(0, 10) })}
+                                    maxLength={10}
+                                />
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label htmlFor="version">Version</Label>
+                                <Input
+                                    id="version"
+                                    placeholder="1.0.0"
+                                    value={submitForm.version}
+                                    onChange={(e) => setSubmitForm({ ...submitForm, version: e.target.value.slice(0, 20) })}
+                                    maxLength={20}
+                                />
+                            </div>
+                        </div>
+
+                        {/* Description */}
+                        <div className="space-y-2">
+                            <Label htmlFor="description">Description *</Label>
+                            <Textarea
+                                id="description"
+                                placeholder="A detailed description of your submission..."
+                                value={submitForm.description}
+                                onChange={(e) => setSubmitForm({ ...submitForm, description: e.target.value.slice(0, 2000) })}
+                                className="h-24 resize-none"
+                                maxLength={2000}
+                            />
+                            <p className="text-xs text-muted-foreground">
+                                {submitForm.description.length}/2000 characters
+                            </p>
+                        </div>
+
+                        {/* Tags */}
+                        <div className="space-y-2">
+                            <Label htmlFor="tags">Tags (comma-separated)</Label>
+                            <Input
+                                id="tags"
+                                placeholder="automation, productivity, ai"
+                                value={submitForm.tags}
+                                onChange={(e) => setSubmitForm({ ...submitForm, tags: e.target.value })}
+                            />
+                        </div>
+
+                        {/* URLs */}
+                        <div className="space-y-2">
+                            <Label htmlFor="demoUrl">Demo URL (recommended)</Label>
+                            <Input
+                                id="demoUrl"
+                                type="url"
+                                placeholder="https://example.com/demo"
+                                value={submitForm.demoUrl}
+                                onChange={(e) => setSubmitForm({ ...submitForm, demoUrl: e.target.value.slice(0, 500) })}
+                                maxLength={500}
+                            />
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label htmlFor="repoUrl">Repository URL (for open source)</Label>
+                            <Input
+                                id="repoUrl"
+                                type="url"
+                                placeholder="https://github.com/user/repo"
+                                value={submitForm.repoUrl}
+                                onChange={(e) => setSubmitForm({ ...submitForm, repoUrl: e.target.value.slice(0, 500) })}
+                                maxLength={500}
+                            />
+                        </div>
+
+                        {/* Submit Actions */}
+                        <div className="flex justify-end gap-2 pt-4 border-t border-border">
+                            <Button variant="outline" onClick={() => setShowSubmitDialog(false)} disabled={submitting}>
+                                Cancel
+                            </Button>
+                            <Button
+                                onClick={handleSubmitToMarketplace}
+                                disabled={!submitForm.name.trim() || !submitForm.description.trim() || !submitForm.category.trim() || submitting}
+                                className="bg-amber-600 hover:bg-amber-700 text-black"
+                            >
+                                {submitting ? (
+                                    <>
+                                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                        Submitting...
+                                    </>
+                                ) : (
+                                    <>
+                                        <Upload className="h-4 w-4 mr-2" />
+                                        Submit for Review
+                                    </>
+                                )}
                             </Button>
                         </div>
                     </div>

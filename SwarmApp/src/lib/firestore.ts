@@ -117,6 +117,10 @@ export interface Agent {
   creditScore?: number;
   /** Trust score (0-100) */
   trustScore?: number;
+  /** Whether this agent was restored from ASN backup */
+  restoredFromBackup?: boolean;
+  /** When the agent was restored from backup */
+  restoredAt?: unknown;
   /** Parent agent ID (if this agent is a child) */
   parentAgentId?: string;
   /** Child agent IDs (if this agent is a parent) */
@@ -458,6 +462,30 @@ export async function getTasksByProject(projectId: string): Promise<Task[]> {
 
 export async function updateTask(taskId: string, data: Partial<Task>): Promise<void> {
   await updateDoc(doc(db, "tasks", taskId), data);
+
+  // Emit HCS score event if task completed (server-side only)
+  if (data.status === 'done' && typeof window === 'undefined') {
+    try {
+      // Get task details to find agent
+      const taskDoc = await getDoc(doc(db, "tasks", taskId));
+      const task = taskDoc.data() as Task;
+
+      if (task.assigneeAgentId) {
+        // Get agent details
+        const agentDoc = await getDoc(doc(db, "agents", task.assigneeAgentId));
+        const agent = agentDoc.data() as Agent;
+
+        if (agent?.asn && agent?.agentAddress) {
+          // Emit task completion event (dynamic import for server-side)
+          const { emitTaskComplete } = await import("./hedera-score-emitter");
+          const complexity = task.priority === 'high' ? 'complex' : task.priority === 'low' ? 'simple' : 'medium';
+          await emitTaskComplete(agent.asn, agent.agentAddress, taskId, complexity);
+        }
+      }
+    } catch (error) {
+      console.error("Failed to emit task complete event:", error);
+    }
+  }
 }
 
 export async function deleteTask(taskId: string): Promise<void> {

@@ -18,35 +18,39 @@ import {
 } from "./chains";
 
 // ============================================================
-// Default Config — Sepolia LINK is the primary chain
+// Default Config — Hedera Testnet is the PRIMARY chain
 // ============================================================
 
-export const DEFAULT_RPC_URL = "https://ethereum-sepolia-rpc.publicnode.com";
-export const DEFAULT_CHAIN_ID = 11155111; // Sepolia
-export const EXPLORER_BASE = "https://sepolia.etherscan.io";
-export const DEFAULT_GAS_LIMIT = 3_000_000;
+export const DEFAULT_RPC_URL = "https://testnet.hashio.io/api";
+export const DEFAULT_CHAIN_ID = 296; // Hedera Testnet
+export const EXPLORER_BASE = "https://hashscan.io/testnet";
+export const DEFAULT_GAS_LIMIT = 10_000_000;
 
 // ============================================================
-// Contract Addresses — primary chain is Sepolia LINK
+// Contract Addresses — PRIMARY chain is Hedera Testnet
 // ============================================================
 
+// Hedera Testnet contracts (PRIMARY — deployed 2026-03-23)
+// Includes credit scoring, ASN identity, reputation system, and Agent Identity NFTs
 export const CONTRACTS = {
-  // Sepolia LINK contracts (primary — deployed 2026-03-08)
+  MOCK_LINK: process.env.NEXT_PUBLIC_HEDERA_MOCK_LINK || "0xEB2B470D2A8dD2192e33e94Db4c7Dd9fb937f38f",
+  ASN_REGISTRY: process.env.NEXT_PUBLIC_HEDERA_ASN_REGISTRY || "0x3E66D6feAEeb68b43E76CF4152154B4F30553ca6",
+  AGENT_REGISTRY: process.env.NEXT_PUBLIC_HEDERA_AGENT_REGISTRY || "0xC110E3bB1a898E1A4bd8Cc75a913603601e7c228",
+  TASK_BOARD: process.env.NEXT_PUBLIC_HEDERA_TASK_BOARD || "0xf97b6900f5573cba7dcE4e58e5118b403E098434",
+  AGENT_TREASURY: process.env.NEXT_PUBLIC_HEDERA_TREASURY || "0x91D581cFdda6F1AC4cA211d8A05B31BeFcEF2882",
+  AGENT_IDENTITY_NFT: process.env.NEXT_PUBLIC_HEDERA_AGENT_NFT || "0x09F7D7717a67783298d5Ca6C0fe036C39951D337",
+} as const;
+
+// Legacy Sepolia contracts (kept for backward compatibility)
+export const SEPOLIA_CONTRACTS = {
   TASK_BOARD: CHAIN_CONFIGS.sepolia?.contracts?.linkTaskBoard || "",
   AGENT_REGISTRY: CHAIN_CONFIGS.sepolia?.contracts?.linkAgentRegistry || "",
   ASN_REGISTRY: CHAIN_CONFIGS.sepolia?.contracts?.linkASNRegistry || "",
   AGENT_TREASURY: CHAIN_CONFIGS.sepolia?.contracts?.linkTreasury || "",
 } as const;
 
-// Legacy Hedera contracts (kept for backward compatibility)
-export const HEDERA_CONTRACTS = {
-  TASK_BOARD: CHAIN_CONFIGS.hedera.contracts.taskBoard!,
-  AGENT_REGISTRY: CHAIN_CONFIGS.hedera.contracts.agentRegistry!,
-  BRAND_VAULT: CHAIN_CONFIGS.hedera.contracts.brandVault!,
-  AGENT_TREASURY: CHAIN_CONFIGS.hedera.contracts.agentTreasury!,
-} as const;
-
-// Hedera-specific gas limit (kept for backward compatibility)
+// Legacy compatibility exports
+export const HEDERA_CONTRACTS = CONTRACTS;
 export const HEDERA_GAS_LIMIT = DEFAULT_GAS_LIMIT;
 
 /** Get contracts for a specific chain */
@@ -109,6 +113,21 @@ export const HEDERA_TREASURY_ABI = [
   "function reserveBalance() view returns (uint256)",
   "function agentAddress() view returns (address)",
   "function owner() view returns (address)",
+];
+
+// Agent Identity NFT ABI — Dynamic NFT for agent reputation
+export const AGENT_IDENTITY_NFT_ABI = [
+  "function mintAgentNFT(address agent, string asn, uint16 initialCreditScore, uint8 initialTrustScore) external returns (uint256)",
+  "function updateReputation(address agent, uint16 newCreditScore, uint8 newTrustScore) external",
+  "function batchUpdateReputation(address[] agents, uint16[] creditScores, uint8[] trustScores) external",
+  "function getTokenId(address agent) external view returns (uint256)",
+  "function getAgentIdentity(uint256 tokenId) external view returns (tuple(string asn, uint16 creditScore, uint8 trustScore, uint256 registeredAt, uint256 lastUpdated))",
+  "function hasNFT(address agent) external view returns (bool)",
+  "function getReputationTier(uint256 tokenId) external view returns (string)",
+  "function tokenURI(uint256 tokenId) external view returns (string)",
+  "function ownerOf(uint256 tokenId) external view returns (address)",
+  "event AgentNFTMinted(address indexed agent, uint256 indexed tokenId, string asn, uint256 timestamp)",
+  "event ReputationUpdated(uint256 indexed tokenId, uint16 creditScore, uint8 trustScore, uint256 timestamp)",
 ];
 
 // ============================================================
