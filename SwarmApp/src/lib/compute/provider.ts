@@ -321,9 +321,18 @@ export function getComputeProvider(providerKey?: ProviderKey | string): ComputeP
     || process.env.COMPUTE_PROVIDER
     || (process.env.E2B_API_KEY ? "e2b" : "stub");
 
-  // Fallback to stub if E2B is requested but no API key is present
+  // Fallbacks to stub for cloud providers if keys are missing
   if (key === "e2b" && !process.env.E2B_API_KEY) {
     console.warn("E2B_API_KEY is missing. Falling back from 'e2b' to 'stub' provider.");
+    key = "stub";
+  } else if (key === "azure" && !process.env.AZURE_SUBSCRIPTION_ID) {
+    console.warn("AZURE_SUBSCRIPTION_ID is missing. Falling back from 'azure' to 'stub' provider.");
+    key = "stub";
+  } else if (key === "aws" && !process.env.AWS_ACCESS_KEY_ID) {
+    console.warn("AWS_ACCESS_KEY_ID is missing. Falling back from 'aws' to 'stub' provider.");
+    key = "stub";
+  } else if (key === "gcp" && !process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+    console.warn("GOOGLE_APPLICATION_CREDENTIALS is missing. Falling back from 'gcp' to 'stub' provider.");
     key = "stub";
   }
 
