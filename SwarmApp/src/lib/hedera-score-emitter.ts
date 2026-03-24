@@ -13,6 +13,7 @@ import {
     createSkillReportEvent,
     createPenaltyEvent,
     createAdminOverrideEvent,
+    createFraudPenaltyEvent,
     type ScoreEvent,
 } from "./hedera-hcs-client";
 
