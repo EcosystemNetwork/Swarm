@@ -119,6 +119,23 @@ export async function checkAndSlashOverdueTasks(): Promise<SlashingEvent[]> {
         await recordSlashingEvent(slashingEvent);
         slashingEvents.push(slashingEvent);
 
+        // Auto-flag agent for credit ops review
+        try {
+            await flagAgentForReview({
+                agentId: task.assigneeAgentId,
+                asn: agent.asn,
+                agentAddress: agent.walletAddress,
+                orgId: (agent as Record<string, unknown>).orgId as string || "",
+                flagType: "slashing",
+                flagReason: `Auto-slash: ${reason.replace(/_/g, " ")} for task ${task.id} (${hoursLate.toFixed(1)}h late)`,
+                flaggedBy: "system",
+                sourceEventId: task.id,
+                priority: creditPenalty >= 30 ? "high" : "medium",
+            });
+        } catch (flagError) {
+            console.error("Failed to flag agent for review:", flagError);
+        }
+
         console.log(`⚔️ SLASHED ${agent.asn}: ${reason} (-${creditPenalty} credit, task ${task.id})`);
     }
 

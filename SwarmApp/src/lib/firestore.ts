@@ -753,7 +753,78 @@ export async function getOpenJobs(orgId: string): Promise<Job[]> {
 }
 
 export async function claimJob(jobId: string, agentId: string, orgId: string, projectId: string): Promise<string> {
-  // Update job status
+  // ── Credit Policy Enforcement ──────────────────────────────
+  const { resolveAgentPolicy } = await import("@/lib/auth-guard");
+  const { canClaimJob } = await import("@/lib/credit-policy");
+  const { getCreditPolicyConfig, recordPolicyEvent } = await import("@/lib/credit-policy-settings");
+
+  const config = await getCreditPolicyConfig();
+  const policyResult = await resolveAgentPolicy(agentId);
+
+  if (config.enforcementEnabled && config.enforceJobClaims && policyResult.ok && policyResult.policy) {
+    // Load job to check eligibility
+    const jobSnap = await getDoc(doc(db, "jobs", jobId));
+    if (!jobSnap.exists()) throw new Error("Job not found");
+    const jobCheck = { id: jobSnap.id, ...jobSnap.data() } as Job;
+
+    // Count active tasks for concurrent limit check
+    const activeQ = query(
+      collection(db, "tasks"),
+      where("assigneeAgentId", "==", agentId),
+      where("status", "in", ["todo", "in_progress"]),
+    );
+    const activeSnap = await getDocs(activeQ);
+    const activeCount = activeSnap.size;
+
+    const eligibility = canClaimJob(policyResult.policy, {
+      reward: jobCheck.reward,
+      priority: jobCheck.priority,
+      minPolicyTier: jobCheck.minPolicyTier,
+    }, activeCount);
+
+    if (!eligibility.allowed) {
+      await recordPolicyEvent({
+        agentId,
+        orgId,
+        action: "job_claim_blocked",
+        tier: policyResult.tier!,
+        details: { jobId, reason: eligibility.reason, activeCount },
+      });
+      throw new Error(`Policy violation: ${eligibility.reason}`);
+    }
+
+    // If manual review required, create approval instead of direct claim
+    if (policyResult.policy.requiresManualReview) {
+      const { createApproval } = await import("@/lib/approvals");
+      await createApproval({
+        orgId,
+        type: "job_dispatch",
+        title: `Job claim requires review: ${jobCheck.title}`,
+        description: `Agent ${agentId} (tier: ${policyResult.policy.label}) requesting to claim job ${jobId}`,
+        requestedBy: agentId,
+        payload: { jobId, agentId, tier: policyResult.tier },
+        priority: "medium",
+      });
+      await recordPolicyEvent({
+        agentId,
+        orgId,
+        action: "manual_review_required",
+        tier: policyResult.tier!,
+        details: { jobId },
+      });
+      throw new Error("Job claim requires manual approval for your current policy tier");
+    }
+
+    await recordPolicyEvent({
+      agentId,
+      orgId,
+      action: "job_claim_allowed",
+      tier: policyResult.tier!,
+      details: { jobId, activeCount },
+    });
+  }
+
+  // ── Original claim logic ───────────────────────────────────
   await updateDoc(doc(db, "jobs", jobId), {
     status: "in_progress",
     takenByAgentId: agentId,

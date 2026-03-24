@@ -103,6 +103,7 @@ const DEFAULT_SECTIONS: NavSection[] = [
     items: [
       { id: "command-center", href: "/command", label: "Command Center", icon: Command, badge: "NEW", maturity: "production" },
       { id: "dashboard", href: "/dashboard", label: "Analytics", icon: BarChart3, maturity: "production" },
+      { id: "credit", href: "/analytics/credit", label: "Credit", icon: TrendingUp, maturity: "production" },
       { id: "hbar", href: "/hbar", label: "Hedera", icon: Zap, maturity: "production" },
       { id: "activity", href: "/activity", label: "Activity", icon: Activity, maturity: "production" },
       { id: "doctor", href: "/doctor", label: "Health", icon: Stethoscope, maturity: "production" },

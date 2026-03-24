@@ -355,10 +355,10 @@ export async function resolveAgentPolicy(agentId: string): Promise<PolicyGuardRe
   const resolution = resolvePolicyTier({
     creditScore: agent.creditScore ?? 680,
     trustScore: agent.trustScore ?? 50,
-    fraudRiskScore: (agent as Record<string, unknown>).fraudRiskScore as number ?? 0,
-    riskFlags: ((agent as Record<string, unknown>).riskFlags as string[]) ?? [],
-    verificationLevel: ((agent as Record<string, unknown>).verificationLevel as "unverified" | "basic" | "verified" | "certified") ?? "unverified",
-    confidenceLevel: (agent as Record<string, unknown>).confidenceLevel as number | undefined,
+    fraudRiskScore: (agent as unknown as Record<string, unknown>).fraudRiskScore as number ?? 0,
+    riskFlags: ((agent as unknown as Record<string, unknown>).riskFlags as string[]) ?? [],
+    verificationLevel: ((agent as unknown as Record<string, unknown>).verificationLevel as "unverified" | "basic" | "verified" | "certified") ?? "unverified",
+    confidenceLevel: (agent as unknown as Record<string, unknown>).confidenceLevel as number | undefined,
   });
 
   // 4. Apply org-level overrides

@@ -15,7 +15,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { validateSession } from "@/lib/session";
 import { getJob, updateJob } from "@/lib/firestore";
 import { createJobBountyEscrow } from "@/lib/hedera-job-bounty";
-import { enforceCreditPolicy } from "@/lib/credit-enforcement";
+import { resolveAgentPolicy } from "@/lib/auth-guard";
+import { calculateRequiredEscrow } from "@/lib/credit-policy";
+import { getCreditPolicyConfig, recordPolicyEvent } from "@/lib/credit-policy-settings";
 
 export async function POST(req: NextRequest) {
   try {
@@ -47,23 +49,28 @@ export async function POST(req: NextRequest) {
     }
 
     // ── Credit Policy Enforcement ──
-    // If the job has been taken by an agent, check their credit policy
+    // Resolve claiming agent's tier for escrow ratio calculation
+    let appliedEscrowRatio: number | undefined;
     if (job.takenByAgentId) {
       try {
-        const enforcement = await enforceCreditPolicy(job.takenByAgentId, "accept_bounty", {
-          bountyHbar,
-        });
-        if (!enforcement.allowed) {
-          return NextResponse.json({
-            error: "Agent's credit score does not meet bounty requirements",
-            reason: enforcement.reason,
-            currentScore: enforcement.currentScore,
-            currentBand: enforcement.currentBand,
-          }, { status: 403 });
+        const config = await getCreditPolicyConfig();
+        const policyResult = await resolveAgentPolicy(job.takenByAgentId);
+
+        if (config.enforcementEnabled && config.enforceEscrow && policyResult.ok && policyResult.policy) {
+          const escrow = calculateRequiredEscrow(policyResult.policy, parseFloat(bountyHbar));
+          appliedEscrowRatio = escrow.escrowRatio;
+
+          await recordPolicyEvent({
+            agentId: job.takenByAgentId,
+            orgId: job.orgId,
+            action: "escrow_enforced",
+            tier: policyResult.tier!,
+            details: { jobId, bountyHbar, escrowRatio: escrow.escrowRatio, escrowAmount: escrow.escrowAmount },
+          });
         }
       } catch (err) {
         // Fail-open: log warning but don't block escrow creation
-        console.warn("[jobs/escrow/create] Credit enforcement check failed (fail-open):", err);
+        console.warn("[jobs/escrow/create] Credit policy check failed (fail-open):", err);
       }
     }
 

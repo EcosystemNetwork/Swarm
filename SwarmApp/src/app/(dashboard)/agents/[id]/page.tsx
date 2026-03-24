@@ -950,6 +950,9 @@ function AgentDetailPage() {
               </Badge>
             </div>
             <CardDescription>Agent Social Number — on-chain identity and credit scoring</CardDescription>
+            <Link href={`/agents/${agentId}/credit`} className="text-xs text-amber-600 hover:text-amber-500 hover:underline transition-colors mt-1 inline-block">
+              View Credit Details →
+            </Link>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">

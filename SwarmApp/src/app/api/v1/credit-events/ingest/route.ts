@@ -3,11 +3,10 @@
  *
  * Ingest one or more credit events into the canonical creditEvents collection.
  *
- * Auth: Internal service secret OR platform admin
+ * Auth: Internal service secret OR platform admin.
  *
  * Body (single): { event: CreditEventInput }
- * Body (batch):  { events: CreditEventInput[] }
- * Optional: { forwardToHCS: boolean }
+ * Body (batch):  { events: CreditEventInput[], forwardToHCS?: boolean }
  */
 
 import { NextRequest } from "next/server";
@@ -37,7 +36,7 @@ export async function POST(request: NextRequest) {
   const forwardToHCS = body.forwardToHCS === true;
 
   // Single event ingestion
-  if (body.event) {
+  if (body.event && typeof body.event === "object") {
     const result = await ingestCreditEvent(
       body.event as CreditEventInput,
       { forwardToHCS },

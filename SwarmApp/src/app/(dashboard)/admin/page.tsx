@@ -1,10 +1,11 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import Link from "next/link";
 import {
   ShieldAlert, Users, Flag, Server, Package, TrendingUp,
   Ban, CheckCircle, XCircle, Loader2, RefreshCw, ChevronDown,
-  AlertTriangle, Globe, Clock, Star,
+  AlertTriangle, Globe, Clock, Star, Scale, ArrowRight,
 } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -243,6 +244,23 @@ export default function AdminPage() {
           <StatCard icon={Server} label="Mod Services" value={stats.modServices} />
         </div>
       )}
+
+      {/* Credit Ops Quick Link */}
+      <Link
+        href="/admin/credit-ops"
+        className="flex items-center justify-between p-4 rounded-xl border border-cyan-500/30 bg-cyan-500/5 hover:bg-cyan-500/10 transition-colors"
+      >
+        <div className="flex items-center gap-3">
+          <Scale className="h-5 w-5 text-cyan-400" />
+          <div>
+            <p className="font-medium">Credit Operations</p>
+            <p className="text-xs text-muted-foreground">
+              Review queue, overrides, policies, appeals & monitoring
+            </p>
+          </div>
+        </div>
+        <ArrowRight className="h-4 w-4 text-muted-foreground" />
+      </Link>
 
       {/* Tabs */}
       <Tabs defaultValue="submissions">

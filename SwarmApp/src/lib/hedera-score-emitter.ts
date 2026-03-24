@@ -12,6 +12,7 @@ import {
     createTaskFailEvent,
     createSkillReportEvent,
     createPenaltyEvent,
+    createAdminOverrideEvent,
     type ScoreEvent,
 } from "./hedera-hcs-client";
 
@@ -96,5 +97,21 @@ export async function emitPenalty(
         // TODO: Implement Scheduled Transaction flow for governance
     }
 
+    await emitScoreEvent(event);
+}
+
+/**
+ * Emit an admin override event.
+ * Call this when a platform admin manually adjusts an agent's score.
+ */
+export async function emitAdminOverride(
+    asn: string,
+    agentAddress: string,
+    creditDelta: number,
+    trustDelta: number,
+    reason: string,
+    overrideId?: string,
+): Promise<void> {
+    const event = createAdminOverrideEvent(asn, agentAddress, creditDelta, trustDelta, reason, overrideId);
     await emitScoreEvent(event);
 }

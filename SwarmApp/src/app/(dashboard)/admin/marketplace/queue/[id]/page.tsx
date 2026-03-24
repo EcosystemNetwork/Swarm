@@ -270,6 +270,10 @@ export default function SubmissionDetailPage() {
                 {item.publisher.banned && (
                   <span className="text-xs ml-1 px-1 py-0.5 rounded bg-red-500/20 text-red-400">BANNED</span>
                 )}
+                <span className="text-muted-foreground ml-2">|</span>
+                <span className="text-xs ml-2 text-muted-foreground">
+                  Approved: {item.publisher.approvedCount}/{item.publisher.totalSubmissions}
+                </span>
               </div>
             )}
             {item.submittedAt && (

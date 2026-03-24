@@ -29,7 +29,7 @@ import {
 /** Score delta event — compact JSON submitted to HCS topic */
 export interface ScoreEvent {
     /** Event type */
-    type: "task_complete" | "task_fail" | "skill_report" | "penalty" | "bonus" | "checkpoint";
+    type: "task_complete" | "task_fail" | "skill_report" | "penalty" | "bonus" | "checkpoint" | "admin_override" | "fraud_penalty";
     /** Agent ASN */
     asn: string;
     /** Agent wallet address */
@@ -283,6 +283,51 @@ export function createCheckpointEvent(
             finalCreditScore,
             finalTrustScore,
         },
+    };
+}
+
+/**
+ * Create an admin override event.
+ * Records a manual score adjustment by a platform admin.
+ */
+export function createAdminOverrideEvent(
+    asn: string,
+    agentAddress: string,
+    creditDelta: number,
+    trustDelta: number,
+    reason: string,
+    overrideId?: string,
+): ScoreEvent {
+    return {
+        type: "admin_override",
+        asn,
+        agentAddress,
+        creditDelta,
+        trustDelta,
+        timestamp: Math.floor(Date.now() / 1000),
+        metadata: { reason, overrideId, adminAction: true },
+    };
+}
+
+/**
+ * Create a fraud penalty event.
+ * Records a penalty applied by the automated fraud detection system.
+ */
+export function createFraudPenaltyEvent(
+    asn: string,
+    agentAddress: string,
+    creditPenalty: number,
+    signalType: string,
+    scanRunId: string,
+): ScoreEvent {
+    return {
+        type: "fraud_penalty",
+        asn,
+        agentAddress,
+        creditDelta: -Math.abs(creditPenalty),
+        trustDelta: -Math.floor(Math.abs(creditPenalty) / 5),
+        timestamp: Math.floor(Date.now() / 1000),
+        metadata: { signalType, scanRunId, fraudDetected: true },
     };
 }
 

@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { TierBadgeTooltip } from "@/components/credit/tier-badge-tooltip";
 
 interface LeaderboardEntry {
     rank: number;
@@ -182,8 +183,8 @@ export default function MarketplaceAgentsPage() {
                                         <Card>
                                             <CardContent className="pt-6">
                                                 <div className="text-sm text-muted-foreground">Tier</div>
-                                                <div className="text-xl font-bold">
-                                                    {getTierIcon(selectedProfile.tier!)} {selectedProfile.tier}
+                                                <div className="mt-1">
+                                                    <TierBadgeTooltip creditScore={selectedProfile.creditScore!} />
                                                 </div>
                                             </CardContent>
                                         </Card>
@@ -288,9 +289,7 @@ export default function MarketplaceAgentsPage() {
                                         )}
                                     </div>
                                     <div className="flex items-center gap-2">
-                                        <Badge className={`${getTierColor(entry.tier)} border`}>
-                                            {getTierIcon(entry.tier)} {entry.tier}
-                                        </Badge>
+                                        <TierBadgeTooltip creditScore={entry.creditScore} />
                                         <div className="text-right">
                                             <div className="text-sm font-mono font-bold text-amber-600">
                                                 {entry.creditScore}
