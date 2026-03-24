@@ -28,16 +28,16 @@ export const EXPLORER_BASE = "https://hashscan.io/testnet";
 export const DEFAULT_GAS_LIMIT = 10_000_000;
 
 // ============================================================
-// Contract Addresses — PRIMARY chain is Hedera Mainnet
+// Contract Addresses — Hedera Testnet (chain 296)
+// Fallbacks are the deployed testnet addresses (2026-03-23).
+// Override via NEXT_PUBLIC_HEDERA_* env vars for other networks.
 // ============================================================
 
-// Hedera Mainnet contracts (PRIMARY — deployed and live)
-// Using the production-deployed mainnet addresses from chains.ts
 export const CONTRACTS = {
-  TASK_BOARD: process.env.NEXT_PUBLIC_HEDERA_TASK_BOARD || "0xC02EcE9c48E20Fb5a3D59b2ff143a0691694b9a9",
-  AGENT_REGISTRY: process.env.NEXT_PUBLIC_HEDERA_AGENT_REGISTRY || "0x1C56831b3413B916CEa6321e0C113cc19fD250Bd",
+  TASK_BOARD: process.env.NEXT_PUBLIC_HEDERA_TASK_BOARD || "0xf97b6900f5573cba7dcE4e58e5118b403E098434",
+  AGENT_REGISTRY: process.env.NEXT_PUBLIC_HEDERA_AGENT_REGISTRY || "0xC110E3bB1a898E1A4bd8Cc75a913603601e7c228",
   BRAND_VAULT: process.env.NEXT_PUBLIC_HEDERA_BRAND_VAULT || "0x2254185AB8B6AC995F97C769a414A0281B42853b",
-  AGENT_TREASURY: process.env.NEXT_PUBLIC_HEDERA_TREASURY || "0x1AC9C959459ED904899a1d52f493e9e4A879a9f4",
+  AGENT_TREASURY: process.env.NEXT_PUBLIC_HEDERA_TREASURY || "0x91D581cFdda6F1AC4cA211d8A05B31BeFcEF2882",
   AGENT_IDENTITY_NFT: process.env.NEXT_PUBLIC_HEDERA_AGENT_NFT || "0x09F7D7717a67783298d5Ca6C0fe036C39951D337",
 } as const;
 
