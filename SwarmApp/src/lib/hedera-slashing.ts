@@ -14,6 +14,7 @@
 import { db } from "@/lib/firebase";
 import { collection, query, where, getDocs, doc, updateDoc, serverTimestamp, addDoc } from "firebase/firestore";
 import { emitPenalty } from "./hedera-score-emitter";
+import { flagAgentForReview } from "./credit-ops/review";
 import type { Task, Agent } from "./firestore";
 
 // ═══════════════════════════════════════════════════════════════
