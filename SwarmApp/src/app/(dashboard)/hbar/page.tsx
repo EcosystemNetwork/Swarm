@@ -31,6 +31,9 @@ import {
 } from "@/lib/swarm-contracts";
 import { ethers } from "ethers";
 import { cn } from "@/lib/utils";
+import { db } from "@/lib/firebase";
+import { collection, query, where, onSnapshot } from "firebase/firestore";
+import type { Agent as FleetAgent } from "@/lib/firestore";
 import SpotlightCard from "@/components/reactbits/SpotlightCard";
 import CountUp from "@/components/reactbits/CountUp";
 
@@ -95,11 +98,26 @@ export default function HbarPage() {
   const [ocDeadlineDays, setOcDeadlineDays] = useState("7");
   const [deliveryInput, setDeliveryInput] = useState("");
 
-  // Agent registration dialog
+  // Agent registration dialog — pick from existing fleet agents
   const [registerOpen, setRegisterOpen] = useState(false);
-  const [ocAgentName, setOcAgentName] = useState("");
-  const [ocAgentSkills, setOcAgentSkills] = useState("");
+  const [fleetAgents, setFleetAgents] = useState<FleetAgent[]>([]);
+  const [selectedAgentId, setSelectedAgentId] = useState("");
   const [ocAgentFeeRate, setOcAgentFeeRate] = useState("500");
+
+  // Fetch org's fleet agents from Firestore
+  useEffect(() => {
+    if (!currentOrg?.id) { setFleetAgents([]); return; }
+    const q = query(collection(db, "agents"), where("orgId", "==", currentOrg.id));
+    const unsub = onSnapshot(q, (snap) => {
+      setFleetAgents(snap.docs.map(d => ({ id: d.id, ...d.data() } as FleetAgent)));
+    });
+    return () => unsub();
+  }, [currentOrg?.id]);
+
+  const selectedFleetAgent = fleetAgents.find(a => a.id === selectedAgentId);
+  const selectedAgentSkills = selectedFleetAgent
+    ? (selectedFleetAgent.reportedSkills?.map(s => s.name).join(", ") || selectedFleetAgent.type)
+    : "";
 
   // Memory tab state
   const [memAgentId, setMemAgentId] = useState("");
@@ -1469,7 +1487,7 @@ export default function HbarPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Register Agent Onchain */}
+      {/* Register Agent Onchain — pick from fleet */}
       <Dialog open={registerOpen} onOpenChange={setRegisterOpen}>
         <DialogContent>
           <DialogHeader>
@@ -1477,64 +1495,92 @@ export default function HbarPage() {
           </DialogHeader>
           <div className="space-y-4">
             <p className="text-xs text-muted-foreground">
-              Register your agent on the Hedera Testnet SwarmAgentRegistry smart contract.
+              Select one of your fleet agents to register on the Hedera SwarmAgentRegistry contract.
             </p>
-            <div>
-              <label className="text-xs font-medium mb-1 block">Agent Name <span className="text-red-500">*</span></label>
-              <Input
-                placeholder="e.g. Alpha Scout"
-                value={ocAgentName}
-                onChange={(e) => setOcAgentName(e.target.value)}
-              />
-            </div>
-            <div>
-              <label className="text-xs font-medium mb-1 block">Skills</label>
-              <Input
-                placeholder="e.g. Research, Trading, Analytics"
-                value={ocAgentSkills}
-                onChange={(e) => setOcAgentSkills(e.target.value)}
-              />
-            </div>
-            <div>
-              <label className="text-xs font-medium mb-1 block">Fee Rate (basis points)</label>
-              <Input
-                type="number"
-                placeholder="500 = 5%"
-                value={ocAgentFeeRate}
-                onChange={(e) => setOcAgentFeeRate(e.target.value)}
-                min="0"
-                max="10000"
-              />
-              <p className="text-[10px] text-muted-foreground mt-1">500 bps = 5% fee on completed tasks</p>
-            </div>
-            {swarmWrite.state.error && (
-              <p className="text-xs text-red-500">{swarmWrite.state.error}</p>
+
+            {fleetAgents.length === 0 ? (
+              <div className="text-center py-6">
+                <p className="text-sm text-muted-foreground mb-2">No agents in your fleet yet</p>
+                <p className="text-xs text-muted-foreground">Register agents on the <a href="/agents" className="text-emerald-500 underline underline-offset-2">Fleet page</a> first</p>
+              </div>
+            ) : (
+              <>
+                <div>
+                  <label className="text-xs font-medium mb-1 block">Select Agent <span className="text-red-500">*</span></label>
+                  <select
+                    className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm"
+                    value={selectedAgentId}
+                    onChange={(e) => setSelectedAgentId(e.target.value)}
+                  >
+                    <option value="">Choose an agent...</option>
+                    {fleetAgents.map((a) => (
+                      <option key={a.id} value={a.id}>
+                        {a.name} ({a.type}) {a.status === "online" ? " — online" : ""}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {selectedFleetAgent && (
+                  <div className="rounded-lg border border-border p-3 space-y-2 bg-muted/30">
+                    <div className="flex items-center gap-2">
+                      <div className={cn("h-2 w-2 rounded-full shrink-0", selectedFleetAgent.status === "online" ? "bg-emerald-400" : "bg-gray-400")} />
+                      <span className="text-sm font-medium">{selectedFleetAgent.name}</span>
+                      <Badge variant="outline" className="text-[10px]">{selectedFleetAgent.type}</Badge>
+                    </div>
+                    {selectedAgentSkills && (
+                      <p className="text-xs text-muted-foreground">Skills: {selectedAgentSkills}</p>
+                    )}
+                    {selectedFleetAgent.asn && (
+                      <p className="text-xs text-muted-foreground font-mono">ASN: {selectedFleetAgent.asn}</p>
+                    )}
+                  </div>
+                )}
+
+                <div>
+                  <label className="text-xs font-medium mb-1 block">Fee Rate (basis points)</label>
+                  <Input
+                    type="number"
+                    placeholder="500 = 5%"
+                    value={ocAgentFeeRate}
+                    onChange={(e) => setOcAgentFeeRate(e.target.value)}
+                    min="0"
+                    max="10000"
+                  />
+                  <p className="text-[10px] text-muted-foreground mt-1">500 bps = 5% fee on completed tasks</p>
+                </div>
+
+                {swarmWrite.state.error && (
+                  <p className="text-xs text-red-500">{swarmWrite.state.error}</p>
+                )}
+                {swarmWrite.state.txHash && (
+                  <p className="text-xs text-emerald-500">Registered! Tx: {swarmWrite.state.txHash.slice(0, 16)}...</p>
+                )}
+                <div className="flex gap-2 justify-end pt-2">
+                  <Button variant="outline" onClick={() => setRegisterOpen(false)} disabled={swarmWrite.state.isLoading}>Cancel</Button>
+                  <Button
+                    onClick={async () => {
+                      if (!selectedFleetAgent) return;
+                      const hash = await swarmWrite.registerAgent(
+                        selectedFleetAgent.name,
+                        selectedAgentSkills,
+                        parseInt(ocAgentFeeRate) || 500,
+                      );
+                      if (hash) {
+                        setSelectedAgentId("");
+                        setOcAgentFeeRate("500");
+                        swarm.refetch();
+                      }
+                    }}
+                    disabled={swarmWrite.state.isLoading || !selectedFleetAgent || !account}
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                  >
+                    {swarmWrite.state.isLoading ? "Registering..." : `Register ${selectedFleetAgent?.name || "Agent"} Onchain`}
+                  </Button>
+                </div>
+                {!account && !authAddress && <p className="text-[10px] text-muted-foreground text-center">Connect your wallet to register onchain</p>}
+              </>
             )}
-            {swarmWrite.state.txHash && (
-              <p className="text-xs text-emerald-500">Registered! Tx: {swarmWrite.state.txHash.slice(0, 16)}...</p>
-            )}
-            <div className="flex gap-2 justify-end pt-2">
-              <Button variant="outline" onClick={() => setRegisterOpen(false)} disabled={swarmWrite.state.isLoading}>Cancel</Button>
-              <Button
-                onClick={async () => {
-                  if (!ocAgentName.trim()) return;
-                  const hash = await swarmWrite.registerAgent(
-                    ocAgentName.trim(),
-                    ocAgentSkills.trim(),
-                    parseInt(ocAgentFeeRate) || 500,
-                  );
-                  if (hash) {
-                    setOcAgentName(""); setOcAgentSkills(""); setOcAgentFeeRate("500");
-                    swarm.refetch();
-                  }
-                }}
-                disabled={swarmWrite.state.isLoading || !ocAgentName.trim() || !account}
-                className="bg-emerald-600 hover:bg-emerald-700 text-white"
-              >
-                {swarmWrite.state.isLoading ? "Registering..." : "Register Onchain"}
-              </Button>
-            </div>
-            {!account && !authAddress && <p className="text-[10px] text-muted-foreground text-center">Connect your wallet to register onchain</p>}
           </div>
         </DialogContent>
       </Dialog>

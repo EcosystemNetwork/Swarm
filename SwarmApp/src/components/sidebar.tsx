@@ -153,7 +153,7 @@ const DEFAULT_SECTIONS: NavSection[] = [
     id: "modifications",
     label: "Modifications",
     items: [
-      { id: "hbar", href: "/hbar", label: "Hedera", icon: Zap, maturity: "production" },
+      { id: "mod-hbar-onchain", href: "/hbar", label: "HBAR", icon: Coins, maturity: "production" },
     ],
     accentColor: "cyan",
     collapsible: true,
