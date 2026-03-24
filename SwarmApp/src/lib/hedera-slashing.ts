@@ -12,7 +12,7 @@
  */
 
 import { db } from "@/lib/firebase";
-import { collection, query, where, getDocs, doc, updateDoc, serverTimestamp } from "firebase/firestore";
+import { collection, query, where, getDocs, doc, updateDoc, serverTimestamp, addDoc } from "firebase/firestore";
 import { emitPenalty } from "./hedera-score-emitter";
 import type { Task, Agent } from "./firestore";
 
@@ -139,7 +139,7 @@ async function checkIfAlreadySlashed(taskId: string): Promise<boolean> {
  */
 async function recordSlashingEvent(event: SlashingEvent): Promise<void> {
     const slashingRef = collection(db, "slashingEvents");
-    await doc(slashingRef).set(event);
+    await addDoc(slashingRef, event);
 }
 
 /**

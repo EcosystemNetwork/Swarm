@@ -19,6 +19,7 @@ import {
   TrendingUp, DollarSign, Settings2, Database,
 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { MaturityBadge } from "@/components/ui/maturity-badge";
 
 /** Map iconName strings from sidebarConfig to lucide components */
 const ICON_MAP: Record<string, typeof LayoutDashboard> = {
@@ -53,6 +54,8 @@ export interface NavItem {
   label: string;
   icon: typeof LayoutDashboard;
   badge?: string;
+  /** Production readiness status */
+  maturity?: "production" | "beta" | "experimental" | "planned";
   /** Child mods rendered indented under this item */
   children?: NavItem[];
 }
@@ -90,29 +93,52 @@ const SECTION_COLORS: Record<string, { activeBg: string; activeText: string; act
 };
 
 const DEFAULT_SECTIONS: NavSection[] = [
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // OPERATOR JOBS — Navigation organized around what you DO, not features
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   {
-    id: "navigate",
-    label: "Navigate",
+    id: "command",
+    label: "Command",
     items: [
-      { id: "dashboard", href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-      { id: "projects", href: "/swarms", label: "Projects", icon: FolderKanban },
-      { id: "agents", href: "/agents", label: "Agents", icon: Users },
-      { id: "channels", href: "/chat", label: "Channels", icon: MessageSquare },
-      { id: "jobs", href: "/jobs", label: "Jobs", icon: Briefcase },
+      { id: "command-center", href: "/command", label: "Command Center", icon: Command, badge: "NEW", maturity: "production" },
+      { id: "dashboard", href: "/dashboard", label: "Analytics", icon: BarChart3, maturity: "production" },
+      { id: "hbar", href: "/hbar", label: "Hedera", icon: Zap, maturity: "production" },
     ],
   },
   {
-    id: "operate",
-    label: "Operate",
+    id: "deploy",
+    label: "Deploy",
     collapsible: true,
     items: [
-      { id: "board", href: "/kanban", label: "Boards", icon: LayoutGrid },
-      { id: "approvals", href: "/approvals", label: "Approvals", icon: Shield },
-      { id: "operators", href: "/operators", label: "Operators", icon: UserCog },
-      { id: "cron", href: "/cron", label: "Scheduler", icon: Clock },
-      { id: "workflows", href: "/workflows", label: "Workflows", icon: Zap },
-      { id: "market", href: "/market", label: "Market", icon: Store },
-      { id: "publisher", href: "/market/publisher", label: "Publisher", icon: TrendingUp },
+      { id: "agents", href: "/agents", label: "Fleet", icon: Users, maturity: "production" },
+      { id: "projects", href: "/swarms", label: "Projects", icon: FolderKanban, maturity: "production" },
+      { id: "market", href: "/market", label: "Marketplace", icon: Store, maturity: "production" },
+      { id: "operators", href: "/operators", label: "Team", icon: UserCog, maturity: "production" },
+    ],
+  },
+  {
+    id: "coordinate",
+    label: "Coordinate",
+    collapsible: true,
+    items: [
+      { id: "board", href: "/kanban", label: "Task Board", icon: LayoutGrid, maturity: "production" },
+      { id: "jobs", href: "/jobs", label: "Job Board", icon: Briefcase, maturity: "production" },
+      { id: "channels", href: "/chat", label: "Channels", icon: MessageSquare, maturity: "production" },
+      { id: "approvals", href: "/approvals", label: "Approvals", icon: Shield, maturity: "production" },
+      { id: "workflows", href: "/workflows", label: "Workflows", icon: Zap, maturity: "beta" },
+      { id: "cron", href: "/cron", label: "Scheduler", icon: Clock, maturity: "production" },
+    ],
+  },
+  {
+    id: "monitor",
+    label: "Monitor",
+    collapsible: true,
+    items: [
+      { id: "activity", href: "/activity", label: "Activity", icon: Activity, maturity: "production" },
+      { id: "doctor", href: "/doctor", label: "Health", icon: Stethoscope, maturity: "production" },
+      { id: "metrics", href: "/metrics", label: "Metrics", icon: BarChart3, maturity: "beta" },
+      { id: "agent-map", href: "/agent-map", label: "Agent Map", icon: Map, maturity: "production" },
+      { id: "logs", href: "/logs", label: "Logs", icon: FileText, maturity: "production" },
     ],
   },
   {
@@ -120,23 +146,11 @@ const DEFAULT_SECTIONS: NavSection[] = [
     label: "Compute",
     collapsible: true,
     items: [
-      { id: "compute-overview", href: "/compute", label: "Overview", icon: Monitor },
-      { id: "compute-workspaces", href: "/compute/workspaces", label: "Workspaces", icon: FolderKanban },
-      { id: "compute-computers", href: "/compute/computers", label: "Computers", icon: HardDrive },
-      { id: "compute-templates", href: "/compute/templates", label: "Templates", icon: LayoutGrid },
-      { id: "compute-sessions", href: "/compute/sessions", label: "Sessions", icon: Clock },
-    ],
-  },
-  {
-    id: "observe",
-    label: "Observe",
-    collapsible: true,
-    items: [
-      { id: "activity", href: "/activity", label: "Activity", icon: Activity },
-      { id: "metrics", href: "/metrics", label: "Metrics", icon: BarChart3 },
-      { id: "usage", href: "/usage", label: "Usage", icon: Coins },
-      { id: "storage", href: "/usage/storage", label: "Storage", icon: Package },
-      { id: "agent-map", href: "/agent-map", label: "Agent Map", icon: Map },
+      { id: "compute-overview", href: "/compute", label: "Overview", icon: Monitor, maturity: "production" },
+      { id: "compute-computers", href: "/compute/computers", label: "Computers", icon: HardDrive, maturity: "production" },
+      { id: "compute-workspaces", href: "/compute/workspaces", label: "Workspaces", icon: FolderKanban, maturity: "beta" },
+      { id: "compute-templates", href: "/compute/templates", label: "Templates", icon: LayoutGrid, maturity: "beta" },
+      { id: "compute-sessions", href: "/compute/sessions", label: "Sessions", icon: Clock, maturity: "beta" },
     ],
   },
   {
@@ -145,14 +159,15 @@ const DEFAULT_SECTIONS: NavSection[] = [
     collapsible: true,
     defaultCollapsed: true,
     items: [
-      { id: "organizations", href: "/organizations", label: "Orgs", icon: Building2 },
-      { id: "cerebro", href: "/cerebro", label: "Cerebro", icon: Brain },
-      { id: "memory", href: "/memory", label: "Memory", icon: HardDrive },
-      { id: "artifacts", href: "/memory?tab=artifacts", label: "Artifacts", icon: Package },
-      { id: "logs", href: "/logs", label: "Logs", icon: FileText },
-      { id: "gateways", href: "/gateways", label: "Gateways", icon: Network },
-      { id: "doctor", href: "/doctor", label: "Health", icon: Stethoscope },
-      { id: "swarm", href: "/swarm", label: "Swarm", icon: Zap },
+      { id: "organizations", href: "/organizations", label: "Organizations", icon: Building2, maturity: "production" },
+      { id: "usage", href: "/usage", label: "Usage & Billing", icon: Coins, maturity: "beta" },
+      { id: "storage", href: "/usage/storage", label: "Storage", icon: Package, maturity: "production" },
+      { id: "cerebro", href: "/cerebro", label: "Cerebro", icon: Brain, maturity: "production" },
+      { id: "memory", href: "/memory", label: "Memory", icon: HardDrive, maturity: "production" },
+      { id: "artifacts", href: "/memory?tab=artifacts", label: "Artifacts", icon: Package, maturity: "production" },
+      { id: "gateways", href: "/gateways", label: "Gateways", icon: Network, maturity: "beta" },
+      { id: "publisher", href: "/market/publisher", label: "Publisher", icon: TrendingUp, maturity: "production" },
+      { id: "swarm", href: "/swarm", label: "Swarm Protocol", icon: Zap, maturity: "beta" },
     ],
   },
   {
@@ -811,11 +826,14 @@ export function Sidebar() {
                           <GripVertical className="h-2.5 w-2.5 text-muted-foreground/0 group-hover/item:text-muted-foreground/40 transition-colors shrink-0 cursor-grab active:cursor-grabbing" />
                           <item.icon className="shrink-0 h-4 w-4" />
                           <span className="truncate">{item.label}</span>
-                          {item.badge && (
-                            <span className={cn("ml-auto text-[9px] px-1.5 py-0.5 rounded-full font-medium", colors.badgeBg, colors.badgeText)}>
-                              {item.badge}
-                            </span>
-                          )}
+                          <div className="ml-auto flex items-center gap-1">
+                            {item.maturity && <MaturityBadge level={item.maturity} />}
+                            {item.badge && (
+                              <span className={cn("text-[9px] px-1.5 py-0.5 rounded-full font-medium", colors.badgeBg, colors.badgeText)}>
+                                {item.badge}
+                              </span>
+                            )}
+                          </div>
                         </Link>
                       )}
                     </div>,
