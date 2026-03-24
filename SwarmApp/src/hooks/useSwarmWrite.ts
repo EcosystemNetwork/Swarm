@@ -37,11 +37,45 @@ interface SwarmWrite {
   reset: () => void;
 }
 
+const HEDERA_TESTNET_CHAIN_ID = 296;
+const HEDERA_TESTNET_HEX = "0x" + HEDERA_TESTNET_CHAIN_ID.toString(16); // "0x128"
+
 async function getSigner(): Promise<ethers.Signer> {
   if (typeof window === "undefined" || !window.ethereum) {
     throw new Error("No wallet detected. Please connect your wallet.");
   }
+
   const provider = new ethers.BrowserProvider(window.ethereum);
+  const network = await provider.getNetwork();
+
+  if (Number(network.chainId) !== HEDERA_TESTNET_CHAIN_ID) {
+    // Try switching to Hedera Testnet
+    try {
+      await window.ethereum.request({
+        method: "wallet_switchEthereumChain",
+        params: [{ chainId: HEDERA_TESTNET_HEX }],
+      });
+    } catch (switchErr: any) {
+      // Chain not added yet — add it
+      if (switchErr?.code === 4902) {
+        await window.ethereum.request({
+          method: "wallet_addEthereumChain",
+          params: [{
+            chainId: HEDERA_TESTNET_HEX,
+            chainName: "Hedera Testnet",
+            nativeCurrency: { name: "HBAR", symbol: "HBAR", decimals: 18 },
+            rpcUrls: ["https://testnet.hashio.io/api"],
+            blockExplorerUrls: ["https://hashscan.io/testnet"],
+          }],
+        });
+      } else {
+        throw new Error("Please switch your wallet to Hedera Testnet (chain 296) to continue.");
+      }
+    }
+    // Re-create provider after network switch
+    return new ethers.BrowserProvider(window.ethereum).getSigner();
+  }
+
   return provider.getSigner();
 }
 
