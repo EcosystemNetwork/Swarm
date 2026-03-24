@@ -10,7 +10,10 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { useSession } from "@/contexts/SessionContext";
 
-const PLATFORM_ADMIN_ADDRESS = "0x723708273e811a07d90d2e81e799b9Ab27F0B549".toLowerCase();
+const PLATFORM_ADMIN_ADDRESSES = [
+  "0x723708273e811a07d90d2e81e799b9Ab27F0B549",
+  "0xFa086eE8EF6bf6C96AfB79Da7a691eFc1c0c24ba",
+].map(addr => addr.toLowerCase());
 
 // ── Types ──
 
@@ -82,7 +85,7 @@ const TIER_COLORS: Record<number, string> = {
 
 export default function AdminPage() {
   const { address: sessionAddress, authenticated } = useSession();
-  const isAdmin = sessionAddress?.toLowerCase() === PLATFORM_ADMIN_ADDRESS;
+  const isAdmin = sessionAddress ? PLATFORM_ADMIN_ADDRESSES.includes(sessionAddress.toLowerCase()) : false;
 
   const [stats, setStats] = useState<OverviewStats | null>(null);
   const [publishers, setPublishers] = useState<Publisher[]>([]);

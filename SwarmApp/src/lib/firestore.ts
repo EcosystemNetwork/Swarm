@@ -61,6 +61,17 @@ export interface Organization {
   hcsVerifiedAt?: unknown;
   /** Whether org ownership has been verified on HCS */
   hcsOwnershipVerified?: boolean;
+  // Hedera org share tokens (ERC20)
+  /** Hedera Token ID for org shares (0.0.xxxxx) */
+  shareTokenId?: string;
+  /** EVM address for the share token */
+  shareTokenAddress?: string;
+  /** Share token symbol (e.g., ACME) */
+  shareTokenSymbol?: string;
+  /** Total supply of shares issued */
+  shareTotalSupply?: string;
+  /** When shares were issued */
+  sharesIssuedAt?: unknown;
 }
 
 export interface GitHubRepoLink {

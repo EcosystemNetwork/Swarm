@@ -94,15 +94,20 @@ const SECTION_COLORS: Record<string, { activeBg: string; activeText: string; act
 
 const DEFAULT_SECTIONS: NavSection[] = [
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  // OPERATOR JOBS — Navigation organized around what you DO, not features
+  // STREAMLINED NAVIGATION — Consolidated for clarity (40% fewer items)
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   {
     id: "command",
     label: "Command",
+    collapsible: true,
     items: [
       { id: "command-center", href: "/command", label: "Command Center", icon: Command, badge: "NEW", maturity: "production" },
       { id: "dashboard", href: "/dashboard", label: "Analytics", icon: BarChart3, maturity: "production" },
       { id: "hbar", href: "/hbar", label: "Hedera", icon: Zap, maturity: "production" },
+      { id: "activity", href: "/activity", label: "Activity", icon: Activity, maturity: "production" },
+      { id: "doctor", href: "/doctor", label: "Health", icon: Stethoscope, maturity: "production" },
+      { id: "agent-map", href: "/agent-map", label: "Agent Map", icon: Map, maturity: "production" },
+      { id: "logs", href: "/logs", label: "Logs", icon: FileText, maturity: "production" },
     ],
   },
   {
@@ -114,6 +119,9 @@ const DEFAULT_SECTIONS: NavSection[] = [
       { id: "projects", href: "/swarms", label: "Projects", icon: FolderKanban, maturity: "production" },
       { id: "market", href: "/market", label: "Marketplace", icon: Store, maturity: "production" },
       { id: "operators", href: "/operators", label: "Team", icon: UserCog, maturity: "production" },
+      { id: "compute-overview", href: "/compute", label: "Compute", icon: Monitor, maturity: "production" },
+      { id: "compute-computers", href: "/compute/computers", label: "Computers", icon: HardDrive, maturity: "production" },
+      { id: "compute-workspaces", href: "/compute/workspaces", label: "Workspaces", icon: FolderKanban, maturity: "beta" },
     ],
   },
   {
@@ -130,30 +138,6 @@ const DEFAULT_SECTIONS: NavSection[] = [
     ],
   },
   {
-    id: "monitor",
-    label: "Monitor",
-    collapsible: true,
-    items: [
-      { id: "activity", href: "/activity", label: "Activity", icon: Activity, maturity: "production" },
-      { id: "doctor", href: "/doctor", label: "Health", icon: Stethoscope, maturity: "production" },
-      { id: "metrics", href: "/metrics", label: "Metrics", icon: BarChart3, maturity: "beta" },
-      { id: "agent-map", href: "/agent-map", label: "Agent Map", icon: Map, maturity: "production" },
-      { id: "logs", href: "/logs", label: "Logs", icon: FileText, maturity: "production" },
-    ],
-  },
-  {
-    id: "compute",
-    label: "Compute",
-    collapsible: true,
-    items: [
-      { id: "compute-overview", href: "/compute", label: "Overview", icon: Monitor, maturity: "production" },
-      { id: "compute-computers", href: "/compute/computers", label: "Computers", icon: HardDrive, maturity: "production" },
-      { id: "compute-workspaces", href: "/compute/workspaces", label: "Workspaces", icon: FolderKanban, maturity: "beta" },
-      { id: "compute-templates", href: "/compute/templates", label: "Templates", icon: LayoutGrid, maturity: "beta" },
-      { id: "compute-sessions", href: "/compute/sessions", label: "Sessions", icon: Clock, maturity: "beta" },
-    ],
-  },
-  {
     id: "platform",
     label: "Platform",
     collapsible: true,
@@ -161,13 +145,9 @@ const DEFAULT_SECTIONS: NavSection[] = [
     items: [
       { id: "organizations", href: "/organizations", label: "Organizations", icon: Building2, maturity: "production" },
       { id: "usage", href: "/usage", label: "Usage & Billing", icon: Coins, maturity: "beta" },
-      { id: "storage", href: "/usage/storage", label: "Storage", icon: Package, maturity: "production" },
+      { id: "storage", href: "/usage/storage", label: "Storage", icon: Database, maturity: "production" },
       { id: "cerebro", href: "/cerebro", label: "Cerebro", icon: Brain, maturity: "production" },
-      { id: "memory", href: "/memory", label: "Memory", icon: HardDrive, maturity: "production" },
-      { id: "artifacts", href: "/memory?tab=artifacts", label: "Artifacts", icon: Package, maturity: "production" },
-      { id: "gateways", href: "/gateways", label: "Gateways", icon: Network, maturity: "beta" },
       { id: "publisher", href: "/market/publisher", label: "Publisher", icon: TrendingUp, maturity: "production" },
-      { id: "swarm", href: "/swarm", label: "Swarm Protocol", icon: Zap, maturity: "beta" },
     ],
   },
   {
@@ -359,7 +339,7 @@ export function Sidebar() {
         }
       }
 
-      // Platform admin section
+      // Platform admin section (streamlined - use tabs on pages instead of nested children)
       const hasAdminSection = next.some(s => s.id === "admin");
       if (isAdmin && !hasAdminSection) {
         next = [...next, {
@@ -369,23 +349,7 @@ export function Sidebar() {
           collapsible: true,
           items: [
             { id: "admin-dashboard", href: "/admin", label: "Dashboard", icon: ShieldAlert },
-            {
-              id: "admin-marketplace", href: "/admin/marketplace", label: "Marketplace", icon: Store,
-              children: [
-                { id: "admin-mkt-overview", href: "/admin/marketplace", label: "Overview", icon: BarChart3 },
-                { id: "admin-mkt-queue", href: "/admin/marketplace/queue", label: "Queue", icon: Clock },
-                { id: "admin-mkt-listings", href: "/admin/marketplace/listings", label: "Listings", icon: Package },
-                { id: "admin-mkt-publishers", href: "/admin/marketplace/publishers", label: "Publishers", icon: Users },
-                { id: "admin-mkt-reports", href: "/admin/marketplace/reports", label: "Reports", icon: Flag },
-                { id: "admin-mkt-versions", href: "/admin/marketplace/versions", label: "Versions", icon: History },
-                { id: "admin-mkt-security", href: "/admin/marketplace/security", label: "Security", icon: Shield },
-                { id: "admin-mkt-rankings", href: "/admin/marketplace/rankings", label: "Rankings", icon: TrendingUp },
-                { id: "admin-mkt-revenue", href: "/admin/marketplace/revenue", label: "Revenue", icon: DollarSign },
-                { id: "admin-mkt-settings", href: "/admin/marketplace/settings", label: "Settings", icon: Settings2 },
-                { id: "admin-mkt-registry", href: "/admin/marketplace/registry", label: "Registry", icon: Database },
-                { id: "admin-mkt-audit", href: "/admin/marketplace/audit", label: "Audit Log", icon: FileText },
-              ],
-            },
+            { id: "admin-marketplace", href: "/admin/marketplace", label: "Marketplace", icon: Store },
             { id: "admin-compute", href: "/compute/admin", label: "Compute", icon: HardDrive },
           ],
         }];
