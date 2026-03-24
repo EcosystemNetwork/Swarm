@@ -900,6 +900,27 @@ export const SKILL_REGISTRY: Skill[] = [
         pricing: { model: "free" },
     },
 
+    // ── OpenClaw Office Sim ──
+    {
+        id: "openclaw-office-sim",
+        name: "OpenClaw Office Sim",
+        description: "Spatial visualization of your agent fleet — watch AI agents work in a living 2D/3D virtual office with real-time status, collaboration lines, and ops panels.",
+        type: "mod",
+        source: "verified",
+        category: "Visualization",
+        icon: "🏢",
+        version: "0.1.0",
+        author: "Swarm Core",
+        tags: ["office", "visualization", "agents", "3d", "spatial", "monitoring", "premium"],
+        pricing: { model: "subscription", tiers: [{ plan: "monthly", price: 9.99, currency: "USD" }] },
+        sidebarConfig: {
+            sectionId: "modifications",
+            label: "Office Sim",
+            href: "/mods/office-sim",
+            iconName: "Monitor",
+        },
+    },
+
     // ── Mecha LaunchPad Skin ──
     {
         id: "skin-mecha",

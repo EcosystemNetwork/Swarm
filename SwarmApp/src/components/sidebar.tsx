@@ -35,6 +35,7 @@ const ICON_MAP: Record<string, typeof LayoutDashboard> = {
   Sparkles: Sparkles,
   Bot: Bot,
   ShieldAlert: ShieldAlert,
+  Monitor: Monitor,
 };
 
 /** Default icon per item type for mods without explicit sidebarConfig */
