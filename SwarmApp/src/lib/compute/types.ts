@@ -123,7 +123,7 @@ export const PROVIDER_LABELS: Record<ProviderKey, { label: string; description: 
   e2b:   { label: "E2B Desktop",        description: "Managed cloud sandbox — fastest setup, built-in VNC" },
   aws:   { label: "AWS EC2",            description: "Amazon EC2 — widest region coverage, SSM integration", comingSoon: true },
   gcp:   { label: "GCP Compute Engine", description: "Google Compute Engine — strong ML/data tooling", comingSoon: true },
-  "swarm-node": { label: "Swarm Node",    description: "Decentralized worker node from the Swarm network", comingSoon: true },
+  "swarm-node": { label: "Swarm Node",    description: "Decentralized worker nodes from the Swarm network" },
   stub:  { label: "Development",         description: "Local stub provider for development" },
 };
 

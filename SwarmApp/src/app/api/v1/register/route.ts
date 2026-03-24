@@ -410,6 +410,10 @@ export async function POST(request: NextRequest) {
             trustScore: initialTrustScore,
             onChainRegistered: false,
             restoredFromBackup: preRestoreResult.restored,
+            // 🔒 PRIVACY: All agents are PRIVATE by default
+            privacyLevel: "private",
+            allowPublicProfile: false,
+            allowPublicScores: false,
             ...(preRestoreResult.restored ? { restoredAt: serverTimestamp() } : {}),
             lastSeen: serverTimestamp(),
             createdAt: serverTimestamp(),

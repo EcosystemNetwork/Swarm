@@ -121,6 +121,12 @@ export interface Agent {
   restoredFromBackup?: boolean;
   /** When the agent was restored from backup */
   restoredAt?: unknown;
+  /** Privacy level: private (default), organization, or public */
+  privacyLevel?: "private" | "organization" | "public";
+  /** Allow public profile (name, bio, skills) */
+  allowPublicProfile?: boolean;
+  /** Allow public reputation scores */
+  allowPublicScores?: boolean;
   /** Parent agent ID (if this agent is a child) */
   parentAgentId?: string;
   /** Child agent IDs (if this agent is a parent) */
