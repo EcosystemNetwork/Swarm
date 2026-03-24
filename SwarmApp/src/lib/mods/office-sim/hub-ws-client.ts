@@ -8,7 +8,7 @@
 import { EventEmitter } from "events";
 import crypto from "crypto";
 
-const HUB_URL = process.env.SWARM_HUB_URL || "http://swarm.perkos.xyz:8400";
+const HUB_URL = process.env.SWARM_HUB_URL || "https://swarmprotocol.fun";
 const SERVICE_AGENT_ID = process.env.OFFICE_SIM_SERVICE_AGENT_ID || "";
 const SERVICE_PRIVATE_KEY = process.env.OFFICE_SIM_SERVICE_PRIVATE_KEY || "";
 

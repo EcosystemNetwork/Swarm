@@ -322,7 +322,7 @@ function parseSkills(skillsStr) {
 // ---------------------------------------------------------------------------
 
 async function cmdRegister() {
-  let hubUrl = arg("--hub") || "https://swarm.perkos.xyz";
+  let hubUrl = arg("--hub") || "https://swarmprotocol.fun";
   let orgId = arg("--org");
   let name = arg("--name");
   let type = arg("--type") || "agent";

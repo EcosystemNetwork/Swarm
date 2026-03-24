@@ -14,7 +14,7 @@ import { NextRequest } from "next/server";
 import { getWalletAddress } from "@/lib/auth-guard";
 import { getAgentsByOrg } from "@/lib/firestore";
 
-const HUB_URL = process.env.SWARM_HUB_URL || "http://swarm.perkos.xyz:8400";
+const HUB_URL = process.env.SWARM_HUB_URL || "https://swarmprotocol.fun";
 
 interface HubOnlineAgent {
   agentId: string;

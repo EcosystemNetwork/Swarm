@@ -23,7 +23,6 @@ Add these to your ad blocker whitelist:
 Add exception for:
 - `swarmprotocol.fun`
 - `swarm-protocol.xyz`
-- `swarm.perkos.xyz`
 
 #### Option C: Use different browser profile
 Open Swarm in:

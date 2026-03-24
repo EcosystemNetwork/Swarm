@@ -490,7 +490,7 @@ Pre-designed, high-quality office themes with matched 3D assets. Available at an
 
 ```
 ┌───────────────┐     ┌──────────────────────────┐
-│  Browser       │────▶│  swarm.perkos.xyz          │
+│  Browser       │────▶│  swarmprotocol.fun           │
 │                │     │                            │
 │                │     │  Swarm Hub (managed)       │
 │                │     │  Office Sim (managed)      │
