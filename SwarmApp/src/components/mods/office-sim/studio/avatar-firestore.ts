@@ -178,6 +178,7 @@ function taskToAvatarData(
     modelUrl: task.meshy?.gatewayUrl,
     animationUrls: Object.keys(animationUrls).length > 0 ? animationUrls : undefined,
     spriteUrl: task.comfyui?.gatewayUrl,
+    spriteSheetUrl: task.comfyui?.sheetGatewayUrl,
     prompt: task.prompt,
     generatedAt: toTimestamp(task.completedAt) || toTimestamp(task.updatedAt),
   };

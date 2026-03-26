@@ -15,6 +15,12 @@ import { DEFAULT_ART_SLOTS, ART_PIPELINE, ART_LABELS } from "./studio/art-types"
 import type { ArtSlot, OfficeArtPieceData } from "./studio/art-types";
 import { ArtCustomizeDialog } from "./studio/ArtCustomizeDialog";
 import { useOrg } from "@/contexts/OrgContext";
+import {
+  EXPANDED_SPRITE_CONFIG,
+  ANIM_ROWS,
+  ANIM_SPEEDS,
+} from "./engine/sprite-system";
+import type { SpriteAnimationType } from "./engine/sprite-system";
 
 /* ═══════════════════════════════════════
    Constants
@@ -23,6 +29,31 @@ import { useOrg } from "@/contexts/OrgContext";
 const CEO_SIZE = 14;
 const CEO_SPEED = 3;
 const PARTICLE_TICK_MS = 40;
+
+/** Map agent visual status to the expanded sprite animation type */
+function getAnimationType(status: AgentVisualStatus): SpriteAnimationType {
+  switch (status) {
+    case "active":
+    case "tool_calling":
+      return "working";
+    case "thinking":
+      return "thinking";
+    case "speaking":
+      return "talking";
+    case "error":
+      return "error";
+    case "blocked":
+      return "error";
+    case "spawning":
+      return "spawning";
+    case "idle":
+      return "idle";
+    case "offline":
+      return "idle";
+    default:
+      return "idle";
+  }
+}
 
 /* ═══════════════════════════════════════
    Main Component
@@ -609,7 +640,14 @@ function DeskSvg({
 
       {/* Agent avatar indicator */}
       {agent && agent.status !== "offline" && (
-        agent.spriteUrl ? (
+        agent.spriteSheetUrl ? (
+          <AnimatedSpriteSvg
+            spriteSheetUrl={agent.spriteSheetUrl}
+            x={x + 16}
+            y={y + 20}
+            status={agent.status}
+          />
+        ) : agent.spriteUrl ? (
           <image
             href={agent.spriteUrl}
             x={x + 24}
@@ -889,6 +927,74 @@ function ArtSlotSvg({ slot, artData, canvasW, theme, onClick }: {
         <animate attributeName="stroke-opacity" values="0.3;0.6;0.3" dur="2s" repeatCount="indefinite" />
       </rect>
     </g>
+  );
+}
+
+/**
+ * AnimatedSpriteSvg — Renders an animated sprite sheet inside SVG using foreignObject.
+ *
+ * Supports the expanded 10-row sprite sheet format:
+ *   Rows 0-3: Walk (down/left/right/up)
+ *   Row 4: Idle    Row 5: Working    Row 6: Thinking
+ *   Row 7: Talking Row 8: Error      Row 9: Spawning
+ *
+ * Uses CSS background-position to display the correct frame, animated via setInterval.
+ */
+function AnimatedSpriteSvg({
+  spriteSheetUrl,
+  x,
+  y,
+  status,
+}: {
+  spriteSheetUrl: string;
+  x: number;
+  y: number;
+  status: AgentVisualStatus;
+}) {
+  const frameRef = useRef(0);
+  const [frameIndex, setFrameIndex] = useState(0);
+  const animType = getAnimationType(status);
+
+  const { frameWidth, frameHeight, framesPerRow, totalRows } = EXPANDED_SPRITE_CONFIG;
+  const row = ANIM_ROWS[animType];
+  const speed = ANIM_SPEEDS[animType];
+
+  // Animate frame cycling — all animation types animate (idle has slow breathing)
+  useEffect(() => {
+    frameRef.current = 0;
+    setFrameIndex(0);
+    const tick = setInterval(() => {
+      frameRef.current = (frameRef.current + 1) % framesPerRow;
+      setFrameIndex(frameRef.current);
+    }, speed);
+    return () => clearInterval(tick);
+  }, [animType, speed, framesPerRow]);
+
+  // Display size in the SVG (1:1 with sprite frame)
+  const displayW = frameWidth;  // 48
+  const displayH = frameHeight; // 64
+
+  // Total sprite sheet pixel dimensions
+  const sheetW = frameWidth * framesPerRow;   // 288
+  const sheetH = frameHeight * totalRows;     // 640
+
+  const bgX = -(frameIndex * frameWidth);
+  const bgY = -(row * frameHeight);
+
+  return (
+    <foreignObject x={x} y={y} width={displayW} height={displayH}>
+      <div
+        style={{
+          width: displayW,
+          height: displayH,
+          backgroundImage: `url(${spriteSheetUrl})`,
+          backgroundPosition: `${bgX}px ${bgY}px`,
+          backgroundSize: `${sheetW}px ${sheetH}px`,
+          backgroundRepeat: "no-repeat",
+          imageRendering: "pixelated",
+        }}
+      />
+    </foreignObject>
   );
 }
 

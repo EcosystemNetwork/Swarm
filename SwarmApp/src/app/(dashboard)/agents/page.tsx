@@ -13,6 +13,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useOrg } from "@/contexts/OrgContext";
 import { useActiveAccount } from "thirdweb/react";
 import { createAgent, updateAgent, deleteAgent, getTasksByOrg, getJobsByOrg, type Agent, type Task, type Job } from "@/lib/firestore";
+
+/** Hash an API key with SHA-256 for secure storage (Web Crypto API for client-side). */
+async function hashApiKeyClient(apiKey: string): Promise<string> {
+  const encoded = new TextEncoder().encode(apiKey);
+  const hashBuffer = await globalThis.crypto.subtle.digest("SHA-256", encoded);
+  return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, "0")).join("");
+}
 import { getAgentAvatarUrl } from "@/lib/agent-avatar";
 import { generateASN } from "@/lib/chainlink";
 import { collection, query, where, onSnapshot, doc, updateDoc } from "firebase/firestore";
@@ -409,6 +416,7 @@ export default function AgentsPage() {
       setCreating(true);
       setError(null);
       const apiKeyForNew = crypto.randomUUID();
+      const apiKeyHash = await hashApiKeyClient(apiKeyForNew);
 
       const asn = generateASN();
 
@@ -420,7 +428,7 @@ export default function AgentsPage() {
         capabilities: [getTypeDescription(agentType)],
         status: 'offline',
         projectIds: [],
-        apiKey: apiKeyForNew,
+        apiKeyHash,
         asn,
         creditScore: 680,
         trustScore: 50,

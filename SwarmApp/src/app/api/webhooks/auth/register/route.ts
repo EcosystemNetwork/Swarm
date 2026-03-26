@@ -10,6 +10,7 @@ import { NextRequest } from "next/server";
 import { PLATFORM_BRIEFING } from "@/app/api/v1/briefing";
 import { getAgentAvatarUrl } from "@/lib/agent-avatar";
 import { agentCheckIn, type Agent } from "@/lib/firestore";
+import { hashApiKey } from "@/app/api/webhooks/auth";
 import { db } from "@/lib/firebase";
 import {
     doc,
@@ -77,7 +78,12 @@ export async function POST(request: NextRequest) {
         }
 
         const agentData = agentSnap.data();
-        if (agentData.apiKey !== apiKey) {
+        // Validate API key — supports both hashed and legacy plaintext
+        const incomingHash = hashApiKey(apiKey);
+        const keyMatch = agentData.apiKeyHash
+            ? incomingHash === agentData.apiKeyHash
+            : agentData.apiKey === apiKey;
+        if (!keyMatch) {
             return Response.json({ error: "Invalid API key" }, { status: 401 });
         }
 

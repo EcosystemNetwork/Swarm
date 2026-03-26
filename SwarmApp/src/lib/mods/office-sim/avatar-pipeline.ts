@@ -25,6 +25,7 @@ import { OFFICE_ANIMATIONS } from "@/lib/mods/meshy/types";
 import type { OfficeAnimationName } from "@/lib/mods/meshy/types";
 import {
   submitPixelArtWorkflow,
+  submitSpriteSheetWorkflow,
   getPromptStatus,
   getGeneratedImage,
   isComfyUIConfigured,
@@ -253,6 +254,14 @@ async function advance3D(
    2D Pipeline (ComfyUI)
    ═══════════════════════════════════════ */
 
+/**
+ * 2D Pipeline (ComfyUI) — Extended to generate both static sprite + animated sprite sheet.
+ *
+ * Flow: pending → generating (static 64×64) → generating_sheet (288×256 walk cycle)
+ *       → uploading (static PNG) → uploading_sheet (sprite sheet PNG) → done
+ *
+ * Each poll advances one step to stay under Netlify's 10s timeout.
+ */
 async function advance2D(
   task: AvatarGenerationTask,
 ): Promise<ComfyUIPipelineState> {
@@ -261,28 +270,57 @@ async function advance2D(
   try {
     switch (state.status) {
       case "pending": {
+        // Step 1: Submit static front-facing sprite
         const promptId = await submitPixelArtWorkflow(task.prompt, 64);
-        return { ...state, status: "generating", promptId, progress: 10 };
+        return { ...state, status: "generating", promptId, progress: 5 };
       }
 
       case "generating": {
+        // Step 2: Poll static sprite → when done, submit sprite sheet
         if (!state.promptId) return { ...state, status: "failed", error: "Missing prompt ID" };
         const result = await getPromptStatus(state.promptId);
 
         if (result.status === "failed") {
-          return { ...state, status: "failed", error: "ComfyUI generation failed" };
+          return { ...state, status: "failed", error: "ComfyUI static sprite generation failed" };
         }
         if (result.status === "completed" && result.filename) {
-          return { ...state, status: "uploading", pngUrl: result.filename, progress: 70 };
+          // Static sprite ready — now submit the animated sprite sheet
+          const sheetPromptId = await submitSpriteSheetWorkflow(task.prompt);
+          return {
+            ...state,
+            status: "generating_sheet",
+            pngUrl: result.filename,
+            spriteSheetPromptId: sheetPromptId,
+            progress: 30,
+          };
         }
-        return { ...state, progress: result.status === "running" ? 40 : 10 };
+        return { ...state, progress: result.status === "running" ? 20 : 5 };
+      }
+
+      case "generating_sheet": {
+        // Step 3: Poll sprite sheet generation
+        if (!state.spriteSheetPromptId) return { ...state, status: "failed", error: "Missing sprite sheet prompt ID" };
+        const result = await getPromptStatus(state.spriteSheetPromptId);
+
+        if (result.status === "failed") {
+          // Sprite sheet failed but static sprite is available — upload the static one
+          return { ...state, status: "uploading", progress: 50 };
+        }
+        if (result.status === "completed" && result.filename) {
+          return { ...state, status: "uploading", sheetPngUrl: result.filename, progress: 50 };
+        }
+        return { ...state, progress: result.status === "running" ? 40 : 30 };
       }
 
       case "uploading": {
+        // Step 4: Upload static sprite to Storacha
         if (!state.pngUrl) return { ...state, status: "failed", error: "Missing output filename" };
 
         if (!isStorachaConfigured()) {
-          // Can't upload without Storacha — use temporary URL
+          // Skip Storacha — move to sprite sheet upload or done
+          if (state.sheetPngUrl) {
+            return { ...state, status: "uploading_sheet", progress: 70 };
+          }
           return { ...state, status: "done", progress: 100 };
         }
 
@@ -290,11 +328,39 @@ async function advance2D(
         const { cid, sizeBytes } = await uploadContent(buf, "avatar-sprite.png");
         await recordCidLink(cid, "default-space", sizeBytes);
 
+        const updated = {
+          ...state,
+          storachaCid: cid,
+          gatewayUrl: buildRetrievalUrl(cid),
+          progress: 75,
+        };
+
+        // If sprite sheet is available, upload it next
+        if (state.sheetPngUrl) {
+          return { ...updated, status: "uploading_sheet" as const };
+        }
+        return { ...updated, status: "done" as const, progress: 100 };
+      }
+
+      case "uploading_sheet": {
+        // Step 5: Upload animated sprite sheet to Storacha
+        if (!state.sheetPngUrl) {
+          return { ...state, status: "done", progress: 100 };
+        }
+
+        if (!isStorachaConfigured()) {
+          return { ...state, status: "done", progress: 100 };
+        }
+
+        const buf = await getGeneratedImage(state.sheetPngUrl);
+        const { cid, sizeBytes } = await uploadContent(buf, "avatar-spritesheet.png");
+        await recordCidLink(cid, "default-space", sizeBytes);
+
         return {
           ...state,
           status: "done",
-          storachaCid: cid,
-          gatewayUrl: buildRetrievalUrl(cid),
+          sheetStorachaCid: cid,
+          sheetGatewayUrl: buildRetrievalUrl(cid),
           progress: 100,
         };
       }
@@ -333,12 +399,12 @@ function computeOverallStatus(task: AvatarGenerationTask): AvatarGenerationStatu
   if ((meshyDone && comfyFailed) || (meshyFailed && comfyDone)) return "partial";
 
   // Still in progress — determine which sub-step we're on
-  if (task.meshy?.status === "uploading" || task.comfyui?.status === "uploading") return "uploading";
+  if (task.meshy?.status === "uploading" || task.comfyui?.status === "uploading" || task.comfyui?.status === "uploading_sheet") return "uploading";
   if (task.meshy?.status === "animate") return "animating";
   if (task.meshy?.status === "rig") return "rigging";
   if (task.meshy?.status === "refine") return "refining_3d";
   if (task.meshy?.status === "preview") return "generating_3d";
-  if (task.comfyui?.status === "generating") return "generating_2d";
+  if (task.comfyui?.status === "generating" || task.comfyui?.status === "generating_sheet") return "generating_2d";
 
   return "pending";
 }

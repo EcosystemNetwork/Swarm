@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
@@ -9,7 +9,13 @@ const sessDir = path.join(OPENCLAW_DIR, 'agents', AGENT_ID, 'sessions');
 
 export const dynamic = 'force-dynamic';
 
-export async function GET(req: Request) {
+export async function GET(req: NextRequest) {
+    // Require authenticated session (injected by middleware)
+    const sessionAddress = req.headers.get('x-session-address');
+    if (!sessionAddress) {
+        return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+    }
+
     try {
         const url = new URL(req.url);
         const rawLimit = parseInt(url.searchParams.get('limit') || '50', 10);

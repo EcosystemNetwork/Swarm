@@ -20,6 +20,64 @@
 
 export type SpriteDirection = "down" | "left" | "right" | "up";
 
+/**
+ * Animation types supported in the expanded sprite sheet.
+ *
+ * Sheet layout (10 rows × 6 cols = 288×640):
+ *   Row 0: Walk Down    (6 frames)
+ *   Row 1: Walk Left    (6 frames)
+ *   Row 2: Walk Right   (6 frames)
+ *   Row 3: Walk Up      (6 frames)
+ *   Row 4: Idle         (6 frames — subtle breathing / bobbing)
+ *   Row 5: Working      (6 frames — typing at keyboard)
+ *   Row 6: Thinking     (6 frames — hand on chin, looking up)
+ *   Row 7: Talking      (6 frames — gesturing, mouth open)
+ *   Row 8: Error        (6 frames — alarmed, red flash pose)
+ *   Row 9: Spawning     (6 frames — materializing / appearing)
+ */
+export type SpriteAnimationType =
+  | "walk_down"
+  | "walk_left"
+  | "walk_right"
+  | "walk_up"
+  | "idle"
+  | "working"
+  | "thinking"
+  | "talking"
+  | "error"
+  | "spawning";
+
+/** Row index for each animation type in the expanded sprite sheet */
+export const ANIM_ROWS: Record<SpriteAnimationType, number> = {
+  walk_down: 0,
+  walk_left: 1,
+  walk_right: 2,
+  walk_up: 3,
+  idle: 4,
+  working: 5,
+  thinking: 6,
+  talking: 7,
+  error: 8,
+  spawning: 9,
+};
+
+/** Number of rows in the expanded sprite sheet */
+export const SPRITE_SHEET_ROWS = 10;
+
+/** Frame speed per animation type (ms per frame) */
+export const ANIM_SPEEDS: Record<SpriteAnimationType, number> = {
+  walk_down: 120,
+  walk_left: 120,
+  walk_right: 120,
+  walk_up: 120,
+  idle: 300,     // slow breathing
+  working: 150,  // moderate typing
+  thinking: 400, // slow contemplation
+  talking: 180,  // mouth flaps
+  error: 200,    // alarmed pulsing
+  spawning: 100, // fast materialization
+};
+
 export interface SpriteSheetConfig {
   /** URL of the sprite sheet image */
   url: string;
@@ -29,7 +87,7 @@ export interface SpriteSheetConfig {
   frameHeight: number;
   /** Number of frames per direction */
   framesPerDirection: number;
-  /** Row index for each direction (0-indexed) */
+  /** Row index for each direction (0-indexed) — walk rows only */
   directionRows: Record<SpriteDirection, number>;
   /** Animation speed: ms per frame */
   frameDurationMs: number;
@@ -48,6 +106,17 @@ export const DEFAULT_SPRITE_CONFIG: Omit<SpriteSheetConfig, "url"> = {
   },
   frameDurationMs: 120,
 };
+
+/** Expanded sprite sheet config (10-row format with all animation types) */
+export const EXPANDED_SPRITE_CONFIG = {
+  frameWidth: 48,
+  frameHeight: 64,
+  framesPerRow: 6,
+  totalRows: SPRITE_SHEET_ROWS,
+  /** Total sprite sheet pixel dimensions */
+  sheetWidth: 48 * 6,   // 288
+  sheetHeight: 64 * 10, // 640
+} as const;
 
 /* ═══════════════════════════════════════
    Sprite Animation State

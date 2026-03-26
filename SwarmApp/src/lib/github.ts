@@ -113,6 +113,44 @@ export interface GitHubComment {
   created_at: string;
 }
 
+// ─── HMAC State Signing (CSRF protection for OAuth callbacks) ──
+
+/**
+ * Sign an OAuth state parameter with HMAC-SHA256 to prevent CSRF/tampering.
+ * Format: `orgId.hmac_hex`
+ */
+export function signOAuthState(orgId: string): string {
+  const secret = getWebhookSecret(); // reuse webhook secret as HMAC key
+  if (!secret) return orgId; // fallback if no secret configured
+  const sig = crypto.createHmac("sha256", secret).update(orgId, "utf-8").digest("hex");
+  return `${orgId}.${sig}`;
+}
+
+/**
+ * Verify and extract the orgId from a signed OAuth state parameter.
+ * Returns the orgId on success, or null if the signature is invalid.
+ */
+export function verifyOAuthState(state: string): string | null {
+  const secret = getWebhookSecret();
+  if (!secret) return state; // fallback if no secret configured
+
+  const dotIndex = state.lastIndexOf(".");
+  if (dotIndex === -1) return null; // unsigned state — reject
+
+  const orgId = state.slice(0, dotIndex);
+  const sig = state.slice(dotIndex + 1);
+
+  const expected = crypto.createHmac("sha256", secret).update(orgId, "utf-8").digest("hex");
+  try {
+    if (crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(sig))) {
+      return orgId;
+    }
+  } catch {
+    // length mismatch
+  }
+  return null;
+}
+
 // ─── JWT Generation ─────────────────────────────────────
 
 function generateAppJwt(): string {

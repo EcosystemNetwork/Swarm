@@ -98,24 +98,45 @@ export async function submitPixelArtWorkflow(
    ═══════════════════════════════════════ */
 
 /**
- * Generate a 4-direction × 6-frame sprite sheet for walk-cycle animation.
- * Output: 288×256 PNG (48px × 6 cols, 64px × 4 rows).
- * Rows: down, left, right, up.
+ * Generate a 10-row × 6-frame expanded sprite sheet with all animation types.
+ *
+ * Output: 288×640 PNG (48px × 6 cols, 64px × 10 rows).
+ *
+ * Rows:
+ *   0: Walk Down     (6 frames)     4: Idle       (6 frames)     8: Error    (6 frames)
+ *   1: Walk Left     (6 frames)     5: Working    (6 frames)     9: Spawning (6 frames)
+ *   2: Walk Right    (6 frames)     6: Thinking   (6 frames)
+ *   3: Walk Up       (6 frames)     7: Talking    (6 frames)
  */
 export async function submitSpriteSheetWorkflow(
   prompt: string,
   frameW: number = 48,
   frameH: number = 64,
   cols: number = 6,
-  rows: number = 4,
+  rows: number = 10,
 ): Promise<string> {
   const endpoint = getEndpoint();
 
   const totalW = frameW * cols; // 288
-  const totalH = frameH * rows; // 256
+  const totalH = frameH * rows; // 640
 
-  const styledPrompt = `pixel art character sprite sheet, ${prompt}, 4 directional walk cycle grid (row 1: facing down, row 2: facing left, row 3: facing right, row 4: facing up), ${cols} frames per direction, RPG game asset, transparent background, organized grid layout, consistent character across all frames, retro pixel art, 8-bit style, ${totalW}x${totalH}`;
-  const negativePrompt = "blurry, realistic, photograph, 3d render, text, watermark, frame, border, single frame only, not a sprite sheet, random poses";
+  const styledPrompt = [
+    `pixel art character sprite sheet, ${prompt},`,
+    `organized ${cols}x${rows} grid of animation frames,`,
+    `row 1: walk cycle facing down (${cols} frames),`,
+    `row 2: walk cycle facing left (${cols} frames),`,
+    `row 3: walk cycle facing right (${cols} frames),`,
+    `row 4: walk cycle facing up (${cols} frames),`,
+    `row 5: idle standing animation (${cols} frames subtle breathing),`,
+    `row 6: sitting typing at desk animation (${cols} frames),`,
+    `row 7: thinking pose hand on chin animation (${cols} frames),`,
+    `row 8: talking gesturing animation (${cols} frames),`,
+    `row 9: alarmed error reaction animation (${cols} frames),`,
+    `row 10: spawning materializing glow animation (${cols} frames),`,
+    `RPG game asset, transparent background, consistent character across all frames,`,
+    `retro pixel art, 8-bit style, ${totalW}x${totalH}`,
+  ].join(" ");
+  const negativePrompt = "blurry, realistic, photograph, 3d render, text, watermark, frame, border, single frame only, random poses, inconsistent character";
 
   const workflow: Record<string, unknown> = {
     "1": {
@@ -134,7 +155,8 @@ export async function submitSpriteSheetWorkflow(
     },
     "4": {
       class_type: "EmptyLatentImage",
-      inputs: { width: totalW * 4, height: totalH * 4, batch_size: 1 },
+      // Generate at upscaled resolution for quality
+      inputs: { width: totalW * 4, height: totalH * 2, batch_size: 1 },
     },
     "5": {
       class_type: "KSampler",
@@ -144,8 +166,8 @@ export async function submitSpriteSheetWorkflow(
         negative: ["3", 0],
         latent_image: ["4", 0],
         seed: Math.floor(Math.random() * 2 ** 32),
-        steps: 30,
-        cfg: 8.0,
+        steps: 35,
+        cfg: 8.5,
         sampler_name: "euler_ancestral",
         scheduler: "normal",
         denoise: 1.0,

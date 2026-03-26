@@ -96,7 +96,6 @@ const PUBLIC_API_PREFIXES = [
   "/api/webhooks",
   "/api/v1",
   "/api/chainlink",
-  "/api/live-feed",
   "/api/cron-jobs",
   "/api/github/webhook",
   "/api/github/callback",
@@ -125,6 +124,8 @@ function withSecurityHeaders(res: NextResponse): NextResponse {
   return res;
 }
 
+const MAX_BODY_BYTES = 2_000_000; // 2MB global limit for API routes
+
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
@@ -135,6 +136,19 @@ export async function middleware(req: NextRequest) {
     pathname.includes(".")
   ) {
     return withSecurityHeaders(NextResponse.next());
+  }
+
+  // Enforce body-size limit on API routes
+  if (pathname.startsWith("/api/")) {
+    const contentLength = req.headers.get("content-length");
+    if (contentLength && parseInt(contentLength, 10) > MAX_BODY_BYTES) {
+      return withSecurityHeaders(
+        NextResponse.json(
+          { error: `Request body too large (max ${MAX_BODY_BYTES / 1_000_000}MB)` },
+          { status: 413 }
+        )
+      );
+    }
   }
 
   // Check if this is a public API route — pass through

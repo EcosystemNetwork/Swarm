@@ -30,6 +30,10 @@ interface LocaleStrings {
   artSlot: string;
   artGenerating: string;
   artClickToCustomize: string;
+  // Character sprites
+  designCharacter: string;
+  spriteSheet: string;
+  animatedSprite: string;
 }
 
 const EN: LocaleStrings = {
@@ -59,6 +63,9 @@ const EN: LocaleStrings = {
   artSlot: "Art Slot",
   artGenerating: "Generating...",
   artClickToCustomize: "Click to customize",
+  designCharacter: "Design Character",
+  spriteSheet: "Sprite Sheet",
+  animatedSprite: "Animated Sprite",
 };
 
 const KO: LocaleStrings = {
@@ -88,6 +95,9 @@ const KO: LocaleStrings = {
   artSlot: "아트 슬롯",
   artGenerating: "생성 중...",
   artClickToCustomize: "클릭하여 커스터마이즈",
+  designCharacter: "캐릭터 디자인",
+  spriteSheet: "스프라이트 시트",
+  animatedSprite: "애니메이션 스프라이트",
 };
 
 const JA: LocaleStrings = {
@@ -117,6 +127,9 @@ const JA: LocaleStrings = {
   artSlot: "アートスロット",
   artGenerating: "生成中...",
   artClickToCustomize: "クリックしてカスタマイズ",
+  designCharacter: "キャラクターデザイン",
+  spriteSheet: "スプライトシート",
+  animatedSprite: "アニメーションスプライト",
 };
 
 const ZH: LocaleStrings = {
@@ -146,6 +159,9 @@ const ZH: LocaleStrings = {
   artSlot: "艺术品位置",
   artGenerating: "生成中...",
   artClickToCustomize: "点击自定义",
+  designCharacter: "角色设计",
+  spriteSheet: "精灵图表",
+  animatedSprite: "动画精灵",
 };
 
 const LOCALE_MAP: Record<Locale, LocaleStrings> = { en: EN, ko: KO, ja: JA, zh: ZH };

@@ -3,10 +3,51 @@
  *
  * Every request to /v1/messages and /v1/send must include a signature.
  * The hub looks up the agent's registered public key and verifies.
+ *
+ * Includes nonce tracking to prevent replay attacks within the
+ * 2-minute timestamp freshness window.
  */
 import crypto from "crypto";
 import { db } from "@/lib/firebase";
 import { doc, getDoc } from "firebase/firestore";
+
+// ── Nonce tracking (in-memory with Redis fallback) ──────
+// Nonces are signature hashes — if the same signature is seen twice
+// within the freshness window, the request is rejected.
+
+const NONCE_TTL_MS = 3 * 60 * 1000; // 3 minutes (slightly > 2-min freshness window)
+const nonceCache = new Map<string, number>(); // nonce → expiry timestamp
+
+// Periodic cleanup (every ~100 calls)
+let nonceCleanupCounter = 0;
+function cleanupNonces() {
+    const now = Date.now();
+    for (const [nonce, expiry] of nonceCache) {
+        if (now >= expiry) nonceCache.delete(nonce);
+    }
+}
+
+/**
+ * Check if a nonce (signature hash) has been seen before.
+ * Returns true if the nonce is fresh (not seen), false if replayed.
+ */
+export function checkAndRecordNonce(signatureBase64: string): boolean {
+    // Cleanup expired nonces periodically
+    if (++nonceCleanupCounter % 100 === 0) cleanupNonces();
+
+    const nonce = crypto.createHash("sha256").update(signatureBase64).digest("hex").slice(0, 32);
+    const now = Date.now();
+
+    if (nonceCache.has(nonce)) {
+        const expiry = nonceCache.get(nonce)!;
+        if (now < expiry) return false; // replay detected
+    }
+
+    nonceCache.set(nonce, now + NONCE_TTL_MS);
+    return true;
+}
+
+// ── Signature verification ──────────────────────────────
 
 /**
  * Verify an Ed25519 signature against a known public key (PEM format).
@@ -36,6 +77,7 @@ export function verifySignature(
 /**
  * Look up an agent's public key from Firestore and verify the signature.
  * Returns the agent data on success, or null on failure.
+ * Also checks the nonce to prevent replay attacks.
  */
 export async function verifyAgentRequest(
     agentId: string,
@@ -48,6 +90,9 @@ export async function verifyAgentRequest(
     agentType: string;
 } | null> {
     if (!agentId || !signatureBase64) return null;
+
+    // Replay protection: reject if this exact signature was already used
+    if (!checkAndRecordNonce(signatureBase64)) return null;
 
     try {
         const agentSnap = await getDoc(doc(db, "agents", agentId));

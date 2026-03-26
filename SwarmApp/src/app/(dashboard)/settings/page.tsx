@@ -631,8 +631,14 @@ export default function SettingsPage() {
                 {process.env.NEXT_PUBLIC_GITHUB_APP_SLUG ? (
                   <Button
                     className="bg-[#24292f] hover:bg-[#32383f] text-white"
-                    onClick={() => {
-                      window.location.href = `https://github.com/apps/${process.env.NEXT_PUBLIC_GITHUB_APP_SLUG}/installations/new?state=${currentOrg.id}`;
+                    onClick={async () => {
+                      try {
+                        const res = await fetch("/api/github/state", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ orgId: currentOrg.id }) });
+                        const { state } = await res.json();
+                        window.location.href = `https://github.com/apps/${process.env.NEXT_PUBLIC_GITHUB_APP_SLUG}/installations/new?state=${encodeURIComponent(state)}`;
+                      } catch {
+                        window.location.href = `https://github.com/apps/${process.env.NEXT_PUBLIC_GITHUB_APP_SLUG}/installations/new?state=${currentOrg.id}`;
+                      }
                     }}
                   >
                     <GitHubIcon className="w-4 h-4 mr-2" />
@@ -655,10 +661,16 @@ export default function SettingsPage() {
                       <Button
                         className="bg-[#24292f] hover:bg-[#32383f] text-white shrink-0"
                         disabled={!ghSlugInput.trim()}
-                        onClick={() => {
+                        onClick={async () => {
                           const slug = ghSlugInput.trim();
                           if (slug) {
-                            window.location.href = `https://github.com/apps/${slug}/installations/new?state=${currentOrg.id}`;
+                            try {
+                              const res = await fetch("/api/github/state", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ orgId: currentOrg.id }) });
+                              const { state } = await res.json();
+                              window.location.href = `https://github.com/apps/${slug}/installations/new?state=${encodeURIComponent(state)}`;
+                            } catch {
+                              window.location.href = `https://github.com/apps/${slug}/installations/new?state=${currentOrg.id}`;
+                            }
                           }
                         }}
                       >

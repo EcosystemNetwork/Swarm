@@ -1,9 +1,10 @@
 /** GitHub OAuth callback — handles GitHub App installation redirect.
- *  Validates that the installation_id from GitHub matches a real installation
- *  before writing to the organization document.
+ *  Validates the HMAC-signed state parameter and verifies that the
+ *  installation_id from GitHub matches a real installation before
+ *  writing to the organization document.
  */
 import { NextRequest, NextResponse } from "next/server";
-import { getInstallation } from "@/lib/github";
+import { getInstallation, verifyOAuthState } from "@/lib/github";
 import { getOrganization, updateOrganization } from "@/lib/firestore";
 import { serverTimestamp } from "firebase/firestore";
 
@@ -11,12 +12,20 @@ export async function GET(req: NextRequest) {
   const { searchParams } = req.nextUrl;
   const installationId = searchParams.get("installation_id");
   const setupAction = searchParams.get("setup_action");
-  const orgId = searchParams.get("state");
+  const state = searchParams.get("state");
 
   // Validate params
-  if (!installationId || !orgId) {
+  if (!installationId || !state) {
     return NextResponse.redirect(
       new URL("/settings?github=error&reason=missing_params", req.url)
+    );
+  }
+
+  // Verify HMAC-signed state to prevent CSRF
+  const orgId = verifyOAuthState(state);
+  if (!orgId) {
+    return NextResponse.redirect(
+      new URL("/settings?github=error&reason=invalid_state", req.url)
     );
   }
 

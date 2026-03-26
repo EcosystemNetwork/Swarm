@@ -17,6 +17,8 @@ import type { OfficeFurnitureData } from "./studio/furniture-types";
 import type { OfficeTextureData } from "./studio/texture-types";
 import type { OfficeArtPieceData } from "./studio/art-types";
 import { getOrgArt } from "./studio/art-firestore";
+import { batchGetAvatars } from "./studio/avatar-firestore";
+import type { AgentAvatarData } from "./studio/avatar-types";
 import { useHubStream } from "@/hooks/useHubStream";
 import { detectLocale } from "./i18n";
 
@@ -96,6 +98,7 @@ export function OfficeProvider({ children }: { children: React.ReactNode }) {
   const prevStatesRef = useRef<Map<string, AgentVisualStatus>>(new Map());
   const bubbleTimesRef = useRef<Map<string, number>>(new Map());
   const prevAgentCountRef = useRef(0);
+  const avatarDataRef = useRef<Map<string, AgentAvatarData>>(new Map());
 
   /* ── Auto-detect locale on mount ── */
   useEffect(() => {
@@ -137,7 +140,7 @@ export function OfficeProvider({ children }: { children: React.ReactNode }) {
 
       const visual = assignPositions(raw, state.layout.desks);
 
-      // Merge avatar assets
+      // Merge avatar assets from plugins API
       if (avatarRes?.ok) {
         try {
           const avatarData = await avatarRes.json();
@@ -161,6 +164,16 @@ export function OfficeProvider({ children }: { children: React.ReactNode }) {
             }
           }
         } catch { /* procedural fallback */ }
+      }
+
+      // Merge avatar data from Firestore (includes spriteSheetUrl)
+      for (const agent of visual) {
+        const avatarEntry = avatarDataRef.current.get(agent.id);
+        if (!avatarEntry) continue;
+        if (avatarEntry.modelUrl && !agent.modelUrl) agent.modelUrl = avatarEntry.modelUrl;
+        if (avatarEntry.spriteUrl && !agent.spriteUrl) agent.spriteUrl = avatarEntry.spriteUrl;
+        if (avatarEntry.spriteSheetUrl) agent.spriteSheetUrl = avatarEntry.spriteSheetUrl;
+        if (avatarEntry.animationUrls && !agent.animationUrls) agent.animationUrls = avatarEntry.animationUrls;
       }
 
       // Perception engine
@@ -281,6 +294,13 @@ export function OfficeProvider({ children }: { children: React.ReactNode }) {
         dispatch({ type: "SET_ART", art: artMap });
       })
       .catch(() => { /* graceful — no art yet */ });
+
+    // Fetch avatar data from Firestore (spriteSheetUrl, etc.)
+    batchGetAvatars(currentOrg.id)
+      .then((avatarMap) => {
+        avatarDataRef.current = avatarMap;
+      })
+      .catch(() => { /* graceful — no custom avatars yet */ });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentOrg, state.theme.id]);
 

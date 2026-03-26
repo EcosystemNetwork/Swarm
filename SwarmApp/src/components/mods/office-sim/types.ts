@@ -69,6 +69,8 @@ export interface VisualAgent {
   // Custom avatar (populated from agentAvatars collection)
   modelUrl?: string;
   spriteUrl?: string;
+  /** Animated sprite sheet URL (4-direction × 6-frame walk cycle) */
+  spriteSheetUrl?: string;
   animationUrls?: Record<string, string>;
 }
 

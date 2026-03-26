@@ -86,8 +86,10 @@ export interface AgentAvatarData {
   modelUrl?: string;
   /** Per-animation GLB gateway URLs keyed by animation name */
   animationUrls?: Record<string, string>;
-  /** Storacha gateway URL to the pixel art PNG */
+  /** Storacha gateway URL to the pixel art PNG (static) */
   spriteUrl?: string;
+  /** Storacha gateway URL to the animated sprite sheet PNG */
+  spriteSheetUrl?: string;
   /** Original prompt used to generate */
   prompt?: string;
   generatedAt?: number;
