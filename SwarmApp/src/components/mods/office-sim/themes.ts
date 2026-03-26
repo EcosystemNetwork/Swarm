@@ -129,6 +129,11 @@ export interface OfficeTheme {
   svgRoomServer: { bg: string; border: string };
   svgRoomErrorBay: { bg: string; border: string };
 
+  // Shadow & highlight
+  svgAmbientShadowColor: string;
+  svgDeskShadowOffset: number;
+  svgHighlightColor: string;
+
   // Department color overrides (optional per-department customization)
   departmentColors?: Partial<Record<DepartmentId, DepartmentColors>>;
 
@@ -189,6 +194,10 @@ export const THEME_PRESETS: OfficeTheme[] = [
     svgRoomServer: { bg: "rgba(6, 182, 212, 0.04)", border: "rgba(6, 182, 212, 0.15)" },
     svgRoomErrorBay: { bg: "rgba(239, 68, 68, 0.06)", border: "rgba(239, 68, 68, 0.2)" },
 
+    svgAmbientShadowColor: "rgba(0, 0, 0, 0.35)",
+    svgDeskShadowOffset: 3,
+    svgHighlightColor: "rgba(255, 240, 220, 0.08)",
+
     furnitureStylePrompt: "modern minimalist startup office, light wood and steel, Scandinavian design",
     textureStylePrompt: "warm oak wood grain, natural matte finish, Scandinavian",
     artStylePrompt: "warm modern art, earth tones, Scandinavian gallery aesthetic",
@@ -230,6 +239,10 @@ export const THEME_PRESETS: OfficeTheme[] = [
     svgRoomBreak: { bg: "rgba(96, 165, 250, 0.04)", border: "rgba(96, 165, 250, 0.15)" },
     svgRoomServer: { bg: "rgba(147, 197, 253, 0.04)", border: "rgba(147, 197, 253, 0.12)" },
     svgRoomErrorBay: { bg: "rgba(239, 68, 68, 0.06)", border: "rgba(239, 68, 68, 0.2)" },
+
+    svgAmbientShadowColor: "rgba(0, 0, 0, 0.4)",
+    svgDeskShadowOffset: 3,
+    svgHighlightColor: "rgba(180, 210, 255, 0.06)",
 
     furnitureStylePrompt: "corporate executive office, glass and brushed steel, premium modern",
     textureStylePrompt: "polished concrete, cool grey, professional corporate",
@@ -273,6 +286,10 @@ export const THEME_PRESETS: OfficeTheme[] = [
     svgRoomServer: { bg: "rgba(0, 229, 255, 0.04)", border: "rgba(0, 229, 255, 0.2)" },
     svgRoomErrorBay: { bg: "rgba(255, 0, 60, 0.08)", border: "rgba(255, 0, 60, 0.3)" },
 
+    svgAmbientShadowColor: "rgba(80, 0, 120, 0.5)",
+    svgDeskShadowOffset: 4,
+    svgHighlightColor: "rgba(224, 64, 251, 0.1)",
+
     furnitureStylePrompt: "cyberpunk futuristic, neon purple and cyan LED accents, dark metal, sci-fi",
     textureStylePrompt: "dark metal grating with neon light bleed, cyberpunk, industrial",
     artStylePrompt: "cyberpunk digital art, neon glow, glitch aesthetic, vaporwave",
@@ -314,6 +331,10 @@ export const THEME_PRESETS: OfficeTheme[] = [
     svgRoomBreak: { bg: "rgba(253, 230, 138, 0.05)", border: "rgba(253, 230, 138, 0.18)" },
     svgRoomServer: { bg: "rgba(6, 182, 212, 0.04)", border: "rgba(6, 182, 212, 0.15)" },
     svgRoomErrorBay: { bg: "rgba(239, 68, 68, 0.06)", border: "rgba(239, 68, 68, 0.2)" },
+
+    svgAmbientShadowColor: "rgba(0, 0, 0, 0.3)",
+    svgDeskShadowOffset: 2,
+    svgHighlightColor: "rgba(255, 228, 196, 0.1)",
 
     furnitureStylePrompt: "cozy indie studio, reclaimed wood, plants, vintage brass accents, warm",
     textureStylePrompt: "worn reclaimed wood, warm tones, rustic cottage",

@@ -131,6 +131,108 @@ function GltfArt({
   );
 }
 
+/* ═══════════════════════════════════════════════════════════════
+   Ceiling Lights — Overhead light panels with point lights
+   ═══════════════════════════════════════════════════════════════ */
+
+function CeilingLights({ theme }: { theme: OfficeTheme }) {
+  const positions: [number, number, number][] = [
+    [-3, 2.95, -1], [1, 2.95, -1], [-3, 2.95, 2], [1, 2.95, 2],
+  ];
+  return (
+    <group>
+      {positions.map((pos, i) => (
+        <group key={i}>
+          {/* Light panel */}
+          <mesh position={pos}>
+            <boxGeometry args={[1.0, 0.04, 0.4]} />
+            <meshStandardMaterial
+              color="#ffffff"
+              emissive="#ffffff"
+              emissiveIntensity={0.3}
+            />
+          </mesh>
+          {/* Point light */}
+          <pointLight position={[pos[0], pos[1] - 0.1, pos[2]]} intensity={0.15} color="#fff5e6" distance={5} />
+        </group>
+      ))}
+    </group>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   Procedural Potted Plant — Low-poly decorative plant
+   ═══════════════════════════════════════════════════════════════ */
+
+function ProceduralPlant({ position }: { position: [number, number, number] }) {
+  return (
+    <group position={position}>
+      {/* Pot */}
+      <mesh position={[0, 0.1, 0]}>
+        <cylinderGeometry args={[0.12, 0.1, 0.2, 8]} />
+        <meshStandardMaterial color="#8B4513" roughness={0.9} />
+      </mesh>
+      {/* Soil */}
+      <mesh position={[0, 0.21, 0]}>
+        <cylinderGeometry args={[0.11, 0.11, 0.02, 8]} />
+        <meshStandardMaterial color="#3a2a1a" roughness={1} />
+      </mesh>
+      {/* Leaves */}
+      {[
+        { pos: [0, 0.4, 0] as [number, number, number], s: 0.08, c: "#2d8a4e" },
+        { pos: [-0.06, 0.35, 0.04] as [number, number, number], s: 0.06, c: "#3aa55e" },
+        { pos: [0.05, 0.36, -0.03] as [number, number, number], s: 0.07, c: "#228B22" },
+      ].map((leaf, i) => (
+        <mesh key={i} position={leaf.pos}>
+          <sphereGeometry args={[leaf.s, 8, 8]} />
+          <meshStandardMaterial color={leaf.c} roughness={0.8} />
+        </mesh>
+      ))}
+      {/* Stem */}
+      <mesh position={[0, 0.3, 0]}>
+        <cylinderGeometry args={[0.008, 0.008, 0.2, 4]} />
+        <meshStandardMaterial color="#4a7a3a" roughness={0.9} />
+      </mesh>
+    </group>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   Window Wall — Glass windows on the right side of the office
+   ═══════════════════════════════════════════════════════════════ */
+
+function WindowWall({ theme }: { theme: OfficeTheme }) {
+  const windows: [number, number][] = [
+    [-2, 1.2], [0, 1.2], [2, 1.2],
+    [-2, 2.2], [0, 2.2], [2, 2.2],
+  ];
+  return (
+    <group position={[7.99, 0, 0]} rotation={[0, -Math.PI / 2, 0]}>
+      {windows.map(([wx, wy], i) => (
+        <group key={i}>
+          {/* Window pane */}
+          <mesh position={[wx, wy, 0]}>
+            <planeGeometry args={[1.5, 0.8]} />
+            <meshStandardMaterial
+              color="#87ceeb"
+              metalness={0.9}
+              roughness={0.1}
+              opacity={0.15}
+              transparent
+              side={THREE.DoubleSide}
+            />
+          </mesh>
+          {/* Window frame */}
+          <mesh position={[wx, wy, 0.01]}>
+            <planeGeometry args={[1.6, 0.9]} />
+            <meshStandardMaterial color="#444" metalness={0.5} roughness={0.5} opacity={0.3} transparent side={THREE.DoubleSide} />
+          </mesh>
+        </group>
+      ))}
+    </group>
+  );
+}
+
 export function OfficeEnvironment({
   theme,
   furniture,
@@ -146,6 +248,17 @@ export function OfficeEnvironment({
       <ThemedFloor theme={theme} textureUrl={floorTextureUrl} />
       <Walls theme={theme} />
       <Ceiling theme={theme} />
+
+      {/* Procedural plants (fallback when no custom plant furniture) */}
+      {!furniture?.has("plant") && (
+        <>
+          <ProceduralPlant position={[-5.5, 0, -2]} />
+          <ProceduralPlant position={[4.5, 0, -2]} />
+          <ProceduralPlant position={[-5.5, 0, 3.5]} />
+        </>
+      )}
+      <WindowWall theme={theme} />
+      <CeilingLights theme={theme} />
 
       {/* Render AI-generated furniture where available */}
       {furniture && Array.from(furniture.entries()).map(([category, data]) => {

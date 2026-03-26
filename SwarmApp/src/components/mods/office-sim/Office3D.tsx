@@ -2,7 +2,7 @@
 "use client";
 
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { OrbitControls, Html } from "@react-three/drei";
+import { OrbitControls, Html, Environment } from "@react-three/drei";
 import { Suspense, useRef, useMemo, useState, useEffect } from "react";
 import * as THREE from "three";
 import { useOffice, getFilteredAgents } from "./office-store";
@@ -11,6 +11,7 @@ import type { VisualAgent, AgentVisualStatus, CameraMode } from "./types";
 import type { OfficeTheme } from "./themes";
 import { GltfAgent } from "./GltfAgent";
 import { OfficeEnvironment } from "./OfficeEnvironment";
+import { hashPick, SKIN_TONES, TOP_COLORS, BOTTOM_COLORS, HAIR_COLORS } from "./engine/avatar-generator";
 
 /* ═══════════════════════════════════════════════════════════════
    Office Floor — Theme-aware floor with grid
@@ -93,6 +94,21 @@ function Desk({ position, theme }: { position: [number, number, number]; theme: 
       <mesh material={deskMat} position={[0, 0.55, -0.15]}>
         <cylinderGeometry args={[0.02, 0.04, 0.15, 6]} />
       </mesh>
+      {/* Keyboard */}
+      <mesh position={[0, 0.49, 0.1]}>
+        <boxGeometry args={[0.35, 0.01, 0.12]} />
+        <meshStandardMaterial color="#1a1a1a" metalness={0.5} roughness={0.5} />
+      </mesh>
+      {/* Mouse */}
+      <mesh position={[0.28, 0.485, 0.12]} rotation={[0, 0.2, 0]}>
+        <capsuleGeometry args={[0.015, 0.03, 4, 6]} />
+        <meshStandardMaterial color="#2a2a2a" metalness={0.4} roughness={0.6} />
+      </mesh>
+      {/* Paper stack */}
+      <mesh position={[-0.4, 0.5, 0.05]}>
+        <boxGeometry args={[0.15, 0.02, 0.1]} />
+        <meshStandardMaterial color="#e8e8e0" roughness={0.9} />
+      </mesh>
     </group>
   );
 }
@@ -121,30 +137,52 @@ function AgentFigure({
   const isActive =
     agent.status !== "offline" && agent.status !== "idle";
 
-  const bodyMat = useMemo(
+  // Per-agent deterministic colors from avatar-generator palettes
+  const shirtColor = hashPick(agent.id, 4, TOP_COLORS);
+  const skinTone = hashPick(agent.id, 0, SKIN_TONES);
+  const pantsColor = hashPick(agent.id, 5, BOTTOM_COLORS);
+  const hairColor = hashPick(agent.id, 1, HAIR_COLORS);
+
+  const shirtMat = useMemo(
     () =>
       new THREE.MeshStandardMaterial({
-        color: "#2a3548",
-        metalness: 0.3,
-        roughness: 0.6,
+        color: shirtColor,
+        metalness: 0.2,
+        roughness: 0.7,
         emissive: new THREE.Color(statusColor),
         emissiveIntensity: isActive ? 0.15 : 0.02,
         transparent: dimmed,
         opacity: dimmed ? 0.2 : 1,
       }),
-    [statusColor, isActive, dimmed],
+    [shirtColor, statusColor, isActive, dimmed],
   );
 
-  const headMat = useMemo(
+  const skinMat = useMemo(
     () =>
       new THREE.MeshStandardMaterial({
-        color: "#e8c4a0",
-        metalness: 0.1,
-        roughness: 0.8,
+        color: skinTone,
+        metalness: 0.2,
+        roughness: 0.7,
+        emissive: new THREE.Color(statusColor),
+        emissiveIntensity: isActive ? 0.15 : 0.02,
         transparent: dimmed,
         opacity: dimmed ? 0.2 : 1,
       }),
-    [dimmed],
+    [skinTone, statusColor, isActive, dimmed],
+  );
+
+  const pantsMat = useMemo(
+    () =>
+      new THREE.MeshStandardMaterial({
+        color: pantsColor,
+        metalness: 0.2,
+        roughness: 0.7,
+        emissive: new THREE.Color(statusColor),
+        emissiveIntensity: isActive ? 0.15 : 0.02,
+        transparent: dimmed,
+        opacity: dimmed ? 0.2 : 1,
+      }),
+    [pantsColor, statusColor, isActive, dimmed],
   );
 
   useFrame((state) => {
@@ -176,38 +214,54 @@ function AgentFigure({
         if (!dimmed) onClick();
       }}
     >
-      {/* Body (torso) */}
-      <mesh material={bodyMat} position={[0, 0.55, 0.1]}>
-        <boxGeometry args={[0.3, 0.35, 0.2]} />
+      {/* Body (torso) — capsule */}
+      <mesh material={shirtMat} position={[0, 0.55, 0.1]}>
+        <capsuleGeometry args={[0.12, 0.15, 8, 12]} />
       </mesh>
 
-      {/* Head */}
-      <mesh ref={headRef} material={headMat} position={[0, 0.82, 0.1]}>
-        <sphereGeometry args={[0.1, 12, 12]} />
+      {/* Head — smoother sphere */}
+      <mesh ref={headRef} material={skinMat} position={[0, 0.82, 0.1]}>
+        <sphereGeometry args={[0.12, 16, 16]} />
       </mesh>
 
-      {/* Arms */}
+      {/* Eyes */}
+      <mesh position={[-0.04, 0.83, 0.2]}>
+        <sphereGeometry args={[0.015, 8, 8]} />
+        <meshStandardMaterial color="#1a1a1a" />
+      </mesh>
+      <mesh position={[0.04, 0.83, 0.2]}>
+        <sphereGeometry args={[0.015, 8, 8]} />
+        <meshStandardMaterial color="#1a1a1a" />
+      </mesh>
+
+      {/* Hair — half-sphere on top of head */}
+      <mesh position={[0, 0.87, 0.08]}>
+        <sphereGeometry args={[0.11, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2]} />
+        <meshStandardMaterial color={hairColor} roughness={0.8} transparent={dimmed} opacity={dimmed ? 0.2 : 1} />
+      </mesh>
+
+      {/* Arms — capsule */}
       <mesh
-        material={bodyMat}
+        material={shirtMat}
         position={[-0.22, 0.48, -0.05]}
         rotation={[0.3, 0, -0.1]}
       >
-        <boxGeometry args={[0.08, 0.25, 0.08]} />
+        <capsuleGeometry args={[0.035, 0.12, 6, 8]} />
       </mesh>
       <mesh
-        material={bodyMat}
+        material={shirtMat}
         position={[0.22, 0.48, -0.05]}
         rotation={[0.3, 0, 0.1]}
       >
-        <boxGeometry args={[0.08, 0.25, 0.08]} />
+        <capsuleGeometry args={[0.035, 0.12, 6, 8]} />
       </mesh>
 
-      {/* Legs */}
-      <mesh material={bodyMat} position={[-0.08, 0.25, 0.15]}>
-        <boxGeometry args={[0.1, 0.3, 0.1]} />
+      {/* Legs — capsule */}
+      <mesh material={pantsMat} position={[-0.08, 0.25, 0.15]}>
+        <capsuleGeometry args={[0.04, 0.12, 6, 8]} />
       </mesh>
-      <mesh material={bodyMat} position={[0.08, 0.25, 0.15]}>
-        <boxGeometry args={[0.1, 0.3, 0.1]} />
+      <mesh material={pantsMat} position={[0.08, 0.25, 0.15]}>
+        <capsuleGeometry args={[0.04, 0.12, 6, 8]} />
       </mesh>
 
       {/* Status light */}
@@ -299,28 +353,55 @@ function MeetingRoom({
           transparent
         />
       </mesh>
-      {[
-        [-1.5, 0.6, 0],
-        [1.5, 0.6, 0],
-        [0, 0.6, -1.25],
-        [0, 0.6, 1.25],
-      ].map((pos, i) => (
-        <mesh
-          key={i}
-          position={[pos[0], pos[1], pos[2]]}
-          rotation={[0, i < 2 ? Math.PI / 2 : 0, 0]}
-        >
-          <planeGeometry args={[i < 2 ? 2.5 : 3, 1.2]} />
-          <meshStandardMaterial
-            color={theme.accentColor}
-            metalness={0.9}
-            roughness={0.1}
-            opacity={0.08}
-            transparent
-            side={THREE.DoubleSide}
-          />
-        </mesh>
-      ))}
+      {/* Left side wall */}
+      <mesh position={[-1.5, 0.6, 0]} rotation={[0, Math.PI / 2, 0]}>
+        <planeGeometry args={[2.5, 1.2]} />
+        <meshStandardMaterial
+          color={theme.accentColor}
+          metalness={0.9}
+          roughness={0.1}
+          opacity={0.08}
+          transparent
+          side={THREE.DoubleSide}
+        />
+      </mesh>
+      {/* Right side wall */}
+      <mesh position={[1.5, 0.6, 0]} rotation={[0, Math.PI / 2, 0]}>
+        <planeGeometry args={[2.5, 1.2]} />
+        <meshStandardMaterial
+          color={theme.accentColor}
+          metalness={0.9}
+          roughness={0.1}
+          opacity={0.08}
+          transparent
+          side={THREE.DoubleSide}
+        />
+      </mesh>
+      {/* Back wall */}
+      <mesh position={[0, 0.6, -1.25]}>
+        <planeGeometry args={[3, 1.2]} />
+        <meshStandardMaterial
+          color={theme.accentColor}
+          metalness={0.9}
+          roughness={0.1}
+          opacity={0.08}
+          transparent
+          side={THREE.DoubleSide}
+        />
+      </mesh>
+      {/* Front wall — split into two panels with door gap */}
+      {/* Left glass panel */}
+      <mesh position={[-0.9, 0.6, 1.25]}>
+        <planeGeometry args={[1.2, 1.2]} />
+        <meshStandardMaterial color={theme.accentColor} metalness={0.9} roughness={0.1} opacity={0.08} transparent side={THREE.DoubleSide} />
+      </mesh>
+      {/* Right glass panel */}
+      <mesh position={[0.9, 0.6, 1.25]}>
+        <planeGeometry args={[1.2, 1.2]} />
+        <meshStandardMaterial color={theme.accentColor} metalness={0.9} roughness={0.1} opacity={0.08} transparent side={THREE.DoubleSide} />
+      </mesh>
+
+      {/* Conference table */}
       <mesh position={[0, 0.4, 0]}>
         <cylinderGeometry args={[0.6, 0.6, 0.04, 16]} />
         <meshStandardMaterial
@@ -328,6 +409,43 @@ function MeetingRoom({
           metalness={theme.deskMetalness}
           roughness={theme.deskRoughness}
         />
+      </mesh>
+
+      {/* Office chairs */}
+      {[
+        { pos: [-0.4, 0, -0.4] as [number, number, number], rot: 0 },
+        { pos: [0.4, 0, -0.4] as [number, number, number], rot: 0 },
+        { pos: [-0.4, 0, 0.4] as [number, number, number], rot: Math.PI },
+        { pos: [0.4, 0, 0.4] as [number, number, number], rot: Math.PI },
+      ].map((chair, i) => (
+        <group key={`chair-${i}`} position={chair.pos} rotation={[0, chair.rot, 0]}>
+          {/* Seat */}
+          <mesh position={[0, 0.3, 0]}>
+            <cylinderGeometry args={[0.15, 0.15, 0.03, 12]} />
+            <meshStandardMaterial color={theme.deskColor} metalness={0.3} roughness={0.7} />
+          </mesh>
+          {/* Backrest */}
+          <mesh position={[0, 0.45, -0.12]}>
+            <boxGeometry args={[0.25, 0.25, 0.02]} />
+            <meshStandardMaterial color={theme.deskColor} metalness={0.3} roughness={0.7} />
+          </mesh>
+          {/* Pedestal */}
+          <mesh position={[0, 0.15, 0]}>
+            <cylinderGeometry args={[0.02, 0.02, 0.3, 6]} />
+            <meshStandardMaterial color="#333" metalness={0.6} roughness={0.4} />
+          </mesh>
+        </group>
+      ))}
+
+      {/* Whiteboard */}
+      <mesh position={[0, 1.2, -1.2]}>
+        <boxGeometry args={[1.5, 0.8, 0.03]} />
+        <meshStandardMaterial color="#f0f0f0" roughness={0.95} />
+      </mesh>
+      {/* Whiteboard frame */}
+      <mesh position={[0, 1.2, -1.22]}>
+        <boxGeometry args={[1.6, 0.9, 0.02]} />
+        <meshStandardMaterial color="#555" metalness={0.4} roughness={0.6} />
       </mesh>
     </group>
   );
@@ -563,6 +681,8 @@ export function Office3D() {
           intensity={theme.pointLightIntensity}
           color={theme.pointLightColor}
         />
+
+        <Environment preset="apartment" background={false} environmentIntensity={0.15} />
 
         <Suspense fallback={<OfficeFloor theme={theme} />}>
           <OfficeEnvironment

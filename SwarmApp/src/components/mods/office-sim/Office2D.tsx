@@ -5,7 +5,7 @@
 
 import { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import { useOffice, getFilteredAgents } from "./office-store";
-import { STATUS_COLORS, STATUS_ICONS, STRESS_COLORS, STRESS_ICONS, BREAK_SPOTS } from "./types";
+import { STATUS_COLORS, STRESS_COLORS, STRESS_ICONS, BREAK_SPOTS } from "./types";
 import type { VisualAgent, DeskSlot, RoomConfig, AgentVisualStatus, Particle, DeliveryAnimation, Position, StressTier } from "./types";
 import type { OfficeTheme } from "./themes";
 import { getDepartmentColors } from "./themes";
@@ -21,6 +21,7 @@ import {
   ANIM_SPEEDS,
 } from "./engine/sprite-system";
 import type { SpriteAnimationType } from "./engine/sprite-system";
+import { hashPick, hashFloat, SKIN_TONES, HAIR_COLORS, TOP_COLORS } from "./engine/avatar-generator";
 
 /* ═══════════════════════════════════════
    Constants
@@ -202,6 +203,13 @@ export function Office2D() {
             <feComposite in="color" in2="blur" operator="in" />
             <feMerge><feMergeNode /><feMergeNode in="SourceGraphic" /></feMerge>
           </filter>
+          <filter id="desk-shadow">
+            <feDropShadow dx="1" dy={theme.svgDeskShadowOffset} stdDeviation="2" floodColor={theme.svgAmbientShadowColor} />
+          </filter>
+          <linearGradient id="desk-highlight" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stopColor={theme.svgHighlightColor} />
+            <stop offset="100%" stopColor="transparent" />
+          </linearGradient>
         </defs>
 
         {/* ── Background ── */}
@@ -223,6 +231,11 @@ export function Office2D() {
         {layout.rooms.map((room) => (
           <RoomSvg key={room.id} room={room} theme={theme} strings={strings} breakSpots={room.type === "break" ? BREAK_SPOTS : undefined} />
         ))}
+
+        {/* ── Decorative: whiteboard, water cooler, filing cabinet ── */}
+        <WhiteboardSvg x={canvasW - 90} y={60} />
+        <WaterCoolerSvg x={canvasW - 40} y={Math.round(canvasH / 2)} />
+        <FilingCabinetSvg x={10} y={Math.round(canvasH / 2)} />
 
         {/* ── Art Slots ── */}
         {DEFAULT_ART_SLOTS.map((slot) => (
@@ -398,22 +411,83 @@ function RoomSvg({ room, theme, strings, breakSpots }: {
     room.type === "server" ? strings.serverRoom :
     room.label;
 
+  const rx = room.position.x;
+  const ry = room.position.y;
+  const rw = room.width;
+  const rh = room.height;
+
   return (
     <g>
       <rect
-        x={room.position.x}
-        y={room.position.y}
-        width={room.width}
-        height={room.height}
+        x={rx}
+        y={ry}
+        width={rw}
+        height={rh}
         rx="4"
         fill={c.bg}
         stroke={c.border}
         strokeWidth="1"
         strokeDasharray={room.type === "error_bay" ? "4 3" : "none"}
       />
+
+      {/* Meeting room: double-line glass wall + diagonal reflection */}
+      {room.type === "meeting" && (
+        <>
+          <rect
+            x={rx + 2}
+            y={ry + 2}
+            width={rw - 4}
+            height={rh - 4}
+            rx="3"
+            fill="none"
+            stroke={c.border}
+            strokeWidth="0.4"
+            opacity={0.5}
+          />
+          {/* Diagonal reflection streak */}
+          <line
+            x1={rx + 6}
+            y1={ry + rh - 6}
+            x2={rx + rw - 6}
+            y2={ry + 6}
+            stroke="rgba(255, 255, 255, 0.04)"
+            strokeWidth="2"
+          />
+        </>
+      )}
+
+      {/* Server room: rack columns with blinking LEDs */}
+      {room.type === "server" && (
+        <g opacity={0.5}>
+          {[0, 1, 2].map((col) => {
+            const rackX = rx + 15 + col * (rw / 3 - 5);
+            return (
+              <g key={col}>
+                {/* Rack frame */}
+                <rect x={rackX} y={ry + 24} width={14} height={rh - 34} rx="1" fill="hsl(215, 15%, 12%)" stroke="hsl(215, 12%, 20%)" strokeWidth="0.4" />
+                {/* LED indicators */}
+                {[0, 1, 2, 3].map((led) => (
+                  <circle
+                    key={led}
+                    cx={rackX + 7}
+                    cy={ry + 30 + led * ((rh - 40) / 4)}
+                    r="1.2"
+                    fill={led % 2 === 0 ? "hsl(140, 60%, 40%)" : "hsl(50, 80%, 50%)"}
+                  >
+                    <animate attributeName="opacity" values={led % 2 === 0 ? "0.4;1;0.4" : "0.6;0.2;0.6"} dur={`${1.5 + col * 0.3}s`} repeatCount="indefinite" />
+                  </circle>
+                ))}
+                {/* Vertical cable */}
+                <line x1={rackX + 12} y1={ry + 26} x2={rackX + 12} y2={ry + rh - 12} stroke="hsl(215, 10%, 18%)" strokeWidth="0.4" />
+              </g>
+            );
+          })}
+        </g>
+      )}
+
       <text
-        x={room.position.x + room.width / 2}
-        y={room.position.y + 16}
+        x={rx + rw / 2}
+        y={ry + 16}
         textAnchor="middle"
         fill="hsl(215, 20%, 50%)"
         fontSize="9"
@@ -427,8 +501,8 @@ function RoomSvg({ room, theme, strings, breakSpots }: {
         <BreakFurnitureSvg
           key={i}
           spot={spot}
-          roomX={room.position.x}
-          roomY={room.position.y + 24}
+          roomX={rx}
+          roomY={ry + 24}
         />
       ))}
     </g>
@@ -446,15 +520,29 @@ function BreakFurnitureSvg({ spot, roomX, roomY }: {
   if (spot.furniture === "sofa") {
     return (
       <g>
+        {/* Main body */}
         <rect x={x} y={y} width="28" height="12" rx="3" fill="hsl(260, 20%, 22%)" stroke="hsl(260, 15%, 30%)" strokeWidth="0.5" />
+        {/* Seat cushion */}
         <rect x={x + 2} y={y + 2} width="24" height="6" rx="2" fill="hsl(260, 25%, 28%)" />
+        {/* Cushion dividers */}
+        <line x1={x + 10} y1={y + 2} x2={x + 10} y2={y + 8} stroke="hsl(260, 18%, 25%)" strokeWidth="0.4" />
+        <line x1={x + 18} y1={y + 2} x2={x + 18} y2={y + 8} stroke="hsl(260, 18%, 25%)" strokeWidth="0.4" />
+        {/* Arm rests */}
+        <rect x={x - 2} y={y + 1} width="3" height="10" rx="1.5" fill="hsl(260, 18%, 20%)" stroke="hsl(260, 12%, 28%)" strokeWidth="0.3" />
+        <rect x={x + 27} y={y + 1} width="3" height="10" rx="1.5" fill="hsl(260, 18%, 20%)" stroke="hsl(260, 12%, 28%)" strokeWidth="0.3" />
       </g>
     );
   }
   if (spot.furniture === "table") {
     return (
       <g>
+        {/* Table top */}
         <rect x={x} y={y} width="18" height="18" rx="2" fill="hsl(30, 25%, 18%)" stroke="hsl(30, 20%, 28%)" strokeWidth="0.5" />
+        {/* Table legs (4 corner dots) */}
+        <circle cx={x + 2} cy={y + 2} r="1" fill="hsl(30, 20%, 14%)" />
+        <circle cx={x + 16} cy={y + 2} r="1" fill="hsl(30, 20%, 14%)" />
+        <circle cx={x + 2} cy={y + 16} r="1" fill="hsl(30, 20%, 14%)" />
+        <circle cx={x + 16} cy={y + 16} r="1" fill="hsl(30, 20%, 14%)" />
         {/* Coffee cup */}
         <circle cx={x + 12} cy={y + 6} r="2.5" fill="hsl(30, 20%, 12%)" stroke="hsl(30, 15%, 25%)" strokeWidth="0.3" />
       </g>
@@ -462,7 +550,14 @@ function BreakFurnitureSvg({ spot, roomX, roomY }: {
   }
   if (spot.furniture === "counter") {
     return (
-      <rect x={x} y={y} width="30" height="8" rx="1" fill="hsl(0, 0%, 16%)" stroke="hsl(0, 0%, 24%)" strokeWidth="0.5" />
+      <g>
+        {/* Counter surface */}
+        <rect x={x} y={y} width="30" height="8" rx="1" fill="hsl(0, 0%, 16%)" stroke="hsl(0, 0%, 24%)" strokeWidth="0.5" />
+        {/* Sink basin */}
+        <ellipse cx={x + 15} cy={y + 4} rx="4" ry="2.5" fill="hsl(210, 10%, 12%)" stroke="hsl(210, 8%, 20%)" strokeWidth="0.3" />
+        {/* Faucet (L-shaped) */}
+        <path d={`M ${x + 15} ${y + 1} L ${x + 15} ${y - 2} L ${x + 18} ${y - 2}`} fill="none" stroke="hsl(0, 0%, 35%)" strokeWidth="0.6" strokeLinecap="round" />
+      </g>
     );
   }
   // Default: small chair
@@ -536,7 +631,6 @@ function DeskSvg({
 }) {
   const { x, y } = desk.position;
   const statusColor = agent ? STATUS_COLORS[agent.status] : "#374151";
-  const icon = agent ? STATUS_ICONS[agent.status] : "";
 
   // Stress-tier visual escalation
   const stressTier: StressTier = agent?.stressTier || "normal";
@@ -568,7 +662,7 @@ function DeskSvg({
     <g
       className="cursor-pointer"
       opacity={dimmed ? 0.2 : 1}
-      filter={agent && !dimmed ? stressFilter : undefined}
+      filter={agent && !dimmed ? (stressFilter || "url(#desk-shadow)") : "url(#desk-shadow)"}
       onMouseEnter={() => agent && onHover(agent.id)}
       onMouseLeave={() => onHover(null)}
       onClick={() => agent && !dimmed && onSelect(agent.id)}
@@ -597,18 +691,59 @@ function DeskSvg({
         stroke={selected ? theme.accentColor : deptId !== "unassigned" ? deptColors.accent + "40" : theme.svgDeskStroke}
         strokeWidth={selected ? 2 : 1}
       />
+      {/* Highlight overlay */}
+      <rect x={x + 2} y={y + 2} width={76} height={52} rx="3" fill="url(#desk-highlight)" />
 
-      {/* Monitor */}
-      <rect x={x + 25} y={y + 6} width={30} height={20} rx="2" fill={theme.svgMonitorFill} stroke={theme.svgMonitorStroke} strokeWidth="0.5" />
-      {/* Monitor screen content */}
-      <rect x={x + 27} y={y + 8} width={26} height={16} rx="1" fill={monitorContent} opacity={0.6} />
-      {/* Monitor screen lines (code) */}
+      {/* Monitor bezel (slightly larger background) */}
+      <rect x={x + 24} y={y + 5} width={32} height={22} rx="2.5" fill={theme.svgMonitorFill} stroke={theme.svgMonitorStroke} strokeWidth="0.7" />
+      {/* Monitor screen */}
+      <rect x={x + 26} y={y + 7} width={28} height={18} rx="1" fill={monitorContent} opacity={0.6} />
+      {/* Monitor stand */}
+      <polygon
+        points={`${x + 37},${y + 27} ${x + 43},${y + 27} ${x + 45},${y + 30} ${x + 35},${y + 30}`}
+        fill={theme.svgMonitorFill}
+        stroke={theme.svgMonitorStroke}
+        strokeWidth="0.3"
+      />
+      {/* Monitor status-dependent screen content */}
       {agent && (agent.status === "active" || agent.status === "tool_calling") && (
-        <g opacity={0.5}>
-          <line x1={x + 29} y1={y + 12} x2={x + 44} y2={y + 12} stroke="hsl(140, 60%, 60%)" strokeWidth="0.5" />
-          <line x1={x + 29} y1={y + 15} x2={x + 40} y2={y + 15} stroke="hsl(140, 50%, 50%)" strokeWidth="0.5" />
-          <line x1={x + 29} y1={y + 18} x2={x + 48} y2={y + 18} stroke="hsl(140, 40%, 45%)" strokeWidth="0.5" />
-          <line x1={x + 29} y1={y + 21} x2={x + 42} y2={y + 21} stroke="hsl(140, 60%, 55%)" strokeWidth="0.5" />
+        <g opacity={0.6}>
+          <line x1={x + 28} y1={y + 10} x2={x + 42} y2={y + 10} stroke="hsl(140, 60%, 60%)" strokeWidth="0.5" />
+          <line x1={x + 28} y1={y + 12.5} x2={x + 38} y2={y + 12.5} stroke="hsl(180, 60%, 55%)" strokeWidth="0.5" />
+          <line x1={x + 28} y1={y + 15} x2={x + 50} y2={y + 15} stroke="hsl(50, 70%, 55%)" strokeWidth="0.5" />
+          <line x1={x + 28} y1={y + 17.5} x2={x + 44} y2={y + 17.5} stroke="hsl(140, 50%, 50%)" strokeWidth="0.5" />
+          <line x1={x + 28} y1={y + 20} x2={x + 36} y2={y + 20} stroke="hsl(180, 55%, 50%)" strokeWidth="0.5" />
+          <line x1={x + 28} y1={y + 22.5} x2={x + 48} y2={y + 22.5} stroke="hsl(50, 60%, 50%)" strokeWidth="0.5" />
+        </g>
+      )}
+      {agent && agent.status === "thinking" && (
+        <g>
+          <circle cx={x + 40} cy={y + 16} r="4" fill="none" stroke="hsl(50, 80%, 50%)" strokeWidth="0.7" opacity={0.7}>
+            <animateTransform attributeName="transform" type="rotate" from={`0 ${x + 40} ${y + 16}`} to={`360 ${x + 40} ${y + 16}`} dur="2s" repeatCount="indefinite" />
+          </circle>
+          <circle cx={x + 40} cy={y + 16} r="1.5" fill="hsl(50, 80%, 50%)" opacity={0.5}>
+            <animate attributeName="opacity" values="0.3;0.8;0.3" dur="1.2s" repeatCount="indefinite" />
+          </circle>
+        </g>
+      )}
+      {agent && agent.status === "error" && (
+        <g opacity={0.7}>
+          <line x1={x + 28} y1={y + 11} x2={x + 46} y2={y + 11} stroke="hsl(0, 70%, 55%)" strokeWidth="0.5" />
+          <line x1={x + 28} y1={y + 14} x2={x + 40} y2={y + 14} stroke="hsl(0, 60%, 50%)" strokeWidth="0.5" />
+          <line x1={x + 28} y1={y + 17} x2={x + 44} y2={y + 17} stroke="hsl(0, 70%, 55%)" strokeWidth="0.5" />
+          {/* Warning triangle */}
+          <polygon points={`${x + 40},${y + 19} ${x + 43},${y + 24} ${x + 37},${y + 24}`} fill="none" stroke="hsl(40, 90%, 55%)" strokeWidth="0.6" />
+          <line x1={x + 40} y1={y + 20.5} x2={x + 40} y2={y + 22.5} stroke="hsl(40, 90%, 55%)" strokeWidth="0.5" />
+        </g>
+      )}
+      {agent && agent.status === "speaking" && (
+        <g opacity={0.6}>
+          {/* Chat bubble 1 */}
+          <rect x={x + 29} y={y + 9} width={10} height={6} rx="2" fill="none" stroke="hsl(210, 50%, 60%)" strokeWidth="0.5" />
+          <polygon points={`${x + 32},${y + 15} ${x + 33},${y + 17} ${x + 35},${y + 15}`} fill="hsl(210, 50%, 60%)" />
+          {/* Chat bubble 2 */}
+          <rect x={x + 41} y={y + 14} width={10} height={6} rx="2" fill="none" stroke="hsl(150, 50%, 55%)" strokeWidth="0.5" />
+          <polygon points={`${x + 48},${y + 20} ${x + 47},${y + 22} ${x + 45},${y + 20}`} fill="hsl(150, 50%, 55%)" />
         </g>
       )}
 
@@ -657,9 +792,7 @@ function DeskSvg({
             style={{ imageRendering: "pixelated" }}
           />
         ) : (
-          <text x={x + 40} y={y + 46} textAnchor="middle" fontSize="10">
-            {icon}
-          </text>
+          <InlineAvatarSvg agentId={agent.id} x={x + 26} y={y + 24} size={28} />
         )
       )}
 
@@ -720,23 +853,198 @@ function DeskSvg({
   );
 }
 
+function InlineAvatarSvg({ agentId, x, y, size = 28 }: { agentId: string; x: number; y: number; size?: number }) {
+  const skinTone = hashPick(agentId, 0, SKIN_TONES);
+  const hairColor = hashPick(agentId, 1, HAIR_COLORS);
+  const shirtColor = hashPick(agentId, 4, TOP_COLORS);
+
+  const headR = size * 0.28;
+  const cx = x + size / 2;
+  const headCy = y + size * 0.32;
+
+  // Torso
+  const torsoW = size * 0.52;
+  const torsoH = size * 0.34;
+  const torsoX = cx - torsoW / 2;
+  const torsoY = headCy + headR * 0.75;
+
+  // Eyes
+  const eyeSpacing = headR * 0.38;
+  const eyeY = headCy - headR * 0.08;
+  const eyeR = size * 0.035;
+
+  // Mouth
+  const mouthY = headCy + headR * 0.35;
+  const mouthW = headR * 0.35;
+
+  // Hair arc
+  const hairSeed = hashFloat(agentId, 10);
+  const hairThickness = headR * (0.3 + hairSeed * 0.25);
+
+  return (
+    <g>
+      {/* Torso / shirt */}
+      <rect
+        x={torsoX}
+        y={torsoY}
+        width={torsoW}
+        height={torsoH}
+        rx={size * 0.08}
+        fill={shirtColor}
+      />
+      {/* Head */}
+      <circle cx={cx} cy={headCy} r={headR} fill={skinTone} />
+      {/* Hair arc on top */}
+      <path
+        d={`M ${cx - headR * 0.85} ${headCy - headR * 0.3} Q ${cx} ${headCy - headR - hairThickness} ${cx + headR * 0.85} ${headCy - headR * 0.3}`}
+        fill={hairColor}
+      />
+      {/* Left eye */}
+      <circle cx={cx - eyeSpacing} cy={eyeY} r={eyeR} fill="#1a1a1a" />
+      {/* Right eye */}
+      <circle cx={cx + eyeSpacing} cy={eyeY} r={eyeR} fill="#1a1a1a" />
+      {/* Mouth */}
+      <path
+        d={`M ${cx - mouthW} ${mouthY} Q ${cx} ${mouthY + mouthW * 0.7} ${cx + mouthW} ${mouthY}`}
+        fill="none"
+        stroke="#1a1a1a"
+        strokeWidth={size * 0.03}
+        strokeLinecap="round"
+      />
+    </g>
+  );
+}
+
 function DeskClutterSvg({ x, y, agent }: { x: number; y: number; agent: VisualAgent | null }) {
   if (!agent || agent.status === "offline") return null;
 
+  const personalItem = hashPick(agent.id, 20, ["photo", "plant", "bottle", "toy"] as const);
+
   return (
     <g opacity={0.5}>
-      {/* Coffee cup */}
-      <circle cx={x + 12} cy={y + 14} r="3" fill="hsl(30, 20%, 15%)" stroke="hsl(30, 15%, 25%)" strokeWidth="0.3" />
-      {agent.status === "active" && (
-        <g opacity={0.4}>
-          <line x1={x + 11} y1={y + 10} x2={x + 10} y2={y + 7} stroke="hsl(0, 0%, 50%)" strokeWidth="0.3" />
-          <line x1={x + 13} y1={y + 10} x2={x + 14} y2={y + 7} stroke="hsl(0, 0%, 50%)" strokeWidth="0.3" />
+      {/* Coffee mug — cylinder body */}
+      <rect x={x + 9} y={y + 11} width={6} height={7} rx="1" fill="hsl(30, 20%, 18%)" stroke="hsl(30, 15%, 28%)" strokeWidth="0.4" />
+      {/* Mug rim (top ellipse) */}
+      <ellipse cx={x + 12} cy={y + 11} rx="3" ry="1" fill="hsl(30, 15%, 22%)" stroke="hsl(30, 12%, 30%)" strokeWidth="0.3" />
+      {/* Mug handle */}
+      <path d={`M ${x + 15} ${y + 13} Q ${x + 18} ${y + 13} ${x + 18} ${y + 15.5} Q ${x + 18} ${y + 18} ${x + 15} ${y + 16}`} fill="none" stroke="hsl(30, 15%, 28%)" strokeWidth="0.5" />
+      {/* Steam wisps for active agents */}
+      {(agent.status === "active" || agent.status === "tool_calling" || agent.status === "thinking") && (
+        <g opacity={0.3}>
+          <path d={`M ${x + 11} ${y + 9} Q ${x + 10} ${y + 6.5} ${x + 11.5} ${y + 5}`} fill="none" stroke="hsl(0, 0%, 60%)" strokeWidth="0.4">
+            <animate attributeName="opacity" values="0.1;0.4;0.1" dur="2s" repeatCount="indefinite" />
+          </path>
+          <path d={`M ${x + 13} ${y + 9} Q ${x + 14} ${y + 7} ${x + 12.5} ${y + 4.5}`} fill="none" stroke="hsl(0, 0%, 60%)" strokeWidth="0.4">
+            <animate attributeName="opacity" values="0.15;0.35;0.15" dur="2.5s" repeatCount="indefinite" />
+          </path>
         </g>
       )}
-      {/* Papers/notes */}
-      <rect x={x + 60} y={y + 10} width="10" height="8" rx="0.5" fill="hsl(48, 50%, 25%)" opacity={0.4} transform={`rotate(5, ${x + 65}, ${y + 14})`} />
+
       {/* Keyboard */}
       <rect x={x + 28} y={y + 30} width={24} height={8} rx="1" fill="hsl(215, 15%, 14%)" stroke="hsl(215, 10%, 20%)" strokeWidth="0.3" />
+      {/* Mouse (next to keyboard) */}
+      <rect x={x + 56} y={y + 32} width={5} height={7} rx="2.5" fill="hsl(215, 12%, 16%)" stroke="hsl(215, 10%, 24%)" strokeWidth="0.3" />
+      <line x1={x + 58.5} y1={y + 33} x2={x + 58.5} y2={y + 35} stroke="hsl(215, 10%, 28%)" strokeWidth="0.3" />
+
+      {/* Cable from monitor base to desk edge */}
+      <path
+        d={`M ${x + 40} ${y + 30} Q ${x + 42} ${y + 36} ${x + 48} ${y + 42} Q ${x + 55} ${y + 50} ${x + 65} ${y + 56}`}
+        fill="none"
+        stroke="hsl(215, 10%, 18%)"
+        strokeWidth="0.6"
+        opacity={0.4}
+      />
+
+      {/* Personal item — deterministically selected */}
+      {personalItem === "photo" && (
+        <g>
+          {/* Photo frame */}
+          <rect x={x + 64} y={y + 8} width={8} height={10} rx="0.5" fill="hsl(30, 20%, 20%)" stroke="hsl(30, 15%, 30%)" strokeWidth="0.4" />
+          <rect x={x + 65.5} y={y + 9.5} width={5} height={7} rx="0.3" fill="hsl(210, 20%, 25%)" />
+        </g>
+      )}
+      {personalItem === "plant" && (
+        <g>
+          {/* Mini plant pot */}
+          <rect x={x + 65} y={y + 14} width={6} height={5} rx="1" fill="hsl(25, 30%, 22%)" />
+          {/* Stem */}
+          <line x1={x + 68} y1={y + 14} x2={x + 68} y2={y + 9} stroke="hsl(140, 40%, 30%)" strokeWidth="0.6" />
+          {/* Leaf blob */}
+          <circle cx={x + 68} cy={y + 8} r="3" fill="hsl(140, 50%, 28%)" />
+        </g>
+      )}
+      {personalItem === "bottle" && (
+        <g>
+          {/* Water bottle */}
+          <rect x={x + 66} y={y + 8} width={4} height={12} rx="1.5" fill="hsl(200, 40%, 30%)" stroke="hsl(200, 30%, 40%)" strokeWidth="0.3" />
+          {/* Cap */}
+          <rect x={x + 66.5} y={y + 6.5} width={3} height={2} rx="0.5" fill="hsl(200, 30%, 22%)" />
+        </g>
+      )}
+      {personalItem === "toy" && (
+        <g>
+          {/* Stress ball */}
+          <circle cx={x + 68} cy={y + 14} r="3.5" fill={hashPick(agent.id, 21, ["hsl(0, 60%, 40%)", "hsl(200, 60%, 40%)", "hsl(120, 50%, 35%)", "hsl(40, 70%, 45%)"])} opacity={0.7} />
+        </g>
+      )}
+    </g>
+  );
+}
+
+function WhiteboardSvg({ x, y }: { x: number; y: number }) {
+  return (
+    <g transform={`translate(${x}, ${y})`}>
+      {/* Board frame */}
+      <rect x="0" y="0" width="70" height="45" rx="2" fill="hsl(0, 0%, 92%)" stroke="hsl(215, 10%, 30%)" strokeWidth="1" />
+      {/* Scribble paths in different colors */}
+      <path d="M 8 10 Q 15 6 22 12 Q 28 18 35 10" fill="none" stroke="hsl(210, 70%, 50%)" strokeWidth="0.8" opacity={0.7} />
+      <path d="M 10 20 Q 20 16 30 22 Q 38 26 48 18" fill="none" stroke="hsl(0, 70%, 50%)" strokeWidth="0.8" opacity={0.6} />
+      <path d="M 12 30 Q 22 26 32 32 Q 40 35 50 28" fill="none" stroke="hsl(140, 60%, 40%)" strokeWidth="0.8" opacity={0.7} />
+      <path d="M 40 8 L 60 8 L 60 18 L 40 18 Z" fill="none" stroke="hsl(280, 50%, 50%)" strokeWidth="0.6" opacity={0.5} />
+      {/* Marker tray */}
+      <rect x="10" y="46" width="50" height="4" rx="1" fill="hsl(215, 10%, 20%)" stroke="hsl(215, 8%, 28%)" strokeWidth="0.4" />
+      {/* Markers */}
+      <rect x="15" y="46.5" width="8" height="2.5" rx="0.5" fill="hsl(210, 70%, 50%)" opacity={0.6} />
+      <rect x="25" y="46.5" width="8" height="2.5" rx="0.5" fill="hsl(0, 70%, 50%)" opacity={0.6} />
+      <rect x="35" y="46.5" width="8" height="2.5" rx="0.5" fill="hsl(140, 60%, 40%)" opacity={0.6} />
+    </g>
+  );
+}
+
+function WaterCoolerSvg({ x, y }: { x: number; y: number }) {
+  return (
+    <g transform={`translate(${x}, ${y})`}>
+      {/* Body / base */}
+      <rect x="2" y="20" width="16" height="30" rx="2" fill="hsl(0, 0%, 18%)" stroke="hsl(0, 0%, 28%)" strokeWidth="0.5" />
+      {/* Water jug on top */}
+      <circle cx="10" cy="14" r="8" fill="hsl(210, 60%, 45%)" opacity={0.4} />
+      <circle cx="10" cy="14" r="6" fill="hsl(210, 70%, 55%)" opacity={0.25} />
+      {/* Jug neck */}
+      <rect x="7" y="20" width="6" height="4" rx="1" fill="hsl(210, 50%, 40%)" opacity={0.3} />
+      {/* Spigot */}
+      <rect x="14" y="28" width="6" height="3" rx="1" fill="hsl(0, 0%, 25%)" stroke="hsl(0, 0%, 35%)" strokeWidth="0.3" />
+      {/* Cup dispenser */}
+      <rect x="15" y="22" width="5" height="5" rx="0.5" fill="hsl(0, 0%, 14%)" stroke="hsl(0, 0%, 22%)" strokeWidth="0.3" />
+      {/* Drip tray */}
+      <rect x="3" y="48" width="14" height="2" rx="0.5" fill="hsl(0, 0%, 14%)" />
+    </g>
+  );
+}
+
+function FilingCabinetSvg({ x, y }: { x: number; y: number }) {
+  return (
+    <g transform={`translate(${x}, ${y})`}>
+      {/* Cabinet body */}
+      <rect x="0" y="0" width="20" height="50" rx="1" fill="hsl(215, 12%, 16%)" stroke="hsl(215, 10%, 24%)" strokeWidth="0.5" />
+      {/* Drawer 1 */}
+      <rect x="1" y="2" width="18" height="14" rx="0.5" fill="hsl(215, 10%, 18%)" stroke="hsl(215, 8%, 26%)" strokeWidth="0.4" />
+      <circle cx="10" cy="9" r="1.2" fill="hsl(215, 8%, 30%)" stroke="hsl(215, 6%, 36%)" strokeWidth="0.3" />
+      {/* Drawer 2 */}
+      <rect x="1" y="18" width="18" height="14" rx="0.5" fill="hsl(215, 10%, 18%)" stroke="hsl(215, 8%, 26%)" strokeWidth="0.4" />
+      <circle cx="10" cy="25" r="1.2" fill="hsl(215, 8%, 30%)" stroke="hsl(215, 6%, 36%)" strokeWidth="0.3" />
+      {/* Drawer 3 */}
+      <rect x="1" y="34" width="18" height="14" rx="0.5" fill="hsl(215, 10%, 18%)" stroke="hsl(215, 8%, 26%)" strokeWidth="0.4" />
+      <circle cx="10" cy="41" r="1.2" fill="hsl(215, 8%, 30%)" stroke="hsl(215, 6%, 36%)" strokeWidth="0.3" />
     </g>
   );
 }

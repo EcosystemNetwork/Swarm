@@ -20,7 +20,7 @@
    ═══════════════════════════════════════ */
 
 /** Deterministic 32-bit hash from string (djb2a variant) */
-function hashString(str: string): number {
+export function hashString(str: string): number {
   let h = 5381;
   for (let i = 0; i < str.length; i++) {
     h = ((h << 5) + h) ^ str.charCodeAt(i);
@@ -29,17 +29,17 @@ function hashString(str: string): number {
 }
 
 /** Pull a float 0..1 from the hash at a given salt offset */
-function hashFloat(id: string, salt: number): number {
+export function hashFloat(id: string, salt: number): number {
   return (hashString(`${id}:${salt}`) % 10000) / 10000;
 }
 
 /** Pull an integer 0..max from the hash */
-function hashInt(id: string, salt: number, max: number): number {
+export function hashInt(id: string, salt: number, max: number): number {
   return hashString(`${id}:${salt}`) % max;
 }
 
 /** Pick an item from an array deterministically */
-function hashPick<T>(id: string, salt: number, arr: readonly T[]): T {
+export function hashPick<T>(id: string, salt: number, arr: readonly T[]): T {
   return arr[hashInt(id, salt, arr.length)];
 }
 
@@ -47,28 +47,28 @@ function hashPick<T>(id: string, salt: number, arr: readonly T[]): T {
    Palettes
    ═══════════════════════════════════════ */
 
-const SKIN_TONES = [
+export const SKIN_TONES = [
   "#f9d5a7", "#f5c18c", "#d8a06e", "#c68642", "#a0674b",
   "#7a4a3a", "#5c3928", "#f0d0b0", "#e8b88a", "#c99b6d",
 ] as const;
 
-const HAIR_COLORS = [
+export const HAIR_COLORS = [
   "#342016", "#5a3214", "#1a1a1a", "#8c5e3c", "#b78847",
   "#cc3333", "#553399", "#2288aa", "#ddaa33", "#777777",
 ] as const;
 
-const TOP_COLORS = [
+export const TOP_COLORS = [
   "#3b82f6", "#ef4444", "#22c55e", "#eab308", "#8b5cf6",
   "#06b6d4", "#f97316", "#ec4899", "#6366f1", "#14b8a6",
   "#64748b", "#dc2626", "#16a34a", "#d97706", "#7c3aed",
 ] as const;
 
-const BOTTOM_COLORS = [
+export const BOTTOM_COLORS = [
   "#1f2937", "#374151", "#1e3a5f", "#4b2d1a", "#1a1a2e",
   "#2d3748", "#4a5568", "#1e293b",
 ] as const;
 
-const SHOE_COLORS = [
+export const SHOE_COLORS = [
   "#374151", "#1f2937", "#92400e", "#f5f5f4", "#ef4444",
   "#3b82f6", "#000000",
 ] as const;
