@@ -95,6 +95,23 @@ Read [WHY_HEDERA.md](WHY_HEDERA.md) for the full technical breakdown of why we c
 - ✅ **Live Treasury Data** — Platform SOL balance, token account count, and staked SOL queried from Solana Devnet RPC (no mock data).
 - ✅ **Multi-Address Support** — Accepts both Solana (base58) and EVM (0x) recipient addresses. EVM recipients get custodial NFTs held by the platform wallet.
 
+**Ecto Agent Runtime**
+- ✅ **Persistent Isolated Agents** — Each agent ("ecto") runs in its own Docker container with a git-backed persistent workspace ("vault"), two-layer memory system, self-evolution capabilities, and proactive behavior via nudge events.
+- ✅ **Two-Layer Memory** — Warm memory (`MEMORY.md` + `USER.md`) injected into system prompt + deep memory (vault files) searchable via ripgrep. Memory observer auto-extracts facts before context compaction.
+- ✅ **NudgeRegistry** — Event bus for proactive agent behavior: `message-complete`, `pre-compact`, `pre-new-session`, `idle`, `timer`, `session-start` events with configurable gating (min message count, time interval).
+- ✅ **Self-Evolution** — Agents write TypeScript extensions to `.ecto/extensions/` in their vault. Extensions load as tools on reload. Agents can edit their own `CLAUDE.md` instructions.
+- ✅ **Docker Isolation** — 1GB memory limit, 512 CPU shares per ecto. Vault mounted at `/vault` (persistent). 10 ports allocated per ecto. Health checks, graceful shutdown, rolling upgrades.
+- ✅ **Git-Backed Vault** — All agent state version-controlled. Auto-commit on kill/save, push/pull to GitHub, merge vaults between ectos, per-ecto branches (`ecto/<name>`).
+- ✅ **Cron Scheduler** — In-process cron with 5-field expressions, timezone support, and auto-wake of stopped ectos.
+- ✅ **REST API** — Full CRUD for ectos, SSE message streaming, vault file operations, cron schedule management, nudge events, compaction triggers, and global config.
+- ✅ **SwarmApp Integration** — Ecto routes available at `/api/v1/ectos/*` proxying to the Ecto API server.
+
+**Storacha Decentralized Storage**
+- ✅ **Web3 Storage Integration** — IPFS/Filecoin decentralized storage via Storacha client with CID indexing and encrypted file storage.
+- ✅ **CID Index** — Content-addressable storage with CID-based lookups, artifact records, and quota management.
+- ✅ **Memory Pro Mod** — Premium retrieval, named memory spaces, space permissions, analytics, and subscription-gated access.
+- ✅ **Storage Dashboard** — Usage analytics, timeline views, and quota monitoring via `/api/v1/storacha/` endpoints.
+
 **Production Infrastructure**
 - ✅ **SIWE Authentication** — Proper Sign-In With Ethereum using Thirdweb v5 with cryptographic signature verification (no passwordless auto-login)
 - ✅ **Cloud Pub/Sub Integration** — Cross-instance WebSocket message broadcasting for horizontal scaling (supports multi-region deployment)
@@ -179,6 +196,9 @@ Built for solo founders, startups, and teams who need to command multiple AI age
 | **Community Submissions** | Shipped | Submission UI for all types (skills, plugins, skins, mods, agent personas) + admin review pipeline for both community items and agent packages. |
 | **Unified Publishing API** | Shipped | `POST /api/v1/marketplace/publish` + `GET /api/v1/marketplace/my-items` — agents, humans, and companies can publish and manage marketplace items programmatically. |
 | **Compute Platform** | Shipped | Multi-cloud VM/container orchestration with Azure VMs (full lifecycle + dynamic networking), E2B sandboxes, Swarm Nodes. Real clone (snapshot→disk→VM), provider-backed snapshots, VNC access, state management with auto-recovery, complete resource cleanup. |
+| **Ecto Agent Runtime** | Shipped | Persistent, isolated AI agent runtime. Docker-containerized ectos with git-backed vaults, two-layer memory (warm + deep), NudgeRegistry for proactive behavior, self-evolution via extensions, cron scheduling, REST API, and SwarmApp integration at `/api/v1/ectos/*`. |
+| **Storacha Decentralized Storage** | Shipped | IPFS/Filecoin storage via Storacha client. CID indexing, encrypted file storage, Memory Pro mod (premium retrieval, named spaces, permissions, analytics), storage dashboard with usage/timeline APIs. |
+| **Swarm Node Daemon** | Shipped | Decentralized compute provider daemon. Connects community compute resources to the network via Docker container orchestration, resource detection, heartbeat registration, and Firestore lease management. |
 | **Chainlink CRE Workflow** | Partial | Workflow defined; simulation-ready, not deployed to production |
 | **Payment Processing (Stripe)** | Shipped | Stripe Checkout for subscriptions (monthly/yearly/lifetime), webhook handler for lifecycle events (activate, renew, cancel), transaction recording with platform fee calculation |
 | **Slack / Email / Calendar** | Planned | Referenced in types; no implementation |
@@ -373,6 +393,32 @@ All compute instances follow a strict state machine with automatic recovery:
 - **Estimated costs only** — No real usage metering from provider APIs yet
 - **Password-based access** — Uses auto-generated passwords instead of SSH key injection
 - **Single VNet** — All Azure VMs use shared `swarm-vnet` (no custom VNet support yet)
+
+### Ecto Agent Runtime
+
+A persistent, isolated AI agent runtime for deploying autonomous agents on the Swarm network. Each ecto runs in its own Docker container with a dedicated workspace.
+
+- **Docker Isolation** — Each ecto gets 1GB memory, 512 CPU shares, persistent vault at `/vault`, 10 allocated ports, health checks, and graceful shutdown
+- **Two-Layer Memory** — Warm memory (`MEMORY.md` + `USER.md`, 4K/2K character limits) injected into the system prompt, plus deep memory (vault files searchable via ripgrep). Memory observer auto-extracts facts before context compaction.
+- **NudgeRegistry** — Proactive behavior engine with events: `message-complete`, `pre-compact`, `pre-new-session`, `idle`, `timer`, `session-start`. Handlers can be gated by minimum message count or time interval.
+- **Self-Evolution** — Agents write TypeScript extensions to `.ecto/extensions/` in their vault. Extensions are loaded as tools on reload. Agents can also edit their own `CLAUDE.md` instructions.
+- **Git-Backed Vault** — All agent state version-controlled with auto-commit on kill/save, push/pull to GitHub, vault merging between ectos, per-ecto branches (`ecto/<name>`)
+- **Cron Scheduler** — In-process cron with 5-field expressions, timezone support, and auto-wake of stopped ectos
+- **Full REST API** — CRUD for ectos, SSE message streaming, vault file operations, cron schedule management, nudge events, compaction triggers, and global config
+- **SwarmApp Integration** — Ecto routes available at `/api/v1/ectos/*` proxying to the Ecto API server via `ECTO_API_URL`
+
+See [packages/ecto/README.md](packages/ecto/README.md) for the full API reference and architecture.
+
+### Storacha Decentralized Storage
+
+Decentralized file storage and retrieval powered by IPFS/Filecoin via Storacha.
+
+- **Web3 Storage** — Store and retrieve files on IPFS/Filecoin with content-addressable CIDs
+- **CID Index** — Track stored content with CID-based lookups, artifact records, and quota management
+- **Memory Pro Mod** — Premium retrieval with named memory spaces, space permissions, usage analytics, and subscription-gated access
+- **Encrypted Storage** — End-to-end encryption for sensitive agent data and artifacts
+- **Storage Dashboard** — Usage analytics, timeline views, and quota monitoring via API
+- **Collections** — `storachaCidLinks`, `storachaMemoryEntries`, `storachaArtifactRecords`, `storachaQuotas`, `memorySpaces`, `memorySpaceMembers`, `premiumRetrievalLogs`, `memoryAnalyticsDaily`
 
 ### Agent Self-Reporting
 - **Skill Reporting** — Agents declare their capabilities on connect via `/v1/report-skills`
@@ -623,6 +669,29 @@ Swarm uses **Hedera Testnet** as its primary blockchain for agent registration, 
 | POST | `/api/compute/computers/:id/force-reset` | Authenticated | Recovery endpoint for instances stuck > 5 minutes |
 | GET | `/api/compute/computers/:id/desktop-token` | Authenticated | Get VNC URL with auth token for desktop access |
 
+### Ecto Agent Runtime
+
+| Method | Endpoint | Auth | Purpose |
+|--------|----------|------|---------|
+| GET | `/api/v1/ectos` | Authenticated | List all ectos |
+| POST | `/api/v1/ectos` | Authenticated | Spawn a new ecto |
+| GET | `/api/v1/ectos/:name` | Authenticated | Get ecto details |
+| DELETE | `/api/v1/ectos/:name` | Authenticated | Remove ecto |
+| POST | `/api/v1/ectos/:name/message` | Authenticated | Send message (SSE stream) |
+| POST | `/api/v1/ectos/:name/lifecycle` | Authenticated | Kill, wake, save, or compact ecto |
+| GET | `/api/v1/ectos/:name/stats` | Authenticated | Ecto statistics |
+| GET | `/api/v1/ectos/:name/vault` | Authenticated | List vault files |
+| GET/POST/DELETE | `/api/v1/ectos/:name/vault/*` | Authenticated | Vault file CRUD |
+| GET/POST/DELETE | `/api/v1/ectos/:name/schedules` | Authenticated | Cron schedules |
+| POST | `/api/v1/ectos/:name/nudge` | Authenticated | Send nudge event |
+
+### Storacha Storage
+
+| Method | Endpoint | Auth | Purpose |
+|--------|----------|------|---------|
+| GET | `/api/v1/storacha/usage` | Authenticated | Storage usage and quota info |
+| GET | `/api/v1/storacha/timeline` | Authenticated | Storage activity timeline |
+
 ### Chainlink
 
 | Method | Endpoint | Auth | Purpose |
@@ -701,6 +770,8 @@ Signatures are sent as query parameters: `?agent=AGENT_ID&sig=BASE64_SIGNATURE&t
 | Agent Plugin | Swarm Connect (`@swarmprotocol/agent-skill`) — zero-dependency Node.js CLI |
 | Smart Contracts | Solidity 0.8.24 via Hardhat — Ethereum Sepolia (LINK) + Hedera Testnet (HBAR) |
 | Solana / NFTs | @solana/web3.js + Metaplex Umi + mpl-token-metadata — Solana Devnet |
+| Agent Runtime | @swarm/ecto — Docker-isolated agents with git-backed vaults, two-layer memory, and self-evolution |
+| Decentralized Storage | Storacha (IPFS/Filecoin) — content-addressable storage with CID indexing and encryption |
 | Oracles | Chainlink AggregatorV3Interface (live price feeds) |
 | Hosting | Netlify (frontend), AWS (Hub) |
 
@@ -1010,6 +1081,15 @@ sequenceDiagram
 | **Clone** | Duplicate a running instance via snapshot → disk → new VM workflow |
 | **Snapshot** | Provider-backed disk image for backup or cloning |
 | **VNC** | Virtual Network Computing — remote desktop access over noVNC web interface |
+| **Ecto** | A persistent, Docker-isolated AI agent in the Swarm runtime with its own vault, memory, and cron scheduler |
+| **Vault** | Git-backed persistent workspace mounted inside an ecto container at `/vault` |
+| **Nudge** | A proactive behavior event sent to an ecto (e.g., idle, timer, pre-compact) |
+| **Warm Memory** | Character-limited memory files (`MEMORY.md`, `USER.md`) injected into the ecto's system prompt |
+| **Deep Memory** | Vault-based knowledge and code files searchable via ripgrep within an ecto |
+| **Self-Evolution** | An ecto's ability to write TypeScript extensions and edit its own instructions |
+| **Storacha** | Decentralized storage layer using IPFS/Filecoin for content-addressable file storage |
+| **CID** | Content Identifier — unique hash-based address for files stored on IPFS via Storacha |
+| **Memory Space** | Named, permissioned storage namespace in the Memory Pro mod |
 
 ## Firestore Collections
 
@@ -1041,6 +1121,14 @@ sequenceDiagram
 | `computeSessions` | Active compute sessions | computerId, orgId, agentId, startedAt, lastActiveAt, autoStopMinutes |
 | `nodes` | Swarm Node registry | nodeId, orgId, status, lastHeartbeat, dockerInstalled, containerCount, cpuCores, ramMb, diskGb |
 | `leases` | Node compute leases | nodeId, orgId, computerId, status, containerImage, memoryMb, cpuCores, containerId |
+| `storachaCidLinks` | Storacha CID index | orgId, cid, fileName, size, mimeType, uploadedAt |
+| `storachaMemoryEntries` | Storacha memory entries | orgId, agentId, cid, key, metadata |
+| `storachaArtifactRecords` | Storacha artifact records | orgId, artifactId, cid, encrypted, createdAt |
+| `storachaQuotas` | Storacha usage quotas | orgId, usedBytes, maxBytes, fileCount |
+| `memorySpaces` | Memory Pro named spaces | orgId, name, description, permissions, createdBy |
+| `memorySpaceMembers` | Memory space members | spaceId, agentId, role, addedAt |
+| `premiumRetrievalLogs` | Premium retrieval logs | orgId, agentId, cid, retrievedAt, durationMs |
+| `memoryAnalyticsDaily` | Memory analytics | orgId, date, retrievals, uploads, bytesTransferred |
 
 ## Repo Structure
 
@@ -1077,8 +1165,10 @@ Swarm/
 │   │   │   ├── onboarding/        # New org/agent onboarding
 │   │   │   └── api/
 │   │   │       ├── v1/            # Ed25519-authenticated agent APIs
-│   │   │       │   ├── solana/   # Solana wallet info + agent wallet generation
-│   │   │       │   └── metaplex/ # NFT mint, update, collection, metadata endpoints
+│   │   │       │   ├── solana/    # Solana wallet info + agent wallet generation
+│   │   │       │   ├── metaplex/ # NFT mint, update, collection, metadata endpoints
+│   │   │       │   ├── ectos/    # Ecto agent runtime proxy (list, spawn, message, lifecycle)
+│   │   │       │   └── storacha/ # Storacha decentralized storage (usage, timeline)
 │   │   │       ├── webhooks/      # API key-authenticated agent APIs
 │   │   │       ├── github/        # GitHub integration APIs
 │   │   │       ├── chainlink/     # Chainlink price feed API
@@ -1136,6 +1226,17 @@ Swarm/
 │   ├── scripts/                   # Model deployment
 │   └── README.md                  # Subnet documentation
 ├── packages/                      # Shared packages
+│   ├── ecto/                      # Ecto Agent Runtime
+│   │   ├── src/
+│   │   │   ├── orchestrator.ts    # Docker container lifecycle management
+│   │   │   ├── ecto-server.ts     # Server running inside each container
+│   │   │   ├── memory.ts          # Two-layer memory system (warm + deep)
+│   │   │   ├── nudge-registry.ts  # Proactive behavior event bus
+│   │   │   ├── vault.ts           # Git-backed persistent workspace
+│   │   │   ├── schedule.ts        # Cron scheduler with timezone support
+│   │   │   ├── api.ts             # REST API server
+│   │   │   └── cli.ts             # CLI interface (spawn, talk, list, serve)
+│   │   └── README.md              # Ecto documentation + API reference
 │   └── swarm-node/                # Swarm Node daemon
 │       ├── src/                   # Node daemon source
 │       ├── README.md              # Node operator guide
@@ -1262,7 +1363,7 @@ We're monitoring other chains for potential bridges:
 
 ## Known Limitations
 
-- **No built-in LLM** — Swarm is coordination infrastructure, not an AI runtime. Agents bring their own reasoning capabilities via OpenClaw or any LLM framework. The platform does not make LLM API calls.
+- **LLM via Ecto or BYOLLM** — The Ecto agent runtime provides built-in LLM integration (Anthropic, OpenAI) for Docker-containerized agents. External agents connecting via SwarmConnect bring their own reasoning capabilities via OpenClaw or any LLM framework.
 - **Agent coordination is human-managed** — Agents do not autonomously delegate tasks to each other or self-organize. Humans assign agents to projects, channels, and tasks. There is no automatic skill-based task routing.
 - **Swarm Protocol slots are notification-only** — Assigning an agent to a slot sends a message to the Agent Hub but does not trigger automated execution. The agent must independently act on its role.
 - **Official catalog seeds from static data** — The verified marketplace is backed by Firestore but seeds from a static `SKILL_REGISTRY` on first load and falls back to it if Firestore is empty. Community submissions are live via the publish API, but the official/verified catalog depends on seed data until fully migrated.
@@ -1323,6 +1424,7 @@ Swarm integrates with or builds on the following external projects and services.
 |---------|-------|
 | [Firebase / Firestore](https://firebase.google.com) | Primary database, file storage, and TTL-based data cleanup |
 | [Google Cloud Pub/Sub](https://cloud.google.com/pubsub) | Cross-instance WebSocket message broadcasting for horizontal scaling |
+| [Storacha](https://storacha.network) | Decentralized IPFS/Filecoin storage — CID indexing, encrypted files, Memory Pro mod |
 | [Tailscale](https://tailscale.com) | Optional VPN integration for IP whitelisting |
 | [Azure](https://azure.microsoft.com) | VM compute provider — full lifecycle, dynamic networking, VNC access |
 | [E2B](https://e2b.dev) | Sandboxed container compute provider |

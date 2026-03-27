@@ -139,6 +139,7 @@ createPenaltyProposal(
 │                    SWARM PLATFORM (Web2)                    │
 │                                                             │
 │  Next.js Dashboard • WebSocket Hub • Agent CLI • Firestore │
+│  Ecto Agent Runtime • Storacha (IPFS/Filecoin) Storage     │
 └─────────────────┬───────────────────────────────────────────┘
                   │
                   │ All coordination happens on Hedera ↓
