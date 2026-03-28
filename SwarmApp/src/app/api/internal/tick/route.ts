@@ -14,7 +14,7 @@ import { NextRequest } from "next/server";
 import { requireInternalService } from "@/lib/auth-guard";
 import { getGlobalActiveRuns } from "@/lib/workflow/store";
 import { advanceRun } from "@/lib/workflow/executor";
-import { evaluateCronTriggers } from "@/lib/workflow/cron-evaluator";
+import { evaluateCronTriggers, evaluateRegularCronJobs } from "@/lib/workflow/cron-evaluator";
 import { getRedis } from "@/lib/redis";
 
 /** Max runs to advance per tick (fits within 10s Netlify timeout) */
@@ -73,7 +73,7 @@ export async function POST(req: NextRequest) {
     console.error("[tick] Failed to fetch active runs:", err);
   }
 
-  // ── Phase 2: Evaluate cron triggers ─────────────────────────────────────
+  // ── Phase 2: Evaluate cron triggers (workflow trigger policies) ─────────────
   let cronResult = { evaluated: 0, fired: 0, errors: 0 };
 
   if (Date.now() - startTime < TIME_BUDGET_MS) {
@@ -82,6 +82,18 @@ export async function POST(req: NextRequest) {
     } catch (err) {
       console.error("[tick] Cron evaluation failed:", err);
       cronResult.errors = 1;
+    }
+  }
+
+  // ── Phase 3: Execute regular cron jobs (briefings, scheduled tasks) ──────────
+  let cronJobsResult = { evaluated: 0, fired: 0, errors: 0 };
+
+  if (Date.now() - startTime < TIME_BUDGET_MS) {
+    try {
+      cronJobsResult = await evaluateRegularCronJobs();
+    } catch (err) {
+      console.error("[tick] Cron jobs evaluation failed:", err);
+      cronJobsResult.errors = 1;
     }
   }
 
@@ -99,5 +111,6 @@ export async function POST(req: NextRequest) {
     elapsed: Date.now() - startTime,
     workflows: { advanced, completed, failed, errors: workflowErrors },
     cron: cronResult,
+    cronJobs: cronJobsResult,
   });
 }

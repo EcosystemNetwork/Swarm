@@ -17,6 +17,10 @@ import {
 } from "firebase/firestore";
 import type { TriggerPolicy, CronTriggerConfig } from "./triggers";
 import { fireEvent } from "./triggers";
+import { getRedis } from "@/lib/redis";
+import { ensureAgentGroupChat, sendMessage, getAgent } from "@/lib/firestore";
+import { generateDailySummary, getDailySummary, formatSummary } from "@/lib/daily-summary";
+import { recordCronExecution, type AgentExecutionResult } from "@/lib/cron-history";
 
 // ── Cron Expression Parser ───────────────────────────────────────────────────
 
@@ -143,4 +147,179 @@ export async function evaluateCronTriggers(): Promise<{
   }
 
   return { evaluated: policies.length, fired, errors };
+}
+
+// ── Regular Cron Job Execution ───────────────────────────────────────────────
+
+interface RawCronJob {
+  id: string;
+  orgId: string;
+  name: string;
+  message: string;
+  schedule: string;
+  agentIds?: string[];
+  targetChannelId?: string;
+  enabled: boolean;
+  paused?: boolean;
+}
+
+/** Get all enabled cron jobs (cross-org). */
+async function getEnabledCronJobs(): Promise<RawCronJob[]> {
+  const q = query(
+    collection(db, "cronJobs"),
+    where("enabled", "==", true),
+  );
+  const snap = await getDocs(q);
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() }) as RawCronJob);
+}
+
+/**
+ * Evaluate all regular cronJobs and execute matching ones.
+ *
+ * For briefing-type jobs: generates a daily summary server-side and posts it
+ * to Agent Hub so the user receives it even when the agent isn't running.
+ * For all jobs: posts the prompt message to Agent Hub mentioning assigned agents.
+ */
+export async function evaluateRegularCronJobs(): Promise<{
+  evaluated: number;
+  fired: number;
+  errors: number;
+}> {
+  const now = new Date();
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const minuteKey = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}-${pad(now.getHours())}-${pad(now.getMinutes())}`;
+
+  let jobs: RawCronJob[];
+  try {
+    jobs = await getEnabledCronJobs();
+  } catch (err) {
+    console.error("[cron-jobs] Failed to fetch cron jobs:", err);
+    return { evaluated: 0, fired: 0, errors: 1 };
+  }
+
+  const active = jobs.filter((j) => !j.paused && !!j.schedule);
+  let fired = 0;
+  let errors = 0;
+  const redis = getRedis();
+
+  for (const job of active) {
+    if (!cronMatchesNow(job.schedule, now)) continue;
+
+    // Minute-level idempotency via Redis
+    const idempotencyKey = `cron-job:${job.id}:${minuteKey}`;
+    if (redis) {
+      try {
+        const acquired = await redis.set(idempotencyKey, "1", { nx: true, ex: 90 });
+        if (!acquired) continue; // Already fired this minute
+      } catch {
+        // Redis unavailable — proceed without dedup
+      }
+    }
+
+    const startTime = new Date();
+    const agentResults: AgentExecutionResult[] = [];
+    let jobSuccess = false;
+
+    try {
+      const hub = await ensureAgentGroupChat(job.orgId);
+      const agentIds = job.agentIds || [];
+      const isBriefingJob = /briefing|standup/i.test(job.name);
+
+      if (isBriefingJob && agentIds.length > 0) {
+        // Generate and deliver briefing server-side for each assigned agent
+        for (const agentId of agentIds) {
+          try {
+            const agent = await getAgent(agentId);
+            const agentName = agent?.name || agentId;
+            const today = now.toISOString().split("T")[0];
+
+            // Generate the summary (idempotent — creates a new one each day)
+            await generateDailySummary(job.orgId, agentId, agentName);
+            const summary = await getDailySummary(job.orgId, agentId, today);
+
+            if (summary) {
+              const formatted = formatSummary(summary);
+              await sendMessage({
+                channelId: hub.id,
+                senderId: agentId,
+                senderName: agentName,
+                senderType: "agent",
+                content: formatted,
+                orgId: job.orgId,
+                createdAt: new Date(),
+              });
+            }
+
+            agentResults.push({
+              agentId,
+              agentName,
+              success: true,
+              responsePreview: `Briefing posted for ${today}`,
+              executedAt: Date.now(),
+            });
+          } catch (err) {
+            agentResults.push({
+              agentId,
+              agentName: agentId,
+              success: false,
+              error: err instanceof Error ? err.message : "Failed to generate briefing",
+              executedAt: Date.now(),
+            });
+          }
+        }
+        jobSuccess = agentResults.some((r) => r.success);
+      } else {
+        // Non-briefing job — post the prompt to Agent Hub for agents to pick up
+        const mentions = agentIds.map((id) => `@${id}`).join(" ");
+        const content = agentIds.length
+          ? `📋 **${job.name}**\n\n${mentions}\n\n${job.message}`
+          : `📋 **${job.name}**\n\n${job.message}`;
+
+        await sendMessage({
+          channelId: hub.id,
+          senderId: "system",
+          senderName: "Swarm Protocol",
+          senderType: "agent",
+          content,
+          orgId: job.orgId,
+          createdAt: new Date(),
+        });
+
+        for (const agentId of agentIds) {
+          agentResults.push({
+            agentId,
+            agentName: agentId,
+            success: true,
+            responsePreview: "Prompt posted to Agent Hub",
+            executedAt: Date.now(),
+          });
+        }
+        jobSuccess = true;
+      }
+
+      fired++;
+    } catch (err) {
+      errors++;
+      console.error(`[cron-jobs] Failed to execute job ${job.id} (${job.name}):`, err);
+    }
+
+    // Record execution history
+    const endTime = new Date();
+    try {
+      await recordCronExecution(
+        job.id,
+        job.name,
+        job.orgId,
+        startTime,
+        endTime,
+        jobSuccess,
+        agentResults,
+        jobSuccess ? undefined : "Execution failed",
+      );
+    } catch (err) {
+      console.error(`[cron-jobs] Failed to record history for ${job.id}:`, err);
+    }
+  }
+
+  return { evaluated: active.length, fired, errors };
 }
