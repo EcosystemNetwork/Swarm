@@ -17,7 +17,7 @@ import {
   Link as LinkIcon, Zap, Palette, Megaphone, Wrench, Plug, Puzzle, Sparkles,
   Monitor, Globe, Code as CodeIcon, Bot, ShieldAlert, Flag, Package, History,
   TrendingUp, DollarSign, Settings2, Database,
-  Star, Search, X, Hexagon, Upload, Layers,
+  Star, Search, X, Hexagon, Upload, Layers, Diamond,
 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { MaturityBadge } from "@/components/ui/maturity-badge";
@@ -38,6 +38,9 @@ const ICON_MAP: Record<string, typeof LayoutDashboard> = {
   ShieldAlert: ShieldAlert,
   Monitor: Monitor,
   DollarSign: DollarSign,
+  Diamond: Diamond,
+  Shield: Shield,
+  Database: Database,
 };
 
 /** Default icon per item type for mods without explicit sidebarConfig */
