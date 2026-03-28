@@ -10,7 +10,9 @@
     "test": "vitest",
     "test:ui": "vitest --ui",
     "test:run": "vitest run",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "seed:ton": "tsx scripts/seed-ton-demo.ts",
+    "seed:ton:clean": "tsx scripts/seed-ton-demo.ts --clean"
   },
   "dependencies": {
     "@aws-sdk/client-bedrock-runtime": "^3.1010.0",
@@ -41,6 +43,7 @@
     "@splinetool/react-spline": "^4.1.0",
     "@splinetool/runtime": "^1.12.58",
     "@storacha/client": "^2.1.2",
+    "@tonconnect/ui-react": "^2.4.2",
     "@types/three": "^0.183.1",
     "@upstash/ratelimit": "^2.0.8",
     "@upstash/redis": "^1.37.0",

@@ -10,9 +10,11 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+# ─── SwarmApp jobs ─────────────────────────────────────────────────────────────
+
 jobs:
   lint:
-    name: Lint
+    name: Lint (SwarmApp)
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -28,7 +30,7 @@ jobs:
       - run: npm run lint
 
   typecheck:
-    name: Type Check
+    name: Type Check (SwarmApp)
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -44,7 +46,7 @@ jobs:
       - run: npx tsc --noEmit
 
   test:
-    name: Test
+    name: Test (SwarmApp)
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -60,7 +62,7 @@ jobs:
       - run: npm run test:run
 
   build:
-    name: Build
+    name: Build (SwarmApp)
     needs: [lint, typecheck, test]
     runs-on: ubuntu-latest
     defaults:
@@ -84,3 +86,80 @@ jobs:
           cache-dependency-path: SwarmApp/package-lock.json
       - run: npm ci
       - run: npm run build
+
+# ─── Hub jobs ──────────────────────────────────────────────────────────────────
+
+  hub-test:
+    name: Test (Hub)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: hub
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: hub/package-lock.json
+      - run: npm ci
+      - run: npm test
+        # Unit tests only — no Firebase/Redis required
+
+# ─── Contracts jobs ────────────────────────────────────────────────────────────
+
+  contracts-compile:
+    name: Compile (Contracts)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: contracts
+    env:
+      # Hardhat config requires DEPLOYER_PRIVATE_KEY at load time.
+      # Use a throwaway non-functional key for compile/test.
+      DEPLOYER_PRIVATE_KEY: "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: contracts/package-lock.json
+      - run: npm ci
+      - run: npm run compile
+
+  contracts-test:
+    name: Test (Contracts)
+    needs: [contracts-compile]
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: contracts
+    env:
+      DEPLOYER_PRIVATE_KEY: "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: contracts/package-lock.json
+      - run: npm ci
+      - run: npm test
+        # Runs against Hardhat in-process network — no Sepolia required
+
+# ─── Release gate ──────────────────────────────────────────────────────────────
+
+  gate:
+    name: Release Gate
+    needs: [build, hub-test, contracts-test]
+    runs-on: ubuntu-latest
+    steps:
+      - name: All checks passed
+        run: |
+          echo "✓ SwarmApp: lint, typecheck, test, build"
+          echo "✓ Hub: unit tests"
+          echo "✓ Contracts: compile + test"
+          echo "SHA: ${{ github.sha }}"
+          echo "Ref: ${{ github.ref }}"
+          echo "This commit is release-safe for staging/testnet deployment."

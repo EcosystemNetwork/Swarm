@@ -729,6 +729,124 @@ app.get("/health", async (_req, res) => {
   });
 });
 
+/**
+ * GET /diagnostics
+ *
+ * PRD 5 — Hub-side registration diagnostics.
+ * Checks whether an agentId is known to the hub and provides actionable
+ * messages for common first-run failures.
+ *
+ * Usage: GET /diagnostics?agentId=<id>
+ */
+app.get("/diagnostics", async (req, res) => {
+  const agentId = req.query.agentId;
+
+  if (!agentId) {
+    return res.status(400).json({
+      ok: false,
+      error: "agentId query param required",
+      hint: "GET /diagnostics?agentId=<your-agent-id>",
+    });
+  }
+
+  const result = {
+    agentId,
+    ts: new Date().toISOString(),
+    checks: {},
+  };
+
+  // 1. ID format
+  const validFormat = /^[a-zA-Z0-9_-]{1,128}$/.test(agentId);
+  result.checks.idFormat = {
+    ok: validFormat,
+    detail: validFormat
+      ? "ID format is valid"
+      : "ID must be 1-128 chars: a-z A-Z 0-9 _ -",
+  };
+
+  // 2. Firestore record exists
+  let agentData = null;
+  try {
+    const snap = await db.collection("agents").doc(agentId).get();
+    if (snap.exists) {
+      agentData = snap.data();
+      result.checks.firestoreRecord = { ok: true, detail: "Agent document found in Firestore" };
+    } else {
+      result.checks.firestoreRecord = {
+        ok: false,
+        detail: "No agent document found — run `swarm register` first",
+        hint: "swarm register --hub <url> --org <orgId> --name <name>",
+      };
+    }
+  } catch (err) {
+    result.checks.firestoreRecord = {
+      ok: false,
+      detail: `Firestore lookup failed: ${err.message}`,
+      hint: "Check FIREBASE_SERVICE_ACCOUNT env var on the hub",
+    };
+  }
+
+  // 3. Public key present
+  if (agentData) {
+    const hasKey = !!agentData.publicKey;
+    result.checks.publicKey = {
+      ok: hasKey,
+      detail: hasKey
+        ? "Public key is stored in Firestore"
+        : "No publicKey field — registration may be incomplete",
+      hint: hasKey ? null : "Re-run `swarm register` to re-upload your public key",
+    };
+  }
+
+  // 4. Currently connected
+  const connected = agentConnections.has(agentId) && agentConnections.get(agentId).size > 0;
+  result.checks.connected = {
+    ok: connected,
+    detail: connected
+      ? `Agent is currently connected (${agentConnections.get(agentId).size} socket(s))`
+      : "Agent is not connected to this hub instance",
+    hint: connected ? null : "Run `swarm daemon` or reconnect via WebSocket",
+  };
+
+  // 5. Status (paused / active)
+  if (agentData) {
+    const status = agentData.status || "active";
+    result.checks.status = {
+      ok: status !== "paused",
+      detail: `Agent status: ${status}`,
+      hint: status === "paused"
+        ? "Agent is paused — resume from the dashboard or via API before sending messages"
+        : null,
+    };
+  }
+
+  // 6. Redis presence
+  try {
+    const instance = await getAgentInstance(agentId);
+    result.checks.redisPresence = {
+      ok: !!instance,
+      detail: instance
+        ? `Agent tracked in Redis on instance ${instance}`
+        : "No Redis presence entry — agent is not actively connected",
+    };
+  } catch (err) {
+    result.checks.redisPresence = {
+      ok: false,
+      detail: `Redis check failed: ${err.message}`,
+      hint: "Check REDIS_URL env var",
+    };
+  }
+
+  // Overall
+  const allOk = Object.values(result.checks).every((c) => c.ok !== false);
+  result.ok = allOk;
+  result.summary = allOk
+    ? "All checks passed — agent is registered and ready"
+    : "One or more checks failed — see individual checks for hints";
+
+  res.json(result);
+});
+
 // GET /agents/online (no auth required — public info)
 app.get("/agents/online", (_req, res) => {
   const online = [];
@@ -791,7 +909,7 @@ server.on("upgrade", async (req, socket, head) => {
 
   if (!sig || !ts) {
     log("warn", "WS upgrade rejected — missing sig or ts", { entityId, wsType });
-    socket.write("HTTP/1.1 401 Unauthorized\r\n\r\n");
+    socket.write("HTTP/1.1 401 Unauthorized\r\nX-Swarm-Error: missing-auth-params\r\nX-Swarm-Hint: URL must include ?sig=<base64>&ts=<epoch-ms>\r\n\r\n");
     socket.destroy();
     return;
   }
@@ -799,8 +917,8 @@ server.on("upgrade", async (req, socket, head) => {
   // Check timestamp freshness (prevent replay of connection URLs)
   const tsMs = parseInt(ts, 10);
   if (Math.abs(Date.now() - tsMs) > AUTH_WINDOW_MS) {
-    log("warn", "WS upgrade rejected — stale timestamp", { entityId, wsType });
-    socket.write("HTTP/1.1 401 Unauthorized\r\n\r\n");
+    log("warn", "WS upgrade rejected — stale timestamp", { entityId, wsType, ageMs: Math.abs(Date.now() - tsMs) });
+    socket.write("HTTP/1.1 401 Unauthorized\r\nX-Swarm-Error: stale-timestamp\r\nX-Swarm-Hint: Clock drift detected — ensure system clock is accurate; auth window is " + AUTH_WINDOW_MS + "ms\r\n\r\n");
     socket.destroy();
     return;
   }
@@ -843,8 +961,9 @@ server.on("upgrade", async (req, socket, head) => {
   const signedMessage = `WS:connect:${agentId}:${ts}`;
   const agentData = await verifyEd25519(agentId, signedMessage, sig);
   if (!agentData) {
-    log("warn", "WS upgrade rejected — invalid signature", { agentId });
-    socket.write("HTTP/1.1 401 Unauthorized\r\n\r\n");
+    log("warn", "WS upgrade rejected — invalid signature", { agentId,
+      hint: "Verify agent is registered (GET /diagnostics?agentId=<id>) and keys match Firestore" });
+    socket.write("HTTP/1.1 401 Unauthorized\r\nX-Swarm-Error: invalid-signature\r\nX-Swarm-Hint: Run GET /diagnostics?agentId=" + agentId + " for diagnosis\r\n\r\n");
     socket.destroy();
     return;
   }
@@ -1163,7 +1282,7 @@ wss.on("connection", async (ws, _req) => {
   let totalReplayed = 0;
 
   for (const ch of channels) {
-    subscribeToChannel(ws, ch.id);
+    await subscribeToChannel(ws, ch.id);
 
     // Replay missed messages if since > 0
     if (sinceMs > 0) {
@@ -1269,9 +1388,9 @@ wss.on("connection", async (ws, _req) => {
       return;
     }
 
-    // Rate limit
-    if (!checkRateLimit(agentId)) {
-      ws.send(JSON.stringify({ error: "Rate limit exceeded", type: "error" }));
+    // Rate limit (checkRateLimit is async — must await or the Promise is always truthy)
+    if (!await checkRateLimit(agentId)) {
+      ws.send(JSON.stringify({ error: "Rate limit exceeded", type: "error", code: "RATE_LIMITED" }));
       return;
     }
 
@@ -1334,7 +1453,7 @@ wss.on("connection", async (ws, _req) => {
 
     // Subscribe/unsubscribe
     if (type === "subscribe" && channelId) {
-      subscribeToChannel(ws, channelId);
+      await subscribeToChannel(ws, channelId);
       streamChannel(ws, channelId, channelId, agentId);
       log("info", "Subscribed", { agentId, channelId });
       ws.send(JSON.stringify({ type: "subscribed", channelId }));
@@ -1342,7 +1461,7 @@ wss.on("connection", async (ws, _req) => {
     }
 
     if (type === "unsubscribe" && channelId) {
-      unsubscribeFromChannel(ws, channelId);
+      await unsubscribeFromChannel(ws, channelId);
       log("info", "Unsubscribed", { agentId, channelId });
       ws.send(JSON.stringify({ type: "unsubscribed", channelId }));
       return;

@@ -4,7 +4,8 @@
   "type": "module",
   "scripts": {
     "start": "node index.mjs",
-    "dev": "node --watch index.mjs"
+    "dev": "node --watch index.mjs",
+    "test": "node --test test/hub.test.mjs"
   },
   "dependencies": {
     "@google-cloud/pubsub": "^5.3.0",

@@ -6,13 +6,15 @@
  * Tabs: Overview | Payments | Bounties | Subscriptions | History | Analytics | Agent Wallets | Policy | Audit | Prank
  */
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { useTonConnectUI, useTonWallet, useTonAddress } from "@tonconnect/ui-react";
 import {
-    Diamond, Wallet, Send, RefreshCw, Shield, FileText, LayoutDashboard,
+    Wallet, Send, RefreshCw, Shield, FileText, LayoutDashboard,
     ShieldCheck, AlertTriangle, CheckCircle2, XCircle, Clock, Ban, ExternalLink,
     Plus, Pause, Play, Trash2, Copy, Check, Trophy, History, BarChart3,
-    KeyRound, Percent, Globe, FlaskConical, TrendingUp, ArrowDownLeft,
+    KeyRound, Percent, TrendingUp, ArrowDownLeft,
     ArrowUpRight, Fingerprint, Ghost, Image, Mic, MessageSquare, Sparkles, Loader2,
+    type LucideIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -32,7 +34,7 @@ import type { TonAgentWallet } from "@/lib/ton-agent-wallet";
 
 type Tab = "overview" | "payments" | "bounties" | "subscriptions" | "history" | "analytics" | "agent-wallets" | "policy" | "audit" | "prank";
 
-const TABS: { id: Tab; label: string; icon: typeof Diamond }[] = [
+const TABS: { id: Tab; label: string; icon: LucideIcon }[] = [
     { id: "overview",      label: "Overview",      icon: LayoutDashboard },
     { id: "payments",      label: "Payments",       icon: Send },
     { id: "bounties",      label: "Bounties",       icon: Trophy },
@@ -394,9 +396,10 @@ function OverviewPanel({ wallets, payments, subscriptions, bounties, balance, po
 // Payments Panel
 // ═══════════════════════════════════════════════════════════════
 
-function PaymentsPanel({ payments, actionLoading, onApprove, onReject, onSend, onRefresh }: {
+function PaymentsPanel({ payments, actionLoading, onApprove, onReject, onExecute, onSend, onRefresh }: {
     payments: TonPayment[]; actionLoading: string | null;
-    onApprove: (p: TonPayment) => void; onReject: (p: TonPayment) => void; onSend: () => void; onRefresh: () => void;
+    onApprove: (p: TonPayment) => void; onReject: (p: TonPayment) => void;
+    onExecute: (p: TonPayment) => void; onSend: () => void; onRefresh: () => void;
 }) {
     return (
         <div className="space-y-3">
@@ -408,6 +411,7 @@ function PaymentsPanel({ payments, actionLoading, onApprove, onReject, onSend, o
                 <div className="rounded-lg border border-border bg-card divide-y divide-border">
                     {payments.map((p) => {
                         const s = PAYMENT_STATUS[p.status];
+                        const isExecuting = actionLoading === `execute-${p.id}`;
                         return (
                             <div key={p.id} className="p-4 space-y-2">
                                 <div className="flex items-start justify-between gap-4">
@@ -430,6 +434,11 @@ function PaymentsPanel({ payments, actionLoading, onApprove, onReject, onSend, o
                                             <Button size="sm" variant="outline" className="h-7 text-xs text-red-400 border-red-500/30 hover:bg-red-500/10" disabled={actionLoading === `reject-${p.id}`} onClick={() => onReject(p)}><XCircle className="h-3 w-3 mr-1" />Reject</Button>
                                             <Button size="sm" className="h-7 text-xs" disabled={actionLoading === `approve-${p.id}`} onClick={() => onApprove(p)}>{actionLoading === `approve-${p.id}` ? <RefreshCw className="h-3 w-3 animate-spin mr-1" /> : <CheckCircle2 className="h-3 w-3 mr-1" />}Approve</Button>
                                         </div>
+                                    )}
+                                    {p.status === "ready" && (
+                                        <Button size="sm" className="h-7 text-xs bg-blue-600 hover:bg-blue-700" disabled={isExecuting} onClick={() => onExecute(p)}>
+                                            {isExecuting ? <><Loader2 className="h-3 w-3 animate-spin mr-1" />Sending…</> : <><Send className="h-3 w-3 mr-1" />Execute On-chain</>}
+                                        </Button>
                                     )}
                                 </div>
                             </div>
@@ -1155,6 +1164,13 @@ export default function TonModPage() {
     const { address: wallet } = useSession();
     const orgId = org?.id;
 
+    // Real TON Connect
+    const [tonConnectUI] = useTonConnectUI();
+    const tonWallet = useTonWallet();
+    const tonAddressRaw = useTonAddress(false);      // "0:hex..." — used for server calls
+    const tonAddressFriendly = useTonAddress(true);  // "EQ..." — displayed in UI
+    const verifiedRef = useRef<string | null>(null); // prevent duplicate verify calls
+
     const [tab, setTab] = useState<Tab>("overview");
     const [loading, setLoading] = useState(true);
     const [actionLoading, setActionLoading] = useState<string | null>(null);
@@ -1213,11 +1229,119 @@ export default function TonModPage() {
         fetchAll().finally(() => setLoading(false));
     }, [orgId, fetchAll]);
 
-    const handleConnectWallet = async () => {
-        if (!orgId || !wallet) return;
-        await fetch("/api/v1/ton/connect", { method: "POST", headers: { ...hdrs(), "Content-Type": "application/json" }, body: JSON.stringify({ orgId, address: wallet, walletName: "Swarm Session" }) });
-        fetchAll();
+    // Auto-connect + verify when TON wallet is linked via TON Connect
+    useEffect(() => {
+        if (!tonWallet || !orgId || !tonAddressRaw) return;
+        // Deduplicate: only run once per connected address
+        if (verifiedRef.current === tonAddressRaw) return;
+        verifiedRef.current = tonAddressRaw;
+
+        const proof = tonWallet.connectItems?.tonProof;
+        const hasProof = proof && "proof" in proof;
+
+        // Save wallet to org (upsert)
+        (async () => {
+            try {
+                const saveRes = await fetch("/api/v1/ton/connect", {
+                    method: "POST",
+                    headers: { ...hdrs(), "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        orgId,
+                        address: tonAddressRaw,
+                        walletName: tonWallet.device?.appName || "TON Wallet",
+                    }),
+                });
+                if (!saveRes.ok) { console.error("[ton connect]", await saveRes.text()); }
+                if (!hasProof) { await fetchAll(); return; }
+                // Cryptographically verify ownership via ton_proof
+                const p = (proof as { proof: { timestamp: number; domain: { lengthBytes: number; value: string }; signature: string; payload: string } }).proof;
+                const verifyRes = await fetch("/api/v1/ton/verify", {
+                    method: "POST",
+                    headers: { ...hdrs(), "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        orgId,
+                        address: tonAddressRaw,
+                        proof: { timestamp: p.timestamp, domain: p.domain, signature: p.signature, payload: p.payload },
+                        publicKey: tonWallet.account.publicKey,
+                    }),
+                });
+                if (!verifyRes.ok) { console.error("[ton verify]", await verifyRes.text()); }
+                await fetchAll();
+            } catch (err) { console.error("[ton wallet auto-verify]", err); }
+        })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [tonWallet?.account?.address, orgId]);
+
+    // Reset dedup ref when wallet disconnects
+    useEffect(() => {
+        if (!tonWallet) verifiedRef.current = null;
+    }, [tonWallet]);
+
+    const handleConnectWallet = () => {
+        if (tonWallet) {
+            tonConnectUI.disconnect();
+            return;
+        }
+        // Request ton_proof at connection time so we can verify ownership server-side
+        tonConnectUI.setConnectRequestParameters({
+            state: "ready",
+            value: { tonProof: `swarm-${orgId || "anon"}-${Date.now()}` },
+        });
+        tonConnectUI.openModal();
     };
+
+    // Poll on-chain history until a matching outgoing tx appears, then return its hash
+    const waitForTxHash = useCallback(async (fromAddress: string, amountNano: string, timeoutMs = 15000): Promise<string | null> => {
+        const deadline = Date.now() + timeoutMs;
+        while (Date.now() < deadline) {
+            await new Promise((r) => setTimeout(r, 2500));
+            try {
+                const r = await fetch(`/api/v1/ton/history?address=${encodeURIComponent(fromAddress)}&limit=5`, { headers: hdrs() });
+                if (!r.ok) continue;
+                const data = await r.json();
+                const match = (data.transactions || []).find((tx: { direction: string; amountNano: string }) =>
+                    tx.direction === "out" && tx.amountNano === amountNano,
+                );
+                if (match) return match.hash as string;
+            } catch { /* retry */ }
+        }
+        return null;
+    }, [hdrs]);
+
+    const handleExecutePayment = useCallback(async (p: TonPayment) => {
+        if (!orgId || !tonWallet) return;
+        setActionLoading(`execute-${p.id}`);
+        try {
+            await tonConnectUI.sendTransaction({
+                messages: [{
+                    address: p.toAddress,
+                    amount: p.amountNano,
+                }],
+                validUntil: Math.floor(Date.now() / 1000) + 300,
+            });
+
+            // Wait for tx to land on-chain and get its hash
+            const txHash = await waitForTxHash(p.fromAddress, p.amountNano);
+
+            await fetch(`/api/v1/ton/payments/${p.id}`, {
+                method: "PATCH",
+                headers: { ...hdrs(), "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    orgId,
+                    action: "execute",
+                    txHash: txHash || `pending-${Date.now()}`,
+                    reviewedBy: wallet || tonAddressRaw,
+                    fromAddress: p.fromAddress,
+                    toAddress: p.toAddress,
+                    amountNano: p.amountNano,
+                }),
+            });
+            await fetchAll();
+        } catch (err) {
+            console.error("[executePayment]", err);
+        }
+        setActionLoading(null);
+    }, [orgId, tonWallet, tonConnectUI, wallet, tonAddressRaw, hdrs, waitForTxHash, fetchAll]);
 
     const handleSendPayment = async (d: { fromAddress: string; toAddress: string; amountTon: string; memo: string }) => {
         if (!orgId || !wallet) return { error: "Not connected" };
@@ -1328,7 +1452,10 @@ export default function TonModPage() {
                         <p className="text-sm text-muted-foreground">Telegram-native payments, bounties, agent wallets, and spending controls on TON</p>
                     </div>
                 </div>
-                <Button variant="outline" size="sm" onClick={handleConnectWallet}><Wallet className="h-4 w-4 mr-1.5" />Connect Wallet</Button>
+                <Button variant="outline" size="sm" onClick={handleConnectWallet}>
+                    <Wallet className="h-4 w-4 mr-1.5" />
+                    {tonWallet ? shortAddr(tonAddressFriendly) : "Connect TON Wallet"}
+                </Button>
             </div>
 
             {/* Tabs */}
@@ -1350,7 +1477,7 @@ export default function TonModPage() {
             ) : (
                 <>
                     {tab === "overview" && <OverviewPanel wallets={connectedWallets} payments={payments} subscriptions={subscriptions} bounties={bounties} balance={balance} policy={policy} feeConfig={feeConfig} onConnect={handleConnectWallet} onSend={() => setShowSend(true)} />}
-                    {tab === "payments" && <PaymentsPanel payments={payments} actionLoading={actionLoading} onApprove={handleApprove} onReject={handleReject} onSend={() => setShowSend(true)} onRefresh={fetchAll} />}
+                    {tab === "payments" && <PaymentsPanel payments={payments} actionLoading={actionLoading} onApprove={handleApprove} onReject={handleReject} onExecute={handleExecutePayment} onSend={() => setShowSend(true)} onRefresh={fetchAll} />}
                     {tab === "bounties" && <BountiesPanel bounties={bounties} actionLoading={actionLoading} wallet={wallet} feeConfig={feeConfig} onPost={() => setShowBounty(true)} onAction={handleBountyAction} onRefresh={fetchAll} />}
                     {tab === "subscriptions" && <SubsPanel subs={subscriptions} actionLoading={actionLoading} onPause={(id) => handleSubAction(id, "paused")} onResume={(id) => handleSubAction(id, "active")} onCancel={(id) => handleSubAction(id, "cancelled")} onCreate={() => setShowSub(true)} onRefresh={fetchAll} />}
                     {tab === "history" && <HistoryPanel address={primaryWallet?.address || null} network="mainnet" />}

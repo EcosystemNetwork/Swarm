@@ -6,7 +6,8 @@
     "compile": "hardhat compile",
     "test": "hardhat test",
     "deploy:sepolia": "hardhat run scripts/deploy.ts --network sepolia",
-    "verify": "hardhat verify --network sepolia"
+    "verify": "hardhat verify --network sepolia",
+    "smoke:sepolia": "hardhat run scripts/smoke.ts --network sepolia"
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-toolbox": "^5.0.0",

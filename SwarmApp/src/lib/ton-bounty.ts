@@ -162,11 +162,11 @@ export async function submitBounty(
 
 export async function resolveBounty(
     id: string,
-    resolution: "approved" | "rejected",
+    resolution: "released" | "rejected",
     opts?: { releaseTxHash?: string; feeNano?: string; netAmountNano?: string },
 ): Promise<void> {
     await updateDoc(doc(db, "tonBounties", id), {
-        status: resolution === "approved" ? "released" : "rejected",
+        status: resolution,
         releaseTxHash: opts?.releaseTxHash || null,
         feeNano: opts?.feeNano || null,
         netAmountNano: opts?.netAmountNano || null,

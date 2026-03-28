@@ -79,7 +79,7 @@ export async function PATCH(
                 feeCalc = calculateBountyFee(amountNano, feeBps);
             }
 
-            await resolveBounty(id, "approved", {
+            await resolveBounty(id, "released", {
                 feeNano: feeCalc.feeNano,
                 netAmountNano: feeCalc.netNano,
             });
@@ -124,7 +124,7 @@ export async function PATCH(
         if (action === "release") {
             const { txHash, releasedBy } = body as { txHash: string; releasedBy?: string };
             if (!txHash) return Response.json({ error: "txHash required for release" }, { status: 400 });
-            await resolveBounty(id, "approved", { releaseTxHash: txHash });
+            await resolveBounty(id, "released", { releaseTxHash: txHash });
             await logTonAudit({
                 orgId, event: "bounty_released", paymentId: null, subscriptionId: null,
                 fromAddress: null, toAddress: null, amountNano: null, txHash,

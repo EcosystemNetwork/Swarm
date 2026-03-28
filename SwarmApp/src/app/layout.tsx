@@ -14,6 +14,7 @@ import { PokemonProvider } from "@/contexts/PokemonContext";
 import { MechaProvider } from "@/contexts/MechaContext";
 import { CommandBar } from "@/components/command-bar";
 import { PostHogProvider } from "@/components/posthog-provider";
+import { TonConnectProvider } from "@/components/ton-connect-provider";
 
 import AutoSiwe from "@/components/AutoSiwe";
 
@@ -55,6 +56,7 @@ export default function RootLayout({
           <PokemonProvider>
           <MechaProvider>
           <Web3Provider>
+            <TonConnectProvider>
             <SessionProvider>
             <AutoSiwe />
             <OrgProvider>
@@ -66,6 +68,7 @@ export default function RootLayout({
               </PostHogProvider>
             </OrgProvider>
             </SessionProvider>
+            </TonConnectProvider>
           </Web3Provider>
           </MechaProvider>
           </PokemonProvider>

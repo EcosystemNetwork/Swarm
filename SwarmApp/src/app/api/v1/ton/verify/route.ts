@@ -34,15 +34,20 @@ function buildVerifyMessage(
     timestamp: number,
     payload: string,
 ): Buffer {
-    // Parse raw address — TON addresses in bounceable/user-friendly form
-    // We need the 32-byte hash part. For simplicity we accept hex raw form.
-    // Production: use @ton/ton Address.parse() to extract workchain + hash.
-    const wc = Buffer.allocUnsafe(4);
-    wc.writeInt32BE(0, 0); // workchain 0 (most addresses)
+    // Parse raw TON address in "workchain:hash" format (e.g. "0:ab12…cd34")
+    // The hash is the 32-byte account identifier; workchain is typically 0.
+    const parts = address.split(":");
+    const workchain = parts.length === 2 ? parseInt(parts[0], 10) : 0;
+    const hashHex = parts.length === 2 ? parts[1] : address.replace(/[^a-fA-F0-9]/g, "");
 
-    // Extract 32-byte address hash from raw hex (last 64 hex chars)
-    const cleanAddr = address.replace(/[^a-fA-F0-9]/g, "");
-    const addrHash = Buffer.from(cleanAddr.slice(-64).padStart(64, "0"), "hex");
+    const wc = Buffer.allocUnsafe(4);
+    wc.writeInt32BE(workchain, 0);
+
+    if (hashHex.length !== 64) {
+        // Fallback: pad/truncate for non-standard formats
+        // Production: use @ton/ton Address.parse() for EQ…/UQ… friendly addresses
+    }
+    const addrHash = Buffer.from(hashHex.padStart(64, "0").slice(0, 64), "hex");
 
     const domainBuf = Buffer.from(domain, "utf8");
     const domainLen = Buffer.allocUnsafe(4);
