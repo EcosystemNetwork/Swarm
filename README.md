@@ -49,6 +49,17 @@ Read [WHY_HEDERA.md](WHY_HEDERA.md) for the full technical breakdown of why we c
 
 ## 🆕 What's New (March 2026)
 
+**TON Treasury Mod + OpenClaw Prank Engine**
+- ✅ **TON Treasury Mod** — Full Telegram-native payment dashboard: TON Connect wallet binding, Toncoin/Jetton payments, bounty board, recurring subscriptions, agent wallets, spending policy (per-tx/daily/monthly caps + allowlist), and audit log.
+- ✅ **OpenClaw Prank** — New "Prank" tab lets you direct OpenClaw to prank a friend on Telegram via a mix of AI-generated text messages, realistic selfie-style photos, and voice notes. Give the friend's name + scenario, pick intensity (light / medium / chaotic), preview the full sequence, then send it live via any Telegram bot.
+  - **Text**: Claude claude-sonnet-4-6 → GPT-4o → Gemini 1.5 Flash → fallback templates (first available key used)
+  - **Images**: fal.ai FLUX → DALL-E 3 (first available key used)
+  - **Voice**: ElevenLabs TTS → OpenAI TTS (first available key used — no key = script text only)
+  - All media types degrade gracefully — works with zero API keys using built-in templates
+- 📄 See `.env.example` for all new `ANTHROPIC_API_KEY`, `GOOGLE_AI_API_KEY`, `FAL_KEY`, `ELEVENLABS_API_KEY` options
+
+
+
 **Compute Platform — Production-Ready VM/Container Orchestration**
 - ✅ **Multi-Cloud Support** — Azure VMs (full production), E2B sandboxes, and decentralized Swarm Nodes
 - ✅ **Real VM Cloning** — Actual machine duplication via snapshot → disk → new VM workflow (not just metadata copying)

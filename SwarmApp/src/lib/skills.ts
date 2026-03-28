@@ -29,6 +29,7 @@ import { BRANDMOVER_MANIFEST } from "./brandmover";
 import { PAYSTREAM_MANIFEST } from "./paystream";
 import { BASE_MANIFEST } from "./base";
 import { CDP_MANIFEST } from "./cdp-manifest";
+import { TON_MANIFEST } from "./ton";
 import type { TokenGateConfig } from "./token-gate";
 
 // ═══════════════════════════════════════════════════════════════
@@ -556,6 +557,33 @@ export const SKILL_REGISTRY: Skill[] = [
             parentModId: "base-mod",
         },
         modManifest: CDP_MANIFEST,
+    },
+    {
+        id: "ton-treasury",
+        name: "TON Treasury",
+        description:
+            "Telegram-native TON payments, agent treasury, and spending controls. TON Connect wallet auth with ton_proof, Toncoin/Jetton reads via TON Center API v3, policy-gated payments with per-tx caps and human approval queue, recurring subscriptions, and a full on-chain audit log. Built for Telegram Mini App.",
+        type: "mod",
+        source: "verified",
+        category: "Web3",
+        icon: "💎",
+        version: "1.0.0",
+        author: "Swarm Core",
+        tags: ["ton", "telegram", "tma", "tonconnect", "payments", "treasury", "jetton", "web3", "subscriptions", "policy"],
+        pricing: {
+            model: "subscription",
+            tiers: [
+                { plan: "monthly", price: 9.99, currency: "USD" },
+                { plan: "yearly", price: 99.99, currency: "USD" },
+            ],
+        },
+        sidebarConfig: {
+            sectionId: "modifications",
+            label: "TON",
+            href: "/mods/ton",
+            iconName: "Diamond",
+        },
+        modManifest: TON_MANIFEST,
     },
     {
         id: "solana-web3",
