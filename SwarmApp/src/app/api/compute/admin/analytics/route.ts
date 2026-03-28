@@ -22,7 +22,7 @@ export async function GET(req: NextRequest) {
   if (!auth.ok) return forbidden(auth.error);
 
   const posthogKey = process.env.POSTHOG_PERSONAL_API_KEY;
-  const posthogHost = process.env.NEXT_PUBLIC_POSTHOG_HOST || "https://us.i.posthog.com";
+  const posthogHost = process.env.POSTHOG_HOST || process.env.NEXT_PUBLIC_POSTHOG_HOST || "https://us.i.posthog.com";
   const projectId = process.env.POSTHOG_PROJECT_ID;
 
   if (!posthogKey || !projectId) {

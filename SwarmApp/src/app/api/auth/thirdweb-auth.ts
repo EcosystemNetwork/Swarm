@@ -28,7 +28,7 @@ let _client: ReturnType<typeof createThirdwebClient> | null = null;
 function getClient() {
   if (_client) return _client;
 
-  const clientId = process.env.NEXT_PUBLIC_THIRDWEB_CLIENT_ID;
+  const clientId = process.env.THIRDWEB_CLIENT_ID || process.env.NEXT_PUBLIC_THIRDWEB_CLIENT_ID;
   const secretKey = process.env.THIRDWEB_SECRET_KEY;
 
   if (!clientId && !secretKey) {
@@ -67,6 +67,7 @@ export function getThirdwebAuth(domain: string) {
 export function getDomainFromRequest(req: Request): string {
   const host = req.headers.get("host")
     || req.headers.get("x-forwarded-host")
+    || process.env.APP_DOMAIN
     || process.env.NEXT_PUBLIC_APP_DOMAIN
     || "swarmprotocol.fun";
   // Strip port for standard ports

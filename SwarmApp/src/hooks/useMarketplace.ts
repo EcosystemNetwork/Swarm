@@ -236,6 +236,25 @@ export function useMarketplace() {
     useEffect(() => { loadMarketplaceAgents(); }, [loadMarketplaceAgents]);
     useEffect(() => { loadFeatured(); }, [loadFeatured]);
 
+    // Handle return from Stripe checkout — add mod to inventory so sidebar picks it up
+    useEffect(() => {
+        const status = searchParams.get("checkout");
+        const modId = searchParams.get("mod");
+        if (status !== "success" || !modId || !currentOrg || !userAddress) return;
+        (async () => {
+            try {
+                const owned = await getOwnedItems(currentOrg.id);
+                if (!owned.some(o => o.skillId === modId)) {
+                    await acquireItem(currentOrg.id, modId, userAddress);
+                    await loadInventory();
+                    window.dispatchEvent(new Event("swarm-inventory-changed"));
+                }
+            } catch (e) {
+                console.error("Failed to add mod to inventory after checkout:", e);
+            }
+        })();
+    }, [searchParams, currentOrg, userAddress, loadInventory]);
+
     // ── Merged data ──
 
     const allItems: Skill[] = useMemo(() => {
@@ -504,7 +523,13 @@ export function useMarketplace() {
                 }
                 if (data.error?.includes("not configured")) {
                     await subscribeToItem(currentOrg.id, itemId, plan, userAddress);
+                    // Also add to inventory so the sidebar picks it up
+                    if (!inventoryMap.has(itemId)) {
+                        await acquireItem(currentOrg.id, itemId, userAddress);
+                    }
                     await loadSubscriptions();
+                    await loadInventory();
+                    window.dispatchEvent(new Event("swarm-inventory-changed"));
                     setSubscribeTarget(null);
                 }
             } else {
@@ -522,7 +547,7 @@ export function useMarketplace() {
         } finally {
             setBusyId(null);
         }
-    }, [currentOrg, account, authenticated, userAddress, allItems, loadSubscriptions]);
+    }, [currentOrg, account, authenticated, userAddress, allItems, inventoryMap, loadSubscriptions, loadInventory]);
 
     const handleCancelSubscription = useCallback(async (sub: MarketSubscription) => {
         setBusyId(sub.itemId);

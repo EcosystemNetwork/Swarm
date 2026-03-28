@@ -96,7 +96,7 @@ export async function POST(req: NextRequest) {
             return Response.json({ valid: false, error: "Proof expired (>10 minutes old)" }, { status: 400 });
         }
 
-        const appDomain = proof.domain?.value || new URL(process.env.NEXT_PUBLIC_APP_URL || "https://app.swarmprotocol.fun").hostname;
+        const appDomain = proof.domain?.value || new URL(process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || "https://app.swarmprotocol.fun").hostname;
         const msg = buildVerifyMessage(address, appDomain, proof.timestamp, proof.payload);
         const sig = Buffer.from(proof.signature, "base64");
         const rawPubkey = Buffer.from(publicKey.replace(/^0x/, ""), "hex");

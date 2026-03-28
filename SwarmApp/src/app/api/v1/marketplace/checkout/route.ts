@@ -52,7 +52,7 @@ export async function POST(req: NextRequest) {
   }
 
   const modName = staticMod?.name || remoteMod?.name || modId;
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+  const appUrl = process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 
   try {
     // Create Stripe Checkout Session via REST API (no SDK dependency needed)

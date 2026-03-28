@@ -22,7 +22,7 @@ interface PrankMessage {
 
 // ─── Config ───────────────────────────────────────────────────
 
-const HUB_URL = process.env.NEXT_PUBLIC_HUB_URL || process.env.HUB_URL || "https://swarmprotocol.fun";
+const HUB_URL = process.env.HUB_URL || process.env.NEXT_PUBLIC_HUB_URL || "https://swarmprotocol.fun";
 const TON_AGENT_ID = process.env.TON_AGENT_ID || "ton-agent";
 
 const INTENSITY_CONFIG: Record<Intensity, { messageCount: number; escalation: string }> = {

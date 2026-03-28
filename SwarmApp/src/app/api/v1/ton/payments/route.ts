@@ -218,7 +218,7 @@ async function notifyApprovalRequired(opts: {
     const chatId = policy?.notifyTelegramChatId;
     if (!chatId) return;
 
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://app.swarmprotocol.fun";
+    const appUrl = process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || "https://app.swarmprotocol.fun";
     const amountTon = nanoToTon(opts.amountNano);
     const shortFrom = opts.fromAddress.slice(0, 10) + "…" + opts.fromAddress.slice(-6);
     const shortTo = opts.toAddress.slice(0, 10) + "…" + opts.toAddress.slice(-6);
