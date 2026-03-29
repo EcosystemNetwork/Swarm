@@ -20,8 +20,7 @@ import {
   HEDERA_TASK_BOARD_ABI,
   HEDERA_GAS_LIMIT,
 } from "@/lib/swarm-contracts";
-// The deployed Hedera Testnet AgentRegistry contract uses the ASN-aware ABI
-import { LINK_AGENT_REGISTRY_ABI as AGENT_REGISTRY_ABI } from "@/lib/link-contracts";
+import { AGENT_REGISTRY_ABI } from "@/lib/swarm-contracts";
 
 interface WriteState {
   isLoading: boolean;

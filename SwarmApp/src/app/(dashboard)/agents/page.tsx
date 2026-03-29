@@ -21,7 +21,7 @@ async function hashApiKeyClient(apiKey: string): Promise<string> {
   return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, "0")).join("");
 }
 import { getAgentAvatarUrl } from "@/lib/agent-avatar";
-import { generateASN } from "@/lib/chainlink";
+import { generateASN } from "@/lib/credit-scoring";
 import { collection, query, where, onSnapshot, doc, updateDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { SKILL_REGISTRY, getInstalledSkills } from "@/lib/skills";

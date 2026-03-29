@@ -19,8 +19,7 @@ import {
   type AgentProfile,
   type TreasuryPnL,
 } from "@/lib/swarm-contracts";
-// The deployed Hedera Testnet AgentRegistry contract uses the ASN-aware ABI
-import { LINK_AGENT_REGISTRY_ABI as AGENT_REGISTRY_ABI } from "@/lib/link-contracts";
+import { AGENT_REGISTRY_ABI } from "@/lib/swarm-contracts";
 
 // Hedera Testnet RPC URL
 const HEDERA_RPC_URL = "https://testnet.hashio.io/api";

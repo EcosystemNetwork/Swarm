@@ -15,9 +15,8 @@ import crypto from "crypto";
 import { PLATFORM_BRIEFING } from "../briefing";
 import { getAgentAvatarUrl } from "@/lib/agent-avatar";
 import { agentCheckIn, getOrganization, type Agent } from "@/lib/firestore";
-import { generateASN } from "@/lib/chainlink";
-import { HEDERA_CONTRACTS, HEDERA_GAS_LIMIT, CONTRACTS, AGENT_IDENTITY_NFT_ABI } from "@/lib/swarm-contracts";
-import { LINK_AGENT_REGISTRY_ABI } from "@/lib/link-contracts";
+import { generateASN } from "@/lib/credit-scoring";
+import { HEDERA_CONTRACTS, HEDERA_GAS_LIMIT, CONTRACTS, AGENT_IDENTITY_NFT_ABI, AGENT_REGISTRY_ABI as LINK_AGENT_REGISTRY_ABI } from "@/lib/swarm-contracts";
 import { db } from "@/lib/firebase";
 import {
     collection,

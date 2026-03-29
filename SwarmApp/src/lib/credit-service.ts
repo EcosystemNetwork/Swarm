@@ -27,7 +27,7 @@ import {
     getDefaultPolicy,
     type ScoreBandInfo,
     type PolicyState,
-} from "@/lib/chainlink";
+} from "@/lib/credit-scoring";
 import {
     getReputationTopicId,
     type ScoreEvent,

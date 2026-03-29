@@ -8,7 +8,7 @@
  * Pure functions only — no Firestore I/O. Settings are in credit-policy-settings.ts.
  */
 
-import type { ScoreBand } from "./chainlink";
+import type { ScoreBand } from "./credit-scoring";
 
 // ═══════════════════════════════════════════════════════════════
 // Types

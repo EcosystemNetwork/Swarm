@@ -12,7 +12,7 @@
 
 import { db } from "@/lib/firebase";
 import { collection, query, where, getDocs } from "firebase/firestore";
-import { getDefaultPolicy, type PolicyState } from "@/lib/chainlink";
+import { getDefaultPolicy, type PolicyState } from "@/lib/credit-scoring";
 import { getCreditProfileCached, type CreditProfile } from "@/lib/credit-service";
 
 // ═══════════════════════════════════════════════════════════════

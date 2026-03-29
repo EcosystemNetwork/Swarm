@@ -58,31 +58,71 @@ export { getContracts, getCurrencySymbol };
 
 // ============================================================
 // ABIs — Canonical (match deployed contracts on Hedera Testnet)
-// Single source of truth: defined in link-contracts.ts
-// The "LINK_" prefix is historical — these ARE the Hedera ABIs.
 // ============================================================
 
-export {
-  LINK_TASK_BOARD_ABI as TASK_BOARD_ABI,
-  LINK_AGENT_REGISTRY_ABI as AGENT_REGISTRY_ABI,
-  LINK_TREASURY_ABI as TREASURY_ABI,
-} from "./link-contracts";
+export const AGENT_REGISTRY_ABI = [
+  // Write functions
+  "function registerAgent(string name, string skills, string asn, uint256 feeRate) external",
+  "function registerAgentFor(address agentAddr, string name, string skills, string asn, uint256 feeRate) external",
+  "function updateSkills(string newSkills) external",
+  "function updateCredit(address agentAddr, uint16 creditScore, uint8 trustScore) external",
+  "function deactivateAgent() external",
+  // Read functions
+  "function getAgent(address agentAddr) view returns (tuple(address agentAddress, string name, string skills, string asn, uint256 feeRate, uint16 creditScore, uint8 trustScore, bool active, uint256 registeredAt))",
+  "function getAgentByASN(string asn) view returns (tuple(address agentAddress, string name, string skills, string asn, uint256 feeRate, uint16 creditScore, uint8 trustScore, bool active, uint256 registeredAt))",
+  "function isRegistered(address agentAddr) view returns (bool)",
+  "function agentCount() view returns (uint256)",
+  "function getAllAgents() view returns (tuple(address agentAddress, string name, string skills, string asn, uint256 feeRate, uint16 creditScore, uint8 trustScore, bool active, uint256 registeredAt)[])",
+  // Events
+  "event AgentRegistered(address indexed agentAddress, string name, string asn, uint256 timestamp)",
+  "event AgentDeactivated(address indexed agentAddress, uint256 timestamp)",
+  "event SkillsUpdated(address indexed agentAddress, string newSkills, uint256 timestamp)",
+  "event CreditUpdated(address indexed agentAddress, uint16 creditScore, uint8 trustScore, uint256 timestamp)",
+];
 
-// Re-export with Hedera-prefixed names for backward compatibility
-export {
-  LINK_TASK_BOARD_ABI as HEDERA_TASK_BOARD_ABI,
-  LINK_AGENT_REGISTRY_ABI as HEDERA_AGENT_REGISTRY_ABI,
-} from "./link-contracts";
+export const TASK_BOARD_ABI = [
+  // Write functions
+  "function postTask(address vault, string title, string description, string requiredSkills, uint256 deadline, uint256 budgetLink) external",
+  "function claimTask(uint256 taskId) external",
+  "function submitDelivery(uint256 taskId, bytes32 deliveryHash) external",
+  "function approveDelivery(uint256 taskId) external",
+  "function disputeDelivery(uint256 taskId) external",
+  // Read functions
+  "function getTask(uint256 taskId) view returns (tuple(uint256 taskId, address vault, string title, string description, string requiredSkills, uint256 deadline, uint256 budget, address poster, address claimedBy, bytes32 deliveryHash, uint256 createdAt, uint8 status))",
+  "function getAllTasks() view returns (tuple(uint256 taskId, address vault, string title, string description, string requiredSkills, uint256 deadline, uint256 budget, address poster, address claimedBy, bytes32 deliveryHash, uint256 createdAt, uint8 status)[])",
+  "function getOpenTasks() view returns (tuple(uint256 taskId, address vault, string title, string description, string requiredSkills, uint256 deadline, uint256 budget, address poster, address claimedBy, bytes32 deliveryHash, uint256 createdAt, uint8 status)[])",
+  "function taskCount() view returns (uint256)",
+  // Events
+  "event TaskPosted(uint256 indexed taskId, address indexed poster, address vault, string title, uint256 budget, uint256 deadline, uint256 timestamp)",
+  "event TaskClaimed(uint256 indexed taskId, address indexed agent, uint256 timestamp)",
+  "event DeliverySubmitted(uint256 indexed taskId, address indexed agent, bytes32 deliveryHash, uint256 timestamp)",
+  "event DeliveryApproved(uint256 indexed taskId, address indexed agent, uint256 payout, uint256 timestamp)",
+  "event DeliveryDisputed(uint256 indexed taskId, address indexed poster, uint256 timestamp)",
+];
 
-export const HEDERA_TREASURY_ABI = [
+export const TREASURY_ABI = [
+  // Write functions
+  "function depositRevenue(uint256 amount) external",
+  "function withdraw(address to, uint256 amount) external",
+  "function setAgentAddress(address _agentAddress) external",
+  // Read functions
   "function getPnL() view returns (uint256 totalRevenue, uint256 computeBalance, uint256 growthBalance, uint256 reserveBalance)",
   "function totalRevenue() view returns (uint256)",
   "function computeBalance() view returns (uint256)",
   "function growthBalance() view returns (uint256)",
   "function reserveBalance() view returns (uint256)",
   "function agentAddress() view returns (address)",
+  "function linkToken() view returns (address)",
   "function owner() view returns (address)",
+  // Events
+  "event RevenueDeposited(address indexed from, uint256 amount, uint256 timestamp)",
+  "event Withdrawn(address indexed to, uint256 amount, uint256 timestamp)",
 ];
+
+// Backward-compatible aliases
+export const HEDERA_TASK_BOARD_ABI = TASK_BOARD_ABI;
+export const HEDERA_AGENT_REGISTRY_ABI = AGENT_REGISTRY_ABI;
+export const HEDERA_TREASURY_ABI = TREASURY_ABI;
 
 // Agent Identity NFT ABI — Dynamic NFT for agent reputation
 export const AGENT_IDENTITY_NFT_ABI = [

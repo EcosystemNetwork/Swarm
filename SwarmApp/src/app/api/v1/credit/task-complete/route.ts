@@ -17,7 +17,7 @@ import {
     HEDERA_CONTRACTS,
     HEDERA_GAS_LIMIT,
 } from "@/lib/swarm-contracts";
-import { LINK_AGENT_REGISTRY_ABI } from "@/lib/link-contracts";
+import { AGENT_REGISTRY_ABI as LINK_AGENT_REGISTRY_ABI } from "@/lib/swarm-contracts";
 import { requirePlatformAdminOrAgent, unauthorized } from "@/lib/auth-guard";
 import { recordCreditAudit } from "@/lib/credit-audit-log";
 import { fireWebhooks } from "@/lib/credit-webhooks";

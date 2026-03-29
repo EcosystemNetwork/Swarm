@@ -18,7 +18,7 @@ import {
     DialogHeader,
     DialogTitle,
 } from "@/components/ui/dialog";
-import { generateASN } from "@/lib/chainlink";
+import { generateASN } from "@/lib/credit-scoring";
 import { createAgent, type Agent } from "@/lib/firestore";
 import {
     type AgentDistribution,

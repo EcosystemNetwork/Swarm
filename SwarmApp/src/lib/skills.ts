@@ -20,7 +20,6 @@ import {
     Timestamp,
 } from "firebase/firestore";
 import { db } from "./firebase";
-import { CHAINLINK_MANIFEST } from "./chainlink";
 import { HBAR_MANIFEST } from "./hbar";
 import { SOLANA_MANIFEST } from "./solana";
 import { METAPLEX_MANIFEST } from "./metaplex";
@@ -427,26 +426,6 @@ export const COMPUTE_CATEGORIES = [
 
 export const SKILL_REGISTRY: Skill[] = [
     // ── Mods ──
-    {
-        id: "chainlink-cre",
-        name: "Chainlink",
-        description: "CRE workflows and ASN (Agent Social Number) identity — portable credit scoring, trust attestations, and policy enforcement for AI agents.",
-        type: "mod",
-        source: "verified",
-        category: "Web3",
-        icon: "🔗",
-        version: "2.0.0",
-        author: "Swarm Core",
-        tags: ["chainlink", "oracle", "automation", "cre", "web3"],
-        pricing: { model: "free" },
-        sidebarConfig: {
-            sectionId: "modifications",
-            label: "Chainlink",
-            href: "/chainlink",
-            iconName: "Link",
-        },
-        modManifest: CHAINLINK_MANIFEST,
-    },
     {
         id: "hbar-onchain",
         name: "HBAR",

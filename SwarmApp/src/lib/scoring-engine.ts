@@ -34,7 +34,7 @@ import {
     serverTimestamp,
 } from "firebase/firestore";
 import type { ScoreEvent } from "./hedera-hcs-client";
-import { getScoreBand, type ScoreBand } from "./chainlink";
+import { getScoreBand, type ScoreBand } from "./credit-scoring";
 
 // ═══════════════════════════════════════════════════════════════
 // Types

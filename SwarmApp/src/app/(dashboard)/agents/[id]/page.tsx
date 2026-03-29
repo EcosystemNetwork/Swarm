@@ -14,9 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useOrg } from "@/contexts/OrgContext";
 import { useSwarmData } from "@/hooks/useSwarmData";
 import { useSwarmWrite } from "@/hooks/useSwarmWrite";
-import { useLinkData } from "@/hooks/useLinkData";
-import { getScoreBand } from "@/lib/chainlink";
-import { LINK_CONTRACTS } from "@/lib/link-contracts";
+import { getScoreBand } from "@/lib/credit-scoring";
 import {
   getAgent,
   getProjectsByOrg,
@@ -111,7 +109,7 @@ function AgentDetailPage() {
   const { address: sessionAddress } = useSession();
   const swarm = useSwarmData();
   const swarmWrite = useSwarmWrite();
-  const linkChain = useLinkData();
+
 
   const [agent, setAgent] = useState<Agent | null>(null);
   const [assignedProjects, setAssignedProjects] = useState<Project[]>([]);
@@ -574,17 +572,10 @@ function AgentDetailPage() {
   const onchainMatch = swarm.agents.find(
     a => a.name.toLowerCase() === agent.name.toLowerCase()
   );
-  // On-chain matching — LINK / Sepolia
-  const linkMatch = linkChain.agents.find(
-    a => a.name.toLowerCase().includes(agent.name.toLowerCase()) || a.asn === agent.asn
-  );
-  // ASN record from on-chain registry
-  const asnRecord = agent.asn ? linkChain.asnRecords.find(r => r.asn === agent.asn) : null;
   // Credit scoring
-  const creditScore = asnRecord?.creditScore ?? agent.creditScore ?? 680;
-  const trustScore = asnRecord?.trustScore ?? agent.trustScore ?? 50;
+  const creditScore = agent.creditScore ?? 680;
+  const trustScore = agent.trustScore ?? 50;
   const scoreBand = getScoreBand(creditScore);
-  const linkDeployed = !!(LINK_CONTRACTS.AGENT_REGISTRY || LINK_CONTRACTS.ASN_REGISTRY);
 
   // Skills — agent-level skills (installed on THIS agent)
   const agentSkillIds = new Set(agentSkills.map(s => s.skillId));
@@ -1155,14 +1146,6 @@ function AgentDetailPage() {
               }>
                 Hedera {onchainMatch ? "✓" : "✗"}
               </Badge>
-              {linkDeployed && (
-                <Badge className={linkMatch
-                  ? "bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-400"
-                  : "bg-muted text-muted-foreground"
-                }>
-                  Sepolia {linkMatch ? "✓" : "✗"}
-                </Badge>
-              )}
               <Badge className={agent.nftMintAddress
                 ? "bg-purple-100 text-purple-700 dark:bg-purple-950/40 dark:text-purple-400"
                 : "bg-muted text-muted-foreground"
@@ -1219,63 +1202,6 @@ function AgentDetailPage() {
               )}
             </div>
 
-            {/* LINK / Sepolia Chain */}
-            {linkDeployed && (
-              <div>
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="text-xs font-medium">Hedera</span>
-                  <Badge variant="outline" className="text-[9px]">LINK</Badge>
-                </div>
-                {linkMatch ? (
-                  <div className="grid grid-cols-2 gap-3 text-sm pl-2 border-l-2 border-blue-500/30">
-                    <div>
-                      <span className="text-xs text-muted-foreground">Agent Address</span>
-                      <p className="font-mono text-xs mt-0.5">{shortAddress(linkMatch.agentAddress)}</p>
-                    </div>
-                    <div>
-                      <span className="text-xs text-muted-foreground">ASN</span>
-                      <p className="font-mono text-xs mt-0.5 text-cyan-600">{linkMatch.asn || '—'}</p>
-                    </div>
-                    <div>
-                      <span className="text-xs text-muted-foreground">Credit / Trust</span>
-                      <p className="text-xs mt-0.5">
-                        <span className={scoreBand.color}>{linkMatch.creditScore}</span>
-                        <span className="text-muted-foreground mx-1">/</span>
-                        <span className="text-blue-500">{linkMatch.trustScore}</span>
-                      </p>
-                    </div>
-                    <div>
-                      <span className="text-xs text-muted-foreground">Status</span>
-                      <p className="text-xs mt-0.5">
-                        <span className={`inline-flex items-center gap-1 ${linkMatch.active ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'}`}>
-                          <span className={`w-2 h-2 rounded-full ${linkMatch.active ? 'bg-emerald-500' : 'bg-muted'}`} />
-                          {linkMatch.active ? 'Active' : 'Inactive'}
-                        </span>
-                      </p>
-                    </div>
-                  </div>
-                ) : agent.linkOnChainRegistered ? (
-                  <div className="pl-2 border-l-2 border-amber-500/30">
-                    <p className="text-xs text-amber-600">Registered (pending sync)</p>
-                    {agent.linkOnChainTxHash && (
-                      <a
-                        href={`https://sepolia.etherscan.io/tx/${agent.linkOnChainTxHash}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-[10px] text-cyan-600 hover:underline"
-                      >
-                        View TX on HashScan
-                      </a>
-                    )}
-                  </div>
-                ) : (
-                  <div className="pl-2 border-l-2 border-muted">
-                    <p className="text-xs text-muted-foreground">Not registered on Sepolia</p>
-                    <p className="text-[10px] text-muted-foreground mt-0.5">Agents are auto-registered on Sepolia during connection</p>
-                  </div>
-                )}
-              </div>
-            )}
 
             {/* Solana Devnet Chain */}
             <div>
