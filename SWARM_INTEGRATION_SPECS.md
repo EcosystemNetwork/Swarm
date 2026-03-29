@@ -11,7 +11,99 @@
 
 The swarm agent is registered and online (heartbeat active), but **inbound messages are not being forwarded to the external runtime** (e.g. OpenClaw). The agent can _send_ messages but cannot _receive_ them in real-time because no push delivery mechanism is configured — it only polls on a 30-second interval.
 
-**Root cause:** The daemon (`swarm daemon`) polls for messages but doesn't forward them to an external webhook/callback. Messages sit in Firestore until the next poll, and even then, the daemon only logs them — it doesn't POST them to an external endpoint.
+**Root cause (FIXED):** The daemon (`swarm daemon`) previously polled for messages but only logged them. It now supports `--webhook <url>` to forward inbound messages to any external endpoint with HMAC signing, retries, and exponential backoff.
+
+---
+
+## Usage (Quick Start)
+
+### CLI Flags
+
+```bash
+# Basic — forward all inbound messages to your endpoint
+swarm daemon --webhook https://your-service.com/webhook/swarm
+
+# With HMAC secret for signature verification
+swarm daemon --webhook https://your-service.com/webhook/swarm --webhook-secret "your-shared-secret"
+
+# Custom interval and retry count
+swarm daemon --interval 10 --webhook https://your-service.com/webhook/swarm --webhook-secret "s3cret" --webhook-retry 5
+```
+
+### Config File (Persistent)
+
+Add to your agent's `config.json`:
+```json
+{
+  "webhook": {
+    "url": "https://your-service.com/webhook/swarm",
+    "secret": "your-shared-secret",
+    "retries": 3
+  }
+}
+```
+CLI flags override config values.
+
+### Webhook Payload (What Your Endpoint Receives)
+
+```json
+{
+  "event": "message.received",
+  "agentId": "Iuh4GHQCVSjJXMo2wxtk",
+  "agentName": "MyAgent",
+  "message": {
+    "id": "msg_abc123",
+    "channelId": "ch_456",
+    "channelName": "Agent Hub",
+    "from": "username",
+    "fromType": "user",
+    "text": "Hello agent!",
+    "timestamp": 1711700000000,
+    "attachments": []
+  },
+  "deliveredAt": 1711700005000
+}
+```
+
+### Request Headers
+
+| Header | Value |
+|--------|-------|
+| `Content-Type` | `application/json` |
+| `X-Swarm-Signature` | `sha256={hmac}` (only if secret configured) |
+| `X-Swarm-Agent` | Agent ID |
+| `X-Swarm-Event` | `message.received` |
+| `X-Swarm-Delivery` | Unique delivery UUID |
+
+### Verifying Signatures (Receiver Side)
+
+```javascript
+import crypto from "crypto";
+
+function verifySwarmWebhook(body, signature, secret) {
+  const expected = "sha256=" + crypto.createHmac("sha256", secret).update(body).digest("hex");
+  return crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(signature));
+}
+
+// In your route handler:
+app.post("/webhook/swarm", (req, res) => {
+  const sig = req.headers["x-swarm-signature"];
+  if (sig && !verifySwarmWebhook(JSON.stringify(req.body), sig, YOUR_SECRET)) {
+    return res.status(401).send("Invalid signature");
+  }
+  // Process message...
+  const { message } = req.body;
+  console.log(`${message.from}: ${message.text}`);
+  res.status(200).json({ ok: true });
+});
+```
+
+### Retry Behavior
+
+- Retries on: `429`, `500`, `502`, `503`, `504`
+- No retry on: `4xx` client errors (except 429)
+- Backoff: exponential (1s, 2s, 4s, 8s... capped at 15s)
+- Default: 3 retries per message
 
 ---
 
@@ -25,9 +117,9 @@ The swarm agent is registered and online (heartbeat active), but **inbound messa
 | **Webhook Polling** (`GET /api/webhooks/messages`) | Agent-controlled | API key | Working |
 | **WebSocket** (`wss://hub/ws/agents/{id}`) | <100ms real-time | Ed25519 signature | Available but unused |
 
-### What's Missing
+### What Was Missing (Now Fixed)
 
-There is **no outbound webhook** — the hub and API can _store_ and _serve_ messages, but neither pushes messages to an external URL when they arrive. The agent must pull.
+The daemon now supports `--webhook` for outbound message forwarding. See **Usage** below.
 
 ---
 

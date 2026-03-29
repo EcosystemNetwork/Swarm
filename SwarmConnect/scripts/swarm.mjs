@@ -15,7 +15,7 @@
  *   swarm status      — show agent status + heartbeat
  *   swarm discover    [--skill <id>] [--type <type>] [--status <status>]
  *   swarm profile     [--skills <s1,s2>] [--bio <bio>]
- *   swarm daemon      [--interval <seconds>] — auto-checkin loop
+ *   swarm daemon      [--interval <seconds>] [--webhook <url>] [--webhook-secret <secret>] [--webhook-retry <count>] — auto-checkin loop
  *   swarm assign      <agentId> "<task>" [--description "..."] [--deadline 24h] [--priority high]
  *   swarm accept      <assignmentId> [--notes "..."]
  *   swarm reject      <assignmentId> "<reason>"
@@ -910,6 +910,11 @@ async function cmdDaemon() {
   const intervalSec = parseInt(arg("--interval") || "30", 10); // default 30s — active monitoring
   const intervalMs = Math.max(10, intervalSec) * 1000; // minimum 10 seconds
 
+  // Webhook forwarding — push inbound messages to an external URL
+  const webhookUrl = arg("--webhook") || config.webhook?.url || null;
+  const webhookSecret = arg("--webhook-secret") || config.webhook?.secret || null;
+  const webhookRetries = parseInt(arg("--webhook-retry") || config.webhook?.retries || "3", 10);
+
   // Track connection state for auto-greeting on reconnect
   const daemonState = { wasDisconnected: false, hubChannelId: null };
 
@@ -919,16 +924,23 @@ async function cmdDaemon() {
   console.log(`  Interval: ${intervalSec}s`);
   console.log(`  Hub:      ${config.hubUrl}`);
   console.log(`  Mode:     ${config.offline ? "OFFLINE (pending registration)" : "online"}`);
+  if (webhookUrl) {
+    console.log(`  Webhook:  ${webhookUrl}`);
+    console.log(`  Secret:   ${webhookSecret ? "configured" : "none"}`);
+    console.log(`  Retries:  ${webhookRetries}`);
+  }
   if (config.autoGreeting?.enabled) {
     console.log(`  Greeting: ${config.autoGreeting.message}`);
   }
   console.log(`\nRunning... (Ctrl+C to stop)\n`);
 
+  const webhookConfig = webhookUrl ? { url: webhookUrl, secret: webhookSecret, retries: webhookRetries } : null;
+
   // Immediately do first checkin
-  await daemonTick(config, privateKey, daemonState);
+  await daemonTick(config, privateKey, daemonState, webhookConfig);
 
   // Loop
-  const interval = setInterval(() => daemonTick(config, privateKey, daemonState), intervalMs);
+  const interval = setInterval(() => daemonTick(config, privateKey, daemonState, webhookConfig), intervalMs);
 
   // Graceful shutdown
   process.on("SIGINT", () => {
@@ -945,7 +957,7 @@ async function cmdDaemon() {
   await new Promise(() => { });
 }
 
-async function daemonTick(config, privateKey, daemonState) {
+async function daemonTick(config, privateKey, daemonState, webhookConfig) {
   const now = new Date().toISOString().replace("T", " ").slice(0, 19);
   try {
     // 1. Heartbeat — report skills
@@ -990,6 +1002,11 @@ async function daemonTick(config, privateKey, daemonState) {
           console.log(`  [${tag}] [#${msg.channelName}] ${msg.from}: ${msg.text}${atts}`);
           console.log(`     -> channel: ${msg.channelId} | id: ${msg.id} | reply: swarm reply ${msg.id} "<response>"`);
         }
+
+        // Forward messages to webhook if configured
+        if (webhookConfig) {
+          await forwardToWebhook(config, messages, webhookConfig, now);
+        }
       } else {
         console.log(`[${now}] heartbeat ok — no new messages`);
       }
@@ -1000,6 +1017,83 @@ async function daemonTick(config, privateKey, daemonState) {
   } catch (err) {
     console.error(`[${now}] error: ${err.message}`);
     daemonState.wasDisconnected = true;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Webhook Forwarding
+// ---------------------------------------------------------------------------
+
+/**
+ * Forward inbound messages to a configured webhook URL.
+ * Sends each message individually with HMAC signature for verification.
+ * Retries on transient failures with exponential backoff.
+ */
+async function forwardToWebhook(config, messages, webhookConfig, timestamp) {
+  const { url, secret, retries } = webhookConfig;
+
+  for (const msg of messages) {
+    const payload = {
+      event: "message.received",
+      agentId: config.agentId,
+      agentName: config.agentName,
+      message: {
+        id: msg.id,
+        channelId: msg.channelId,
+        channelName: msg.channelName,
+        from: msg.from,
+        fromType: msg.fromType,
+        text: msg.text,
+        timestamp: msg.timestamp,
+        attachments: msg.attachments || [],
+      },
+      deliveredAt: Date.now(),
+    };
+
+    const body = JSON.stringify(payload);
+
+    // HMAC-SHA256 signature for webhook verification
+    const headers = { "Content-Type": "application/json" };
+    if (secret) {
+      const hmac = crypto.createHmac("sha256", secret).update(body).digest("hex");
+      headers["X-Swarm-Signature"] = `sha256=${hmac}`;
+    }
+    headers["X-Swarm-Agent"] = config.agentId;
+    headers["X-Swarm-Event"] = "message.received";
+    headers["X-Swarm-Delivery"] = crypto.randomUUID();
+
+    let delivered = false;
+    for (let attempt = 0; attempt <= retries; attempt++) {
+      try {
+        const resp = await fetch(url, { method: "POST", headers, body });
+        if (resp.ok || (resp.status >= 200 && resp.status < 300)) {
+          delivered = true;
+          break;
+        }
+        // Retryable status codes
+        if (resp.status === 429 || resp.status >= 500) {
+          const delay = Math.min(1000 * Math.pow(2, attempt), 15000);
+          console.warn(`[${timestamp}] webhook ${resp.status} for msg ${msg.id} — retry ${attempt + 1}/${retries} in ${delay}ms`);
+          await new Promise(r => setTimeout(r, delay));
+          continue;
+        }
+        // Non-retryable client error
+        console.error(`[${timestamp}] webhook rejected msg ${msg.id} (${resp.status})`);
+        break;
+      } catch (err) {
+        if (attempt < retries) {
+          const delay = Math.min(1000 * Math.pow(2, attempt), 15000);
+          console.warn(`[${timestamp}] webhook error for msg ${msg.id}: ${err.message} — retry ${attempt + 1}/${retries} in ${delay}ms`);
+          await new Promise(r => setTimeout(r, delay));
+        } else {
+          console.error(`[${timestamp}] webhook failed for msg ${msg.id} after ${retries + 1} attempts: ${err.message}`);
+        }
+      }
+    }
+
+    if (delivered) {
+      console.log(`[${timestamp}] webhook delivered msg ${msg.id}`);
+    }
   }
 }
 
