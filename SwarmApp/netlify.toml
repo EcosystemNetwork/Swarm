@@ -1,6 +1,9 @@
 [build]
   # Build skipped — handled by GitHub Actions (Netlify OOMs on 573 routes).
   # Netlify CLI deploys the pre-built .next directory from CI.
+  # `ignore` returns exit 0 → Netlify skips auto-builds on push.
+  # `netlify-cli deploy --prod` bypasses ignore (direct deploy, not a build).
+  ignore = "exit 0"
   command = "echo 'Deployed from GitHub Actions'"
   publish = ".next"
 
