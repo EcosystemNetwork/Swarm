@@ -15,7 +15,7 @@ const nextConfig: NextConfig = {
     "@azure/arm-containerinstance",
     "@azure/identity",
   ],
-  // Skip TS type checking during build to avoid OOM on Netlify.
+  // Skip TS type checking during build to avoid OOM on Netlify/Vercel.
   // Run `npx tsc --noEmit` locally or in CI for type safety.
   typescript: {
     ignoreBuildErrors: true,

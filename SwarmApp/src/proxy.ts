@@ -1,5 +1,5 @@
 /**
- * Next.js Middleware — Server-side session validation.
+ * Next.js Proxy — Server-side session validation.
  *
  * Runs on every matched route BEFORE rendering.
  * Validates the `swarm_session` JWT cookie and injects session headers
@@ -7,6 +7,8 @@
  *
  * Protected dashboard routes redirect to "/" if no valid session.
  * API routes that need auth get a 401 response.
+ *
+ * Named `proxy.ts` per the Next.js 16 convention (previously `middleware.ts`).
  */
 import { NextRequest, NextResponse } from "next/server";
 import { jwtVerify } from "jose";
@@ -124,7 +126,10 @@ function withSecurityHeaders(res: NextResponse): NextResponse {
 
 const MAX_BODY_BYTES = 2_000_000; // 2MB global limit for API routes
 
-export async function middleware(req: NextRequest) {
+// Named `proxy` as required by Next.js 16 when using the `proxy.ts` convention.
+// This function performs session validation and security header injection —
+// the same logic previously exported as `middleware` from `middleware.ts`.
+export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
   // Skip public assets and Next.js internals
