@@ -1018,15 +1018,15 @@ function AgentDetailPage() {
                 </div>
               </div>
               <div className="text-center p-3 rounded-lg border border-border">
-                <div className="text-2xl font-bold text-purple-500">{asnRecord?.tasksCompleted ?? 0}</div>
+                <div className="text-2xl font-bold text-purple-500">{agent.tasksCompleted ?? 0}</div>
                 <div className="text-[10px] text-muted-foreground mt-0.5">Tasks Completed</div>
                 <div className="text-[9px] text-muted-foreground mt-1">On-chain verified</div>
               </div>
               <div className="text-center p-3 rounded-lg border border-border">
                 <div className="flex items-center justify-center gap-1">
-                  {asnRecord ? (
+                  {agent.asnOnChainRegistered ? (
                     <span className="text-emerald-500 text-lg font-bold">On-Chain</span>
-                  ) : agent.asnOnChainRegistered ? (
+                  ) : agent.onChainRegistered ? (
                     <span className="text-amber-500 text-lg font-bold">Pending</span>
                   ) : (
                     <span className="text-muted-foreground text-lg font-bold">Off-Chain</span>
