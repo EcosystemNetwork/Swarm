@@ -16,9 +16,9 @@ import { jwtVerify } from "jose";
 const SESSION_COOKIE = "swarm_session";
 
 // ── Security Headers ──────────────────────────────────────
-// Applied to all SSR responses. Netlify [[headers]] only cover
-// static assets — SSR pages served by serverless functions need
-// these set here in the middleware.
+// Applied to all SSR responses. Vercel middleware handles headers
+// for server-rendered pages; these are also set in vercel.json for
+// static assets.
 const SECURITY_HEADERS: Record<string, string> = {
   "X-Frame-Options": "SAMEORIGIN",
   "X-Content-Type-Options": "nosniff",

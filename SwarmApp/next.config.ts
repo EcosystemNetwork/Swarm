@@ -5,7 +5,7 @@ const nextConfig: NextConfig = {
   // where the bundler wraps Map/Set in module namespaces that SES can corrupt).
   transpilePackages: ["@xyflow/react", "@xyflow/system"],
   // Keep heavy packages out of the serverless function bundle.
-  // Netlify/Vercel will resolve them from node_modules at runtime,
+  // Vercel resolves them from node_modules at runtime,
   // preventing cold-start timeouts and 502s from oversized bundles.
   serverExternalPackages: [
     "ethers",
@@ -15,7 +15,7 @@ const nextConfig: NextConfig = {
     "@azure/arm-containerinstance",
     "@azure/identity",
   ],
-  // Skip TS type checking during build to avoid OOM on Netlify/Vercel.
+  // Skip TS type checking during build to avoid OOM on Vercel.
   // Run `npx tsc --noEmit` locally or in CI for type safety.
   typescript: {
     ignoreBuildErrors: true,
