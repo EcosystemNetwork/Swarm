@@ -73,40 +73,21 @@ jobs:
       - run: npm ci
       - run: npm run build
 
-  # ── Deploy to Netlify from GitHub Actions (Netlify OOMs on 573 routes) ──
+  # ── Deploy to Vercel ──
 
   deploy:
-    name: Deploy (Netlify)
+    name: Deploy (Vercel)
     needs: [build, hub-test]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     defaults:
       run:
         working-directory: SwarmApp
     env:
-      NEXT_PUBLIC_FIREBASE_API_KEY: ${{ secrets.NEXT_PUBLIC_FIREBASE_API_KEY }}
-      NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: ${{ secrets.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN }}
-      NEXT_PUBLIC_FIREBASE_PROJECT_ID: ${{ secrets.NEXT_PUBLIC_FIREBASE_PROJECT_ID }}
-      NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: ${{ secrets.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET }}
-      NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID }}
-      NEXT_PUBLIC_FIREBASE_APP_ID: ${{ secrets.NEXT_PUBLIC_FIREBASE_APP_ID }}
-      NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID: ${{ secrets.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID }}
-      NEXT_PUBLIC_THIRDWEB_CLIENT_ID: ${{ secrets.NEXT_PUBLIC_THIRDWEB_CLIENT_ID }}
-      NEXT_PUBLIC_APP_DOMAIN: ${{ secrets.NEXT_PUBLIC_APP_DOMAIN }}
-      NEXT_PUBLIC_ADMIN_ADDRESS: ${{ secrets.NEXT_PUBLIC_ADMIN_ADDRESS }}
-      NEXT_PUBLIC_HEDERA_CHAIN_ID: ${{ secrets.NEXT_PUBLIC_HEDERA_CHAIN_ID }}
-      NEXT_PUBLIC_HEDERA_RPC_URL: ${{ secrets.NEXT_PUBLIC_HEDERA_RPC_URL }}
-      NEXT_PUBLIC_HEDERA_TREASURY: ${{ secrets.NEXT_PUBLIC_HEDERA_TREASURY }}
-      NEXT_PUBLIC_HEDERA_AGENT_REGISTRY: ${{ secrets.NEXT_PUBLIC_HEDERA_AGENT_REGISTRY }}
-      NEXT_PUBLIC_HEDERA_ASN_REGISTRY: ${{ secrets.NEXT_PUBLIC_HEDERA_ASN_REGISTRY }}
-      NEXT_PUBLIC_HEDERA_TASK_BOARD: ${{ secrets.NEXT_PUBLIC_HEDERA_TASK_BOARD }}
-      NEXT_PUBLIC_HEDERA_AGENT_NFT: ${{ secrets.NEXT_PUBLIC_HEDERA_AGENT_NFT }}
-      NEXT_PUBLIC_HEDERA_MOCK_LINK: ${{ secrets.NEXT_PUBLIC_HEDERA_MOCK_LINK }}
-      NEXT_PUBLIC_GITHUB_APP_SLUG: ${{ secrets.NEXT_PUBLIC_GITHUB_APP_SLUG }}
-      NEXT_PUBLIC_SUPER_ADMINS: ${{ secrets.NEXT_PUBLIC_SUPER_ADMINS }}
-      NEXT_PUBLIC_OPENCLAW_WORKSPACE: ${{ secrets.NEXT_PUBLIC_OPENCLAW_WORKSPACE }}
-      NEXT_PUBLIC_TREASURY_ADDRESS: ${{ secrets.NEXT_PUBLIC_TREASURY_ADDRESS }}
-      NEXT_PUBLIC_THIRDWEB_SECRET: ${{ secrets.NEXT_PUBLIC_THIRDWEB_SECRET }}
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -115,8 +96,8 @@ jobs:
           cache: npm
           cache-dependency-path: SwarmApp/package-lock.json
       - run: npm ci
-      - name: Build and Deploy to Netlify
-        run: npx netlify-cli deploy --prod --build --site=${{ secrets.NETLIFY_SITE_ID }} --auth=${{ secrets.NETLIFY_AUTH_TOKEN }}
+      - name: Deploy to Vercel
+        run: npx vercel deploy --prod --token=${{ secrets.VERCEL_TOKEN }} --yes
 
 # ─── Hub jobs ──────────────────────────────────────────────────────────────────
 
