@@ -161,6 +161,8 @@ export const DEFAULT_SECTIONS: NavSection[] = [
     label: "Modifications",
     items: [
       { id: "mod-hbar-onchain", href: "/hbar", label: "HBAR", icon: Hexagon, maturity: "production" },
+      { id: "mod-flow-defi", href: "/mods/flow", label: "Flow", icon: Coins, maturity: "beta" },
+      { id: "mod-eth-foundation", href: "/mods/eth-foundation", label: "ETH Foundation", icon: Diamond, maturity: "beta" },
     ],
     accentColor: "cyan",
     collapsible: true,

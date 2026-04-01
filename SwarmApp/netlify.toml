@@ -1,9 +1,6 @@
 [build]
-  # Build skipped — handled by GitHub Actions (Netlify OOMs on 573 routes).
-  # GH Actions runs `npm run build` then `netlify-cli deploy --prod --dir=.next`.
-  # The plugin-nextjs is NOT needed here — `netlify deploy` uploads pre-built output directly.
-  ignore = "exit 0"
-  command = "echo 'Skipped — deployed from GitHub Actions'"
+  ignore = "exit 1"
+  command = "node --max-old-space-size=3072 node_modules/.bin/next build"
   publish = ".next"
 
 [build.environment]

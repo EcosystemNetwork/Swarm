@@ -24,7 +24,7 @@ export async function register() {
 
     // Validate environment variables — warn if critical vars missing.
     // NOTE: Do NOT call process.exit() here. In serverless environments
-    // (Netlify, Vercel) this kills the function container and causes 502
+    // (Netlify) this kills the function container and causes 502
     // on ALL routes. Individual routes handle missing env gracefully.
     try {
       requireValidEnv();

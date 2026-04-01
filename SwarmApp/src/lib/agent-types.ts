@@ -326,7 +326,7 @@ export const AGENT_TYPE_REGISTRY: AgentTypeInfo[] = [
     label: "Next.js Developer",
     category: "language-specialists",
     description: "Next.js SSR/SSG, App Router, and full-stack React applications",
-    tags: ["nextjs", "react", "ssr", "vercel"],
+    tags: ["nextjs", "react", "ssr", "netlify"],
   },
   {
     id: "php-pro",

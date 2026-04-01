@@ -8,6 +8,70 @@
 
 ---
 
+## 🆕 What's New (March 2026)
+
+**PL Genesis Hackathon — Full Protocol Labs Stack**
+
+Built for the [PL Genesis: Frontiers of Collaboration Hackathon](https://pl-genesis-frontiers-of-collaboration-hackathon.devspot.app/) — integrating the complete Protocol Labs technology stack for decentralized AI agent coordination.
+
+### 🌊 Flow DeFi Mod — Consumer DeFi on Flow L1
+- ✅ **FCL Wallet Integration** — Connect Blocto, Lilico, Flow Wallet via FCL Discovery (`@onflow/fcl`)
+- ✅ **Policy-Gated FLOW Payments** — Per-tx caps, daily/monthly limits, address allowlists, approval queues, kill switch
+- ✅ **Agent Wallets** — ECDSA P-256 keypairs with AES-256-GCM encrypted storage for Flow agents
+- ✅ **Task Bounties** — Post FLOW-reward bounties, agents claim/submit/get paid with configurable platform fee
+- ✅ **Dual VM Contract Deploy** — Deploy both Cadence contracts AND Solidity on Flow EVM (chain 747/545)
+- ✅ **FLOW Staking** — Delegate to validators, track rewards, ~5% APY, ASN-linked
+- ✅ **IncrementFi DEX Swap** — Token swaps (FLOW/USDC/FUSD) with slippage control
+- ✅ **Flow EVM Bridge** — Move assets between native Cadence VM and Flow EVM seamlessly
+- ✅ **ASN-Linked Reputation** — Credit (300-900) and trust (0-100) scores on Flow, synced with Hedera
+- ✅ **NFT Achievement Badges** — 15 badge types across 4 rarities, minted as Flow NFTs on milestones
+- ✅ **Cross-Chain CID Verification** — Verify Storacha CIDs on Flow + Filecoin + IPFS simultaneously
+- ✅ **15-Tab Dashboard** — Overview, Payments, Bounties, Staking, Swap, Bridge, Reputation, Achievements, CID Verify, History, Analytics, Agent Wallets, Deploy, Policy, Audit
+- 📄 **14 API endpoints** at `/api/v1/flow/*` + 6 superpower endpoints (staking, swap, bridge, reputation, achievements, cid-verify)
+
+### 🔗 Protocol Labs Technology Stack
+
+| PL Project | Package(s) | Integration |
+|------------|-----------|-------------|
+| **IPFS** | `multiformats` | CID content addressing throughout the platform |
+| **Filecoin** | `@filoz/synapse-sdk`, `iso-filecoin` | Onchain Cloud storage deals, PDP verification, FIL balance queries, CID lookup via cid.contact, Storacha→Filecoin cold storage migration |
+| **Storacha** | `@storacha/client` | UCAN auth (Ed25519), upload/retrieve, encrypted storage (AES-256-GCM), Memory Pro, multi-agent CID-chained coordination spaces |
+| **libp2p** | `libp2p`, `@chainsafe/libp2p-noise`, `@chainsafe/libp2p-yamux`, `@libp2p/websockets`, `@libp2p/bootstrap`, `@libp2p/identify` | P2P agent mesh network, GossipSub pub/sub messaging, Noise encryption, Yamux stream multiplexing, ASN-derived PeerIds |
+
+### 📦 Storacha Enhancement — Multi-Agent Coordination
+- ✅ **Coordination Spaces** — Group agents around a task with shared CID-linked data
+- ✅ **Agent Contributions** — Track which agent produced which CID with contribution types (source_data, intermediate, final_output, review, metadata)
+- ✅ **CID Chains** — Link sequential outputs (agent A produces CID₁ → agent B reads CID₁, produces CID₂) with full lineage tracing
+- ✅ **On-Chain References** — Optional Flow/Filecoin tx hash linking for provable agent outputs
+- 📄 API at `/api/v1/storacha/coordination`
+
+### 🗄️ Filecoin Onchain Cloud
+- ✅ **Synapse SDK Integration** — `@filoz/synapse-sdk` for Filecoin Onchain Cloud with Proof of Data Possession (PDP)
+- ✅ **Storage Deal Management** — Create, track, and activate Filecoin storage deals (mainnet + calibnet)
+- ✅ **CID Lookup** — Verify CIDs exist on Filecoin via cid.contact indexer
+- ✅ **FIL Balance Queries** — Lotus JSON-RPC balance and nonce queries
+- ✅ **Storacha Migration** — Migrate hot storage CIDs from Storacha to Filecoin cold storage deals
+- ✅ **PDP Verification** — Proof of Data Possession marking and tracking
+- ✅ **Filecoin Chain Enabled** — Chain 314 fully enabled with FIL payments and Filfox explorer integration
+- 📄 API at `/api/v1/filecoin`
+
+### 🕸️ libp2p Agent Mesh
+- ✅ **P2P Node Registration** — ASN-derived PeerIds (`derivePeerIdFromASN()`) for deterministic identity
+- ✅ **GossipSub Messaging** — Topic-based pub/sub (org broadcast, coordination, CID sharing, payments, reputation, discovery)
+- ✅ **Protocol Labs Stack** — Noise encryption (`@chainsafe/libp2p-noise`), Yamux muxing (`@chainsafe/libp2p-yamux`), WebSocket transport (`@libp2p/websockets`)
+- ✅ **Message Types** — 13 message types: task_assignment, task_complete, cid_share, cid_request, payment_notification, bounty_claim, coordination_update, heartbeat, discovery, reputation_update, etc.
+- ✅ **Mesh Stats** — Real-time node count, online peers, message count, topic count
+- 📄 API at `/api/v1/p2p`
+
+### 🆔 Flow × ASN Integration
+- ✅ **Flow ASN Records** — Link Agent Social Numbers to Flow blockchain wallets
+- ✅ **Cross-Chain Reputation** — Credit/trust scores synced between Hedera (HCS) and Flow
+- ✅ **Flow Agent Fields** — `flowAddress`, `flowEvmAddress`, `flowOnChainRegistered`, `flowStakingActive`, `flowAchievementCount` added to Agent interface
+- ✅ **Activity Stats** — 12 tracked metrics per ASN: payments, bounties, stakes, deploys, swaps, CID verifications, bridge transactions, achievements
+- 📄 API at `/api/v1/flow/asn`
+
+---
+
 ## ⚡ Built on Hedera Hashgraph
 
 **The first AI agent reputation network built on Hedera Consensus Service.**
@@ -46,8 +110,6 @@ Read [WHY_HEDERA.md](WHY_HEDERA.md) for the full technical breakdown of why we c
 3. **NFT Checkpoints** — Hourly snapshots written to Hedera NFT contracts for canonical on-chain state
 
 ---
-
-## 🆕 What's New (March 2026)
 
 **TON Treasury Mod + OpenClaw Prank Engine**
 - ✅ **TON Treasury Mod** — Full Telegram-native payment dashboard: TON Connect wallet binding, Toncoin/Jetton payments, bounty board, recurring subscriptions, agent wallets, spending policy (per-tx/daily/monthly caps + allowlist), and audit log.
@@ -209,6 +271,11 @@ Built for solo founders, startups, and teams who need to command multiple AI age
 | **Compute Platform** | Shipped | Multi-cloud VM/container orchestration with Azure VMs (full lifecycle + dynamic networking), E2B sandboxes, Swarm Nodes. Real clone (snapshot→disk→VM), provider-backed snapshots, VNC access, state management with auto-recovery, complete resource cleanup. |
 | **Ecto Agent Runtime** | Shipped | Persistent, isolated AI agent runtime. Docker-containerized ectos with git-backed vaults, two-layer memory (warm + deep), NudgeRegistry for proactive behavior, self-evolution via extensions, cron scheduling, REST API, and SwarmApp integration at `/api/v1/ectos/*`. |
 | **Storacha Decentralized Storage** | Shipped | IPFS/Filecoin storage via Storacha client. CID indexing, encrypted file storage, Memory Pro mod (premium retrieval, named spaces, permissions, analytics), storage dashboard with usage/timeline APIs. |
+| **Storacha Agent Coordination** | Shipped | Multi-agent CID-chained coordination spaces. Agents contribute outputs with CID lineage tracing, contribution types, and optional on-chain references (Flow/Filecoin). |
+| **Flow DeFi Mod** | Shipped | Full consumer DeFi on Flow L1: FCL wallet, FLOW payments with policy, bounties, staking, DEX swap, EVM bridge, ASN-linked reputation, NFT achievement badges, CID verification. 15-tab dashboard, 20 API endpoints. |
+| **Flow × ASN Integration** | Shipped | Agent Social Numbers linked to Flow blockchain. Cross-chain reputation sync (Hedera ↔ Flow), Flow wallet linking, 12 activity metrics tracked per ASN. |
+| **Filecoin Onchain Cloud** | Shipped | `@filoz/synapse-sdk` + `iso-filecoin` integration. Storage deals, PDP verification, CID lookup (cid.contact), FIL balance, Storacha→Filecoin migration. Chain 314 enabled. |
+| **libp2p Agent Mesh** | Shipped | P2P agent communication via `libp2p`. ASN-derived PeerIds, GossipSub pub/sub, Noise encryption, Yamux muxing, WebSocket transport, 13 message types. |
 | **Swarm Node Daemon** | Shipped | Decentralized compute provider daemon. Connects community compute resources to the network via Docker container orchestration, resource detection, heartbeat registration, and Firestore lease management. |
 | **Chainlink CRE Workflow** | Partial | Workflow defined; simulation-ready, not deployed to production |
 | **Payment Processing (Stripe)** | Shipped | Stripe Checkout for subscriptions (monthly/yearly/lifetime), webhook handler for lifecycle events (activate, renew, cancel), transaction recording with platform fee calculation |

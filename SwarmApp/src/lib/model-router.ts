@@ -381,6 +381,170 @@ export async function logRoutingDecision(
   });
 }
 
+// ─── Per-Request Model Switching ────────────────────────────────────
+//
+// Enables a single agent to use different models for different tasks within
+// the same session. The agent (or orchestrator) specifies a "task role" and
+// the model policy decides which provider/model to use.
+//
+// Task roles:
+//   reasoning  — complex analysis, planning (use strongest model)
+//   coding     — code generation, debugging (models with good code benchmarks)
+//   fast       — simple extraction, classification (cheapest/fastest)
+//   creative   — writing, brainstorming (models with good creative output)
+//   vision     — image understanding (multimodal models only)
+//   embedding  — text embeddings (embedding-specific models)
+//
+// This replaces the static "one provider per ecto" limitation.
+
+export type TaskRole = "reasoning" | "coding" | "fast" | "creative" | "vision" | "embedding";
+
+export interface ModelPolicy {
+  /** Human-readable name for this policy */
+  name: string;
+  /** Default model for unspecified roles */
+  defaultModel: ModelName;
+  /** Model assignment per task role */
+  roleModels: Partial<Record<TaskRole, ModelName>>;
+  /** Maximum concurrent requests across all models */
+  maxConcurrentRequests?: number;
+  /** Daily budget cap (shared across all models in this policy) */
+  dailyBudgetCap?: number;
+}
+
+/** Built-in policies */
+export const MODEL_POLICIES: Record<string, ModelPolicy> = {
+  balanced: {
+    name: "Balanced",
+    defaultModel: "gpt-4o",
+    roleModels: {
+      reasoning: "claude-3.5-sonnet",
+      coding: "gpt-4o",
+      fast: "gpt-4o-mini",
+      creative: "claude-3.5-sonnet",
+      vision: "gpt-4o",
+    },
+  },
+  performance: {
+    name: "Performance",
+    defaultModel: "claude-3-opus",
+    roleModels: {
+      reasoning: "claude-3-opus",
+      coding: "gpt-4o",
+      fast: "claude-3-haiku",
+      creative: "claude-3-opus",
+      vision: "gemini-1.5-pro",
+    },
+  },
+  budget: {
+    name: "Budget",
+    defaultModel: "gpt-4o-mini",
+    roleModels: {
+      reasoning: "gpt-4o-mini",
+      coding: "gpt-4o-mini",
+      fast: "gpt-3.5-turbo",
+      creative: "claude-3-haiku",
+      vision: "gemini-pro",
+    },
+    dailyBudgetCap: 5.0,
+  },
+  anthropic_first: {
+    name: "Anthropic First",
+    defaultModel: "claude-3.5-sonnet",
+    roleModels: {
+      reasoning: "claude-3-opus",
+      coding: "claude-3.5-sonnet",
+      fast: "claude-3-haiku",
+      creative: "claude-3-opus",
+      vision: "claude-3.5-sonnet",
+    },
+  },
+  openai_first: {
+    name: "OpenAI First",
+    defaultModel: "gpt-4o",
+    roleModels: {
+      reasoning: "gpt-4o",
+      coding: "gpt-4o",
+      fast: "gpt-4o-mini",
+      creative: "gpt-4o",
+      vision: "gpt-4o",
+    },
+  },
+};
+
+export interface MultiModelRequest extends RouteRequest {
+  /** Task role for model selection */
+  taskRole?: TaskRole;
+  /** Policy name or custom policy */
+  policy?: string | ModelPolicy;
+}
+
+/**
+ * Route a request using per-request model switching.
+ *
+ * Unlike `routeRequest` which uses a single preferred model with fallbacks,
+ * this selects the model based on task role + policy, then applies the same
+ * circuit breaker and budget logic on top.
+ */
+export async function routeMultiModelRequest(
+  request: MultiModelRequest,
+): Promise<RouteResponse> {
+  const { taskRole, policy: policyInput } = request;
+
+  // Resolve policy
+  let policy: ModelPolicy;
+  if (!policyInput) {
+    policy = MODEL_POLICIES.balanced;
+  } else if (typeof policyInput === "string") {
+    policy = MODEL_POLICIES[policyInput] || MODEL_POLICIES.balanced;
+  } else {
+    policy = policyInput;
+  }
+
+  // Select model for this task role
+  const selectedModel = taskRole
+    ? (policy.roleModels[taskRole] || policy.defaultModel)
+    : policy.defaultModel;
+
+  // Build a routing strategy from the policy
+  const strategy: RoutingStrategy = {
+    primary: selectedModel,
+    fallbacks: DEFAULT_FALLBACK_CHAINS[selectedModel] || [],
+    dailyBudgetCap: policy.dailyBudgetCap,
+    enableCircuitBreaker: true,
+  };
+
+  // Delegate to existing routing logic (circuit breaker, budget, fallbacks)
+  return routeRequest(
+    { ...request, preferredModel: selectedModel },
+    strategy,
+  );
+}
+
+/**
+ * Get the recommended model for a task role without routing (no side effects).
+ */
+export function getModelForRole(
+  taskRole: TaskRole,
+  policyName?: string,
+): ModelName {
+  const policy = policyName
+    ? (MODEL_POLICIES[policyName] || MODEL_POLICIES.balanced)
+    : MODEL_POLICIES.balanced;
+  return policy.roleModels[taskRole] || policy.defaultModel;
+}
+
+/**
+ * List all available policies.
+ */
+export function listPolicies(): Array<{ name: string; key: string; policy: ModelPolicy }> {
+  return Object.entries(MODEL_POLICIES).map(([key, policy]) => ({
+    key,
+    name: policy.name,
+    policy,
+  }));
+}
+
 // ─── Analytics ──────────────────────────────────────────────────────
 
 export async function getRoutingStats(orgId: string, daysBack: number = 7): Promise<{

@@ -1,6 +1,5 @@
 [build]
   base = "SwarmApp"
-  # Build handled by GitHub Actions — Netlify OOMs on 573 routes.
-  # SwarmApp/netlify.toml has ignore = "exit 0" to skip auto-builds.
-  command = "echo 'Skipped — deployed from GitHub Actions'"
+  ignore = "exit 1"
+  command = "npm run build"
   publish = "SwarmApp/.next"

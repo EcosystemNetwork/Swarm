@@ -220,8 +220,8 @@ export const CHAIN_CONFIGS: Record<string, ChainConfig> = {
             contractUrl: (a) => `https://filfox.info/en/address/${a}`,
         },
         contracts: {},
-        enabled: false,
-        paymentEnabled: false,
+        enabled: true,
+        paymentEnabled: true,
         logo: "/chains/filecoin.svg",
     },
 

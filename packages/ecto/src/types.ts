@@ -145,3 +145,18 @@ export interface ContainerConfig {
     memoryMb: number;
     cpuShares: number;
 }
+
+// ── Vector Memory ──
+
+export interface VectorMemoryConfig {
+    /** Embedding provider: 'openai' | 'local' */
+    embeddingProvider: 'openai' | 'local';
+    /** Model name for OpenAI embeddings */
+    embeddingModel?: string;
+    /** Custom embedding API base URL */
+    embeddingBaseUrl?: string;
+    /** Vector dimensions (auto-detected from provider if not set) */
+    dimensions?: number;
+    /** Auto-ingest knowledge/ directory on startup */
+    autoIngestKnowledge?: boolean;
+}

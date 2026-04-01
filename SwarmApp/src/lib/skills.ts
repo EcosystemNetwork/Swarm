@@ -29,6 +29,8 @@ import { PAYSTREAM_MANIFEST } from "./paystream";
 import { BASE_MANIFEST } from "./base";
 import { CDP_MANIFEST } from "./cdp-manifest";
 import { TON_MANIFEST } from "./ton";
+import { FLOW_MANIFEST } from "./flow";
+import { ETH_FOUNDATION_MANIFEST } from "./eth-foundation";
 import type { TokenGateConfig } from "./token-gate";
 
 // ═══════════════════════════════════════════════════════════════
@@ -563,6 +565,48 @@ export const SKILL_REGISTRY: Skill[] = [
             iconName: "Diamond",
         },
         modManifest: TON_MANIFEST,
+    },
+    {
+        id: "flow-defi",
+        name: "Flow DeFi",
+        description:
+            "Consumer DeFi on Flow L1 — FCL wallet auth, FLOW/FT payments with policy-gated spending controls, task bounties with FLOW rewards, agent wallets (ECDSA P-256), Cadence + EVM contract deployment, staking, and Storacha-verified agent outputs. Built for PL Genesis hackathon.",
+        type: "mod",
+        source: "verified",
+        category: "Web3",
+        icon: "🌊",
+        version: "1.0.0",
+        author: "Swarm Core",
+        tags: ["flow", "cadence", "evm", "defi", "payments", "treasury", "staking", "nft", "web3", "storacha", "protocol-labs"],
+        pricing: { model: "free" },
+        sidebarConfig: {
+            sectionId: "modifications",
+            label: "Flow",
+            href: "/mods/flow",
+            iconName: "Coins",
+        },
+        modManifest: FLOW_MANIFEST,
+    },
+    {
+        id: "eth-foundation",
+        name: "Ethereum Foundation",
+        description:
+            "Community & Network public goods on Ethereum — wallet auth, ETH/ERC-20 payments with policy-gated spending controls, task bounties, agent wallets (secp256k1), Solidity contract deployment, staking, governance, and ESP-aligned public goods tracking. Built for PL Genesis hackathon.",
+        type: "mod",
+        source: "verified",
+        category: "Web3",
+        icon: "diamond",
+        version: "1.0.0",
+        author: "Swarm Core",
+        tags: ["ethereum", "eth", "solidity", "evm", "public-goods", "esp", "governance", "defi", "payments", "treasury", "staking", "nft", "web3"],
+        pricing: { model: "free" },
+        sidebarConfig: {
+            sectionId: "modifications",
+            label: "ETH Foundation",
+            href: "/mods/eth-foundation",
+            iconName: "Diamond",
+        },
+        modManifest: ETH_FOUNDATION_MANIFEST,
     },
     {
         id: "solana-web3",

@@ -19,6 +19,14 @@ import * as path from 'path';
 import { execSync } from 'child_process';
 import { WarmMemory, MemoryEntry, MemoryObserverResult } from './types';
 import { childLogger } from './logger';
+import {
+    VectorMemoryManager,
+    EmbeddingProvider,
+    VectorSearchResult,
+    HybridSearchResult,
+    createOpenAIEmbeddingProvider,
+    createLocalEmbeddingProvider,
+} from './vector-memory';
 
 const log = childLogger('memory');
 
@@ -29,11 +37,57 @@ export class MemoryManager {
     private vaultPath: string;
     private memoryPath: string;
     private userPath: string;
+    private vectorMemory: VectorMemoryManager | null = null;
 
     constructor(vaultPath: string) {
         this.vaultPath = vaultPath;
         this.memoryPath = path.join(vaultPath, 'MEMORY.md');
         this.userPath = path.join(vaultPath, 'USER.md');
+    }
+
+    // ── Vector Memory Integration ──
+
+    /**
+     * Initialize semantic vector memory with an embedding provider.
+     * Call once after construction to enable semantic search.
+     */
+    initVectorMemory(provider?: EmbeddingProvider): VectorMemoryManager {
+        if (!provider) {
+            // Auto-detect: use OpenAI if key available, else local
+            const apiKey = process.env.OPENAI_API_KEY;
+            provider = apiKey
+                ? createOpenAIEmbeddingProvider({ apiKey })
+                : createLocalEmbeddingProvider();
+        }
+        this.vectorMemory = new VectorMemoryManager(this.vaultPath, provider);
+        log.info('vector memory initialized');
+        return this.vectorMemory;
+    }
+
+    /** Get the vector memory manager (null if not initialized) */
+    getVectorMemory(): VectorMemoryManager | null {
+        return this.vectorMemory;
+    }
+
+    /**
+     * Semantic search across vault — falls back to text search if vector memory
+     * is not initialized.
+     */
+    async searchSemantic(query: string, topK = 10): Promise<HybridSearchResult[]> {
+        if (!this.vectorMemory) {
+            // Fallback to text-only search
+            const textResults = this.searchDeep(query, topK);
+            return textResults.map(r => ({
+                file: r.file,
+                content: r.content,
+                score: 1, // text matches are binary
+                source: 'text' as const,
+            }));
+        }
+
+        // Hybrid: combine vector + text search via RRF
+        const textResults = this.searchDeep(query, topK);
+        return this.vectorMemory.hybridSearch(query, textResults, topK);
     }
 
     // ── Warm Memory (injected into system prompt) ──
