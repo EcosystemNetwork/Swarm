@@ -193,6 +193,24 @@ export interface Agent {
   flowStakingActive?: boolean;
   /** Flow achievement badge count */
   flowAchievementCount?: number;
+  /** Ethereum wallet address (Sepolia/Mainnet) */
+  ethAddress?: string;
+  /** Ethereum ASN on-chain registration tx hash */
+  ethOnChainTxHash?: string;
+  /** Ethereum ASN on-chain registration status */
+  ethOnChainRegistered?: boolean;
+  /** ERC-8004 Agent Registry tokenId */
+  erc8004TokenId?: string;
+  /** ERC-8004 operator wallet address */
+  erc8004OperatorAddress?: string;
+  /** ERC-8004 registration tx hash */
+  erc8004RegistrationTxHash?: string;
+  /** ERC-8004 on-chain reputation score (0-100) */
+  erc8004ReputationScore?: number;
+  /** Number of ERC-8004 validation attestations received */
+  erc8004ValidationCount?: number;
+  /** Agent capability manifest CID (IPFS/Storacha) */
+  agentManifestCid?: string;
   /** Number of completed tasks (denormalized counter) */
   tasksCompleted?: number;
   /** Resolved credit policy tier (cached, updated on score change) */

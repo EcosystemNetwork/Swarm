@@ -78,12 +78,14 @@ interface GovernanceProposal {
 // Constants
 // ═══════════════════════════════════════════════════════════════
 
-type Tab = "overview" | "payments" | "bounties" | "public-goods" | "governance" | "staking" | "swap" | "bridge" | "history" | "analytics" | "agent-wallets" | "deploy" | "policy" | "audit";
+type Tab = "overview" | "payments" | "bounties" | "erc8004" | "reputation" | "public-goods" | "governance" | "staking" | "swap" | "bridge" | "history" | "analytics" | "agent-wallets" | "deploy" | "policy" | "audit";
 
 const TABS: { id: Tab; label: string; icon: LucideIcon }[] = [
     { id: "overview",       label: "Overview",        icon: LayoutDashboard },
     { id: "payments",       label: "Payments",        icon: Send },
     { id: "bounties",       label: "Bounties",        icon: Trophy },
+    { id: "erc8004",        label: "ERC-8004",        icon: Fingerprint },
+    { id: "reputation",     label: "Reputation",      icon: ShieldCheck },
     { id: "public-goods",   label: "Public Goods",    icon: Heart },
     { id: "governance",     label: "Governance",      icon: Vote },
     { id: "staking",        label: "Staking",         icon: TrendingUp },
@@ -634,7 +636,7 @@ export default function EthFoundationModPage() {
                                 <div key={pg.id} className="rounded-lg border border-border p-4 bg-card space-y-2">
                                     <div className="flex items-center justify-between">
                                         <span className="text-[10px] font-medium bg-violet-500/10 text-violet-400 px-1.5 py-0.5 rounded">{pg.type}</span>
-                                        <span className="text-[10px] text-muted-foreground">{fmtDate(pg.createdAt)}</span>
+                                        <span className="text-[10px] text-muted-foreground">{fmtDate(pg.createdAt as Date | null)}</span>
                                     </div>
                                     <p className="text-sm font-medium">{pg.description}</p>
                                     {pg.repo && (
@@ -680,8 +682,8 @@ export default function EthFoundationModPage() {
                                             </div>
                                         </div>
                                         <div className="flex items-center justify-between text-[10px] text-muted-foreground">
-                                            <span>Created: {fmtDate(p.createdAt)}</span>
-                                            <span>Ends: {fmtDate(p.endsAt)}</span>
+                                            <span>Created: {fmtDate(p.createdAt as Date | null)}</span>
+                                            <span>Ends: {fmtDate(p.endsAt as Date | null)}</span>
                                         </div>
                                     </div>
                                 );
@@ -840,7 +842,7 @@ export default function EthFoundationModPage() {
                                             {w.ensName && <span className="text-xs text-indigo-400 ml-1">{w.ensName}</span>}
                                         </div>
                                     </div>
-                                    <p className="text-[10px] text-muted-foreground">{fmtDate(w.createdAt)}</p>
+                                    <p className="text-[10px] text-muted-foreground">{fmtDate(w.createdAt as Date | null)}</p>
                                 </div>
                             ))}
                         </div>
@@ -893,6 +895,118 @@ export default function EthFoundationModPage() {
                                 <span className="text-xs text-yellow-400 flex items-center gap-1"><AlertTriangle className="h-3 w-3" />All payments require approval</span>
                             )}
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {activeTab === "erc8004" && (
+                <div className="space-y-4">
+                    <div className="flex items-center gap-2">
+                        <Fingerprint className="h-5 w-5 text-violet-400" />
+                        <h3 className="text-sm font-semibold">ERC-8004 Agent Identity & Trust</h3>
+                    </div>
+
+                    {/* Explainer */}
+                    <div className="rounded-lg border border-border bg-card p-4 text-xs text-muted-foreground space-y-2">
+                        <p>ERC-8004 (EIP-8004) provides three on-chain registries for autonomous agent identity:</p>
+                        <ul className="list-disc list-inside space-y-1">
+                            <li><strong className="text-foreground">Agent Registry</strong> — ERC-721 identity tokens with operator wallets and metadata URIs</li>
+                            <li><strong className="text-foreground">Reputation Registry</strong> — Composable on-chain trust scores from task completions and peer reviews</li>
+                            <li><strong className="text-foreground">Validation Registry</strong> — Third-party attestations of agent capabilities and certifications</li>
+                        </ul>
+                    </div>
+
+                    {/* Identity Card */}
+                    <div className="rounded-lg border border-violet-500/20 bg-violet-500/5 p-4 space-y-3">
+                        <h4 className="text-xs font-semibold flex items-center gap-2"><Fingerprint className="h-3.5 w-3.5 text-violet-400" />Agent Identity</h4>
+                        <div className="rounded-md border border-dashed border-border p-6 text-center space-y-2">
+                            <p className="text-xs text-muted-foreground">No ERC-8004 identity registered yet. Register your agent to enable trust-gated transactions.</p>
+                            <Button size="sm" variant="outline"><Fingerprint className="h-3.5 w-3.5 mr-1.5" />Register Agent (ERC-8004)</Button>
+                        </div>
+                    </div>
+
+                    {/* On-Chain Reputation */}
+                    <div className="rounded-lg border border-border bg-card p-4 space-y-3">
+                        <h4 className="text-xs font-semibold flex items-center gap-2"><ShieldCheck className="h-3.5 w-3.5 text-yellow-400" />On-Chain Reputation</h4>
+                        <div className="grid grid-cols-4 gap-3">
+                            {[
+                                { label: "Score", value: "—", sub: "/100" },
+                                { label: "Tasks", value: "0" },
+                                { label: "Successes", value: "0" },
+                                { label: "Disputes", value: "0" },
+                            ].map((s) => (
+                                <div key={s.label} className="rounded-lg border border-border p-3">
+                                    <p className="text-[10px] text-muted-foreground">{s.label}</p>
+                                    <p className="text-lg font-bold">{s.value}{s.sub && <span className="text-xs text-muted-foreground font-normal">{s.sub}</span>}</p>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Validation Attestations */}
+                    <div className="rounded-lg border border-border bg-card p-4 space-y-3">
+                        <h4 className="text-xs font-semibold flex items-center gap-2"><ShieldCheck className="h-3.5 w-3.5 text-green-400" />Validation Attestations</h4>
+                        <EmptyState label="No capability validations yet — validators attest to agent skills and certifications" />
+                    </div>
+
+                    {/* DevSpot Manifest */}
+                    <div className="rounded-lg border border-border bg-card p-4 space-y-3">
+                        <h4 className="text-xs font-semibold flex items-center gap-2"><FileText className="h-3.5 w-3.5 text-blue-400" />Agent Manifest (agent.json)</h4>
+                        <div className="rounded-md bg-muted/50 p-3 font-mono text-[10px] whitespace-pre overflow-x-auto">{`{
+  "name": "...",
+  "operatorWallet": "0x...",
+  "erc8004TokenId": null,
+  "supportedTools": ["code_gen", "github", "blockchain_tx"],
+  "taskCategories": ["defi", "public-goods", "governance"],
+  "computeConstraints": { "maxCostUsd": 5.0 }
+}`}</div>
+                    </div>
+
+                    {/* Bounty Tracks */}
+                    <div className="rounded-lg border border-border bg-card p-4 space-y-3">
+                        <h4 className="text-xs font-semibold">Hackathon Bounty Tracks</h4>
+                        <div className="grid grid-cols-2 gap-3">
+                            <div className="rounded-md border border-violet-500/20 bg-violet-500/5 p-3">
+                                <p className="text-xs font-semibold text-violet-400 mb-1">Agent Only: Let the Agent Cook</p>
+                                <p className="text-[10px] text-muted-foreground">$4,000 — Fully autonomous agents that discover, plan, execute, and submit without human intervention. ERC-8004 identity required.</p>
+                            </div>
+                            <div className="rounded-md border border-blue-500/20 bg-blue-500/5 p-3">
+                                <p className="text-xs font-semibold text-blue-400 mb-1">Agents With Receipts — ERC-8004</p>
+                                <p className="text-[10px] text-muted-foreground">$4,004 — Agent systems leveraging ERC-8004 identity, reputation, and validation registries for verifiable trust.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {activeTab === "reputation" && (
+                <div className="space-y-4">
+                    <h3 className="text-sm font-semibold flex items-center gap-2"><ShieldCheck className="h-4 w-4 text-yellow-400" />Reputation & Trust</h3>
+                    <div className="grid grid-cols-3 gap-3">
+                        {[
+                            { label: "Credit Score", value: "680", sub: "300-900", color: "text-indigo-400" },
+                            { label: "Trust Score", value: "50/100", color: "text-yellow-400" },
+                            { label: "Tier", value: "Bronze", sub: "→ Silver → Gold → Platinum → Diamond", color: "text-amber-400" },
+                        ].map((s) => (
+                            <div key={s.label} className="rounded-lg border border-border p-4 bg-card">
+                                <p className="text-xs text-muted-foreground">{s.label}</p>
+                                <p className={cn("text-xl font-bold mt-0.5", s.color)}>{s.value}</p>
+                                {s.sub && <p className="text-[10px] text-muted-foreground mt-1">{s.sub}</p>}
+                            </div>
+                        ))}
+                    </div>
+                    <div className="rounded-lg border border-border bg-card p-4 text-xs text-muted-foreground space-y-2">
+                        <p>Reputation scores update based on:</p>
+                        <ul className="list-disc list-inside space-y-1">
+                            <li>ETH payments sent/received (+credit)</li>
+                            <li>Bounties completed (+credit, +trust)</li>
+                            <li>Public goods contributions (+credit, +trust)</li>
+                            <li>Governance votes (+trust)</li>
+                            <li>ERC-8004 validations received (+trust)</li>
+                            <li>Trust-gated delegations completed (+trust)</li>
+                            <li>Autonomous executions completed (+credit, +trust)</li>
+                            <li>Disputes or timeouts (-credit, -trust)</li>
+                        </ul>
                     </div>
                 </div>
             )}
