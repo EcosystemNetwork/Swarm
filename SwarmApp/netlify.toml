@@ -1,7 +1,5 @@
 [build]
-  # Netlify auto-builds are skipped (ignore = exit 0).
-  # Builds run in GitHub Actions via: netlify-cli deploy --prod --build
-  ignore = "exit 0"
+  ignore = "exit 1"
   command = "npm run build"
   publish = ".next"
 
