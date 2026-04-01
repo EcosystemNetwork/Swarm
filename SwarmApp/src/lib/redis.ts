@@ -1,7 +1,7 @@
 /**
  * Upstash Redis client singleton.
  *
- * Connectionless HTTP-based client — works in serverless (Netlify, Vercel,
+ * Connectionless HTTP-based client — works in serverless (Netlify,
  * Cloudflare Workers) without persistent TCP connections.
  *
  * Env:

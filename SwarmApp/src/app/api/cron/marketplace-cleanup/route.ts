@@ -7,7 +7,7 @@
  * 3. Tier recalculation: auto-upgrade publisher tiers
  *
  * Auth: Platform admin or internal service secret
- * Trigger: Vercel cron (daily) or manual
+ * Trigger: Netlify cron (daily) or manual
  */
 import { NextRequest } from "next/server";
 import { getDocs, query, collection, where, updateDoc, doc, Timestamp } from "firebase/firestore";

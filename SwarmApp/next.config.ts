@@ -5,7 +5,7 @@ const nextConfig: NextConfig = {
   // where the bundler wraps Map/Set in module namespaces that SES can corrupt).
   transpilePackages: ["@xyflow/react", "@xyflow/system"],
   // Keep heavy packages out of the serverless function bundle.
-  // Netlify/Vercel will resolve them from node_modules at runtime,
+  // Netlify will resolve them from node_modules at runtime,
   // preventing cold-start timeouts and 502s from oversized bundles.
   serverExternalPackages: [
     "ethers",

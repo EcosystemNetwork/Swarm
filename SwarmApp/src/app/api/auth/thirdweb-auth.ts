@@ -7,7 +7,7 @@
  *
  * Client and auth instances are created lazily on first use so that
  * missing env vars don't crash the serverless function at import time
- * (which produces an opaque 502 on Netlify/Vercel).
+ * (which produces an opaque 502 on Netlify).
  *
  * The ConnectButton `auth` prop on the client wires into these endpoints:
  *   - getLoginPayload  → POST /api/auth/payload
