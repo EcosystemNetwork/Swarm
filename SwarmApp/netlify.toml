@@ -1,10 +1,10 @@
 [build]
   ignore = "exit 1"
-  command = "npm run build"
+  command = "node --max-old-space-size=3072 node_modules/.bin/next build"
   publish = ".next"
 
 [build.environment]
-  NODE_OPTIONS = "--max-old-space-size=4096"
+  NODE_OPTIONS = "--max-old-space-size=3072"
   SECRETS_SCAN_SMART_DETECTION_ENABLED = "false"
 
 # ── Security headers ──

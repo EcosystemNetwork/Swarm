@@ -22,6 +22,10 @@ const nextConfig: NextConfig = {
   },
   // Disable source maps in production to reduce memory during build.
   productionBrowserSourceMaps: false,
+  // Skip ESLint during build to reduce memory on Netlify.
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
 };
 
 export default nextConfig;
