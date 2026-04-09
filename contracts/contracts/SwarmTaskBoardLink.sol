@@ -40,6 +40,8 @@ contract SwarmTaskBoardLink is Ownable {
     event DeliverySubmitted(uint256 indexed taskId, address indexed agent, bytes32 deliveryHash, uint256 timestamp);
     event DeliveryApproved(uint256 indexed taskId, address indexed agent, uint256 payout, uint256 timestamp);
     event DeliveryDisputed(uint256 indexed taskId, address indexed poster, uint256 timestamp);
+    event TaskCancelled(uint256 indexed taskId, address indexed poster, uint256 refund, uint256 timestamp);
+    event DisputeResolved(uint256 indexed taskId, address indexed recipient, uint256 payout, bool refundedPoster, uint256 timestamp);
 
     constructor(address _linkToken) Ownable(msg.sender) {
         require(_linkToken != address(0), "Invalid LINK address");
@@ -134,6 +136,46 @@ contract SwarmTaskBoardLink is Ownable {
         task.status = uint8(TaskStatus.Disputed);
 
         emit DeliveryDisputed(taskId, msg.sender, block.timestamp);
+    }
+
+    /**
+     * @notice Cancel an open task and refund the poster.
+     *         Any user may cancel a task once the deadline has passed;
+     *         the poster may cancel at any time before the task is claimed.
+     * @param taskId The task to cancel
+     */
+    function cancelTask(uint256 taskId) external {
+        require(taskId < tasks.length, "Invalid task");
+        Task storage task = tasks[taskId];
+        require(task.status == uint8(TaskStatus.Open), "Task is not open");
+        require(
+            task.poster == msg.sender || task.deadline <= block.timestamp,
+            "Only poster can cancel before deadline"
+        );
+
+        task.status = uint8(TaskStatus.Expired);
+        linkToken.safeTransfer(task.poster, task.budget);
+
+        emit TaskCancelled(taskId, task.poster, task.budget, block.timestamp);
+    }
+
+    /**
+     * @notice Resolve a disputed task (admin only).
+     *         Sends the escrowed budget to either the poster (refund) or the
+     *         agent (pay out), and marks the task Completed.
+     * @param taskId      The disputed task to resolve
+     * @param refundPoster True to refund the poster; false to pay the agent
+     */
+    function resolveDispute(uint256 taskId, bool refundPoster) external onlyOwner {
+        require(taskId < tasks.length, "Invalid task");
+        Task storage task = tasks[taskId];
+        require(task.status == uint8(TaskStatus.Disputed), "Task not disputed");
+
+        task.status = uint8(TaskStatus.Completed);
+        address recipient = refundPoster ? task.poster : task.claimedBy;
+        linkToken.safeTransfer(recipient, task.budget);
+
+        emit DisputeResolved(taskId, recipient, task.budget, refundPoster, block.timestamp);
     }
 
     function getTask(uint256 taskId) external view returns (Task memory) {

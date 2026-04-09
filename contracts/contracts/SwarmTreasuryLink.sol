@@ -73,8 +73,21 @@ contract SwarmTreasuryLink is Ownable {
 
     function withdraw(address to, uint256 amount) external onlyOwner {
         require(to != address(0), "Invalid address");
-        uint256 contractBalance = linkToken.balanceOf(address(this));
-        require(amount <= contractBalance, "Insufficient balance");
+        require(linkToken.balanceOf(address(this)) >= amount, "Insufficient balance");
+
+        // Deduct withdrawn amount from the allocated buckets proportionally so
+        // that getPnL() continues to reflect actual holdings after a withdrawal.
+        uint256 allocated = computeBalance + growthBalance + reserveBalance;
+        if (allocated > 0 && amount <= allocated) {
+            uint256 computeDeduct = (amount * computeBalance) / allocated;
+            uint256 growthDeduct  = (amount * growthBalance)  / allocated;
+            // Reserve bucket absorbs any rounding remainder to prevent underflow.
+            uint256 reserveDeduct = amount - computeDeduct - growthDeduct;
+
+            computeBalance -= computeDeduct;
+            growthBalance  -= growthDeduct;
+            reserveBalance -= reserveDeduct;
+        }
 
         linkToken.safeTransfer(to, amount);
 

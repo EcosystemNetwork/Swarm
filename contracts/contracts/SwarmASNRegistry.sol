@@ -136,6 +136,11 @@ contract SwarmASNRegistry is Ownable {
         return allASNs.length;
     }
 
+    /// @notice Alias for totalRecords() — used by smoke checks and external tooling.
+    function asnCount() external view returns (uint256) {
+        return allASNs.length;
+    }
+
     function getAllRecords() external view returns (ASNRecord[] memory) {
         ASNRecord[] memory result = new ASNRecord[](allASNs.length);
         for (uint256 i = 0; i < allASNs.length; i++) {
