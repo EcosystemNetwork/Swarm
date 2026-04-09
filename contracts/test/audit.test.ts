@@ -99,7 +99,31 @@ describe("SwarmTreasuryLink — withdraw updates bucket balances", () => {
     );
   });
 
-  it("reverts when withdrawing more than the token balance", async () => {
+  it("drains all buckets when withdrawal exceeds tracked allocation", async () => {
+    const [owner] = await ethers.getSigners();
+    const { link, treasury } = await deployTreasury(owner);
+    const treasuryAddr = await treasury.getAddress();
+
+    // Deposit 100 LINK through the normal path (tracked in buckets)
+    const depositAmount = ethers.parseEther("100");
+    await link.approve(treasuryAddr, depositAmount);
+    await treasury.depositRevenue(depositAmount);
+
+    // Send extra 100 LINK directly — NOT tracked in buckets
+    await link.transfer(treasuryAddr, ethers.parseEther("100"));
+
+    // Withdraw the full 200 LINK (more than the 100 LINK tracked in buckets)
+    await treasury.withdraw(owner.address, ethers.parseEther("200"));
+
+    const [, computeAfter, growthAfter, reserveAfter] = await treasury.getPnL();
+
+    // All buckets must be zeroed — no inflated figures
+    expect(computeAfter).to.equal(0n);
+    expect(growthAfter).to.equal(0n);
+    expect(reserveAfter).to.equal(0n);
+  });
+
+
     const [owner] = await ethers.getSigners();
     const { link, treasury } = await deployTreasury(owner);
     const treasuryAddr = await treasury.getAddress();

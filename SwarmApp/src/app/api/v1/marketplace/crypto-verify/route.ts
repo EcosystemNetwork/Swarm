@@ -212,7 +212,7 @@ async function verifyEvmTx(
 
 export async function POST(req: NextRequest) {
     // Rate limit by IP to prevent abuse and excessive RPC/mirror-node calls.
-    const ip = req.headers.get("x-forwarded-for") || "unknown";
+    const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
     const limited = await rateLimit(`crypto-verify:${ip}`);
     if (limited) return limited;
 

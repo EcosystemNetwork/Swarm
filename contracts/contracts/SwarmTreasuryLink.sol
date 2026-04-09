@@ -77,12 +77,16 @@ contract SwarmTreasuryLink is Ownable {
 
         // Deduct withdrawn amount from the allocated buckets proportionally so
         // that getPnL() continues to reflect actual holdings after a withdrawal.
+        // If the withdrawal amount exceeds tracked allocations (e.g. tokens were
+        // sent directly to the contract), drain all buckets to prevent them from
+        // reporting inflated figures.
         uint256 allocated = computeBalance + growthBalance + reserveBalance;
-        if (allocated > 0 && amount <= allocated) {
-            uint256 computeDeduct = (amount * computeBalance) / allocated;
-            uint256 growthDeduct  = (amount * growthBalance)  / allocated;
+        if (allocated > 0) {
+            uint256 deductAmount = amount < allocated ? amount : allocated;
+            uint256 computeDeduct = (deductAmount * computeBalance) / allocated;
+            uint256 growthDeduct  = (deductAmount * growthBalance)  / allocated;
             // Reserve bucket absorbs any rounding remainder to prevent underflow.
-            uint256 reserveDeduct = amount - computeDeduct - growthDeduct;
+            uint256 reserveDeduct = deductAmount - computeDeduct - growthDeduct;
 
             computeBalance -= computeDeduct;
             growthBalance  -= growthDeduct;
