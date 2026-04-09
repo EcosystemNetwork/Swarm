@@ -16,6 +16,7 @@ import { db } from "@/lib/firebase";
 import { subscribeToItem, type SubscriptionPlan } from "@/lib/skills";
 import { getMarketplaceSettings } from "@/lib/marketplace-settings";
 import { CHAIN_CONFIGS } from "@/lib/chains";
+import { rateLimit } from "@/app/api/v1/rate-limit";
 
 const CRYPTO_PAYMENTS_COLLECTION = "cryptoPayments";
 const EVM_CHAINS = new Set(["ethereum", "avalanche", "base", "sepolia", "filecoin"]);
@@ -210,6 +211,11 @@ async function verifyEvmTx(
 // ═══════════════════════════════════════════════════════════════
 
 export async function POST(req: NextRequest) {
+    // Rate limit by IP to prevent abuse and excessive RPC/mirror-node calls.
+    const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+    const limited = await rateLimit(`crypto-verify:${ip}`);
+    if (limited) return limited;
+
     const wallet = req.headers.get("x-wallet-address")?.toLowerCase();
     if (!wallet) {
         return NextResponse.json({ error: "Authentication required" }, { status: 401 });
@@ -231,6 +237,11 @@ export async function POST(req: NextRequest) {
     }
 
     const payment = paymentSnap.data();
+
+    // Ensure the caller owns this payment intent to prevent cross-user interference.
+    if (payment.wallet?.toLowerCase() !== wallet) {
+        return NextResponse.json({ error: "Payment intent does not belong to you" }, { status: 403 });
+    }
 
     if (payment.status === "verified") {
         return NextResponse.json({ ok: true, verified: true, alreadyVerified: true });

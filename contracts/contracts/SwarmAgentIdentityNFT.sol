@@ -148,6 +148,9 @@ contract SwarmAgentIdentityNFT is ERC721, Ownable {
         require(agents.length == trustScores.length, "Array length mismatch");
 
         for (uint256 i = 0; i < agents.length; i++) {
+            require(creditScores[i] >= 300 && creditScores[i] <= 900, "Invalid credit score");
+            require(trustScores[i] <= 100, "Invalid trust score");
+
             uint256 tokenId = agentToTokenId[agents[i]];
             if (tokenId != 0) {
                 AgentIdentity storage identity = agentIdentities[tokenId];
@@ -253,8 +256,9 @@ contract SwarmAgentIdentityNFT is ERC721, Ownable {
             return super._update(to, tokenId, auth);
         }
 
-        // Allow admin burns/recovery (to == address(0) or owner is calling)
-        if (to == address(0) || auth == owner()) {
+        // Allow admin burns/recovery: burning (to == address(0)) or the contract
+        // owner is the transaction sender (covers emergencyTransfer calls).
+        if (to == address(0) || msg.sender == owner()) {
             return super._update(to, tokenId, auth);
         }
 
