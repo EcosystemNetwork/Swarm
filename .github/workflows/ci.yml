@@ -5,6 +5,7 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  workflow_dispatch:
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -102,6 +103,10 @@ jobs:
       NEXT_PUBLIC_HEDERA_TASK_BOARD: ${{ secrets.NEXT_PUBLIC_HEDERA_TASK_BOARD }}
       NEXT_PUBLIC_HEDERA_AGENT_NFT: ${{ secrets.NEXT_PUBLIC_HEDERA_AGENT_NFT }}
       NEXT_PUBLIC_HEDERA_MOCK_LINK: ${{ secrets.NEXT_PUBLIC_HEDERA_MOCK_LINK }}
+      NEXT_PUBLIC_LINK_TREASURY: ${{ secrets.NEXT_PUBLIC_LINK_TREASURY }}
+      NEXT_PUBLIC_LINK_AGENT_REGISTRY: ${{ secrets.NEXT_PUBLIC_LINK_AGENT_REGISTRY }}
+      NEXT_PUBLIC_LINK_ASN_REGISTRY: ${{ secrets.NEXT_PUBLIC_LINK_ASN_REGISTRY }}
+      NEXT_PUBLIC_LINK_TASK_BOARD: ${{ secrets.NEXT_PUBLIC_LINK_TASK_BOARD }}
       NEXT_PUBLIC_GITHUB_APP_SLUG: ${{ secrets.NEXT_PUBLIC_GITHUB_APP_SLUG }}
       NEXT_PUBLIC_SUPER_ADMINS: ${{ secrets.NEXT_PUBLIC_SUPER_ADMINS }}
       NEXT_PUBLIC_OPENCLAW_WORKSPACE: ${{ secrets.NEXT_PUBLIC_OPENCLAW_WORKSPACE }}
@@ -115,8 +120,9 @@ jobs:
           cache: npm
           cache-dependency-path: SwarmApp/package-lock.json
       - run: npm ci
-      - name: Build and Deploy to Netlify
-        run: npx netlify-cli deploy --prod --build --site=${{ secrets.NETLIFY_SITE_ID }} --auth=${{ secrets.NETLIFY_AUTH_TOKEN }}
+      - run: npm run build
+      - name: Deploy to Netlify
+        run: npx netlify-cli deploy --prod --dir=.next --site=${{ secrets.NETLIFY_SITE_ID }} --auth=${{ secrets.NETLIFY_AUTH_TOKEN }}
 
 # ─── Hub jobs ──────────────────────────────────────────────────────────────────
 
@@ -189,9 +195,9 @@ jobs:
     steps:
       - name: All checks passed
         run: |
-          echo "✓ SwarmApp: lint, typecheck, test, build"
+          echo "✓ SwarmApp: lint, test, build"
           echo "✓ Hub: unit tests"
-          echo "✓ Contracts: compile + test"
+          echo "✓ Deploy: Netlify"
           echo "SHA: ${{ github.sha }}"
           echo "Ref: ${{ github.ref }}"
           echo "This commit is release-safe for staging/testnet deployment."
